@@ -1,8 +1,10 @@
 # 四川麻将 · 血战到底
 
+[![CI](https://github.com/gangzhao2021/Mahjong/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gangzhao2021/Mahjong/actions/workflows/ci.yml)
+
 1 名真人 + 3 个 AI 的休闲麻将手游。需求见 [PRD](Mahjong%20Mobile%20Game%20V1%20PRD%20and%20Development%20Prompt.md)。
 
-当前进度：**第 1–5 阶段**（核心原型、AI 性格与对话、账号与经济系统、AI 长期记忆、管理后台）。
+当前进度：**第 1–6 阶段全部完成**（核心原型、AI 性格与对话、账号与经济系统、AI 长期记忆、管理后台、上线前打磨），另有牌局重启恢复和英文界面。
 
 ## 目录结构
 
