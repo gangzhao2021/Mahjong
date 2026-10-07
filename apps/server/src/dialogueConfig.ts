@@ -68,12 +68,7 @@ export function loadDialogueConfig(region: Region = (process.env.REGION as Regio
     quickPhrases?: QuickPhrase[];
   }>('dialogue.json');
 
-  const settings = { ...file.settings };
-  if (region === 'china') {
-    // Appendix D.4: toned-down banter in the China build.
-    settings.trashTalkIntensity = Math.min(settings.trashTalkIntensity, 0.4);
-    settings.sarcasmIntensity = Math.min(settings.sarcasmIntensity, 0.4);
-  }
+  const settings = regionalSettings(file.settings, region);
   return {
     region,
     roster,
@@ -84,6 +79,16 @@ export function loadDialogueConfig(region: Region = (process.env.REGION as Regio
     defaultBanter: region === 'china' ? 'mild' : 'spicy',
     llm: file.llm,
     blocklist: [...DEFAULT_BLOCKLIST, ...file.extraBlocklist],
+  };
+}
+
+/** Appendix D.4: toned-down banter in the China build, whatever the admin sets. */
+export function regionalSettings(settings: DialogueSettings, region: Region): DialogueSettings {
+  if (region !== 'china') return { ...settings };
+  return {
+    ...settings,
+    trashTalkIntensity: Math.min(settings.trashTalkIntensity, 0.4),
+    sarcasmIntensity: Math.min(settings.sarcasmIntensity, 0.4),
   };
 }
 

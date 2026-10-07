@@ -27,12 +27,38 @@ const CONFIG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 
 export function loadEconomyConfig(): EconomyConfig {
   const config = JSON.parse(readFileSync(path.join(CONFIG_DIR, 'economy.json'), 'utf8')) as EconomyConfig;
-  const problems: string[] = [];
-  if (!config.loginRewards.length) problems.push('loginRewards must not be empty');
-  if (!config.tables.some((t) => t.baseScore === 0 && t.minCoins === 0)) problems.push('a practice table (base 0, min 0) is required (PRD §11)');
-  if (new Set(config.tables.map((t) => t.id)).size !== config.tables.length) problems.push('duplicate table ids');
+  const problems = validateEconomy(config);
   if (problems.length) throw new Error(`Invalid economy config: ${problems.join('; ')}`);
   return config;
+}
+
+const isCount = (n: unknown) => Number.isInteger(n) && (n as number) >= 0;
+
+/** Problems with an economy config (empty = valid). Used for the file and for admin edits. */
+export function validateEconomy(c: EconomyConfig): string[] {
+  const problems: string[] = [];
+  if (!isCount(c.startingCoins)) problems.push('startingCoins must be a non-negative integer');
+  if (!Array.isArray(c.loginRewards) || !c.loginRewards.length || !c.loginRewards.every(isCount)) {
+    problems.push('loginRewards must be a non-empty list of non-negative integers');
+  }
+  if (!Number.isInteger(c.rewardResetHour) || c.rewardResetHour < 0 || c.rewardResetHour > 23) problems.push('rewardResetHour must be 0–23');
+  if (!Number.isInteger(c.rewardUtcOffsetHours) || Math.abs(c.rewardUtcOffsetHours) > 14) problems.push('rewardUtcOffsetHours must be -14–14');
+  if (!Array.isArray(c.tables) || !c.tables.length) problems.push('at least one table is required');
+  else {
+    for (const t of c.tables) {
+      if (typeof t.id !== 'string' || !/^[a-z0-9_-]{1,20}$/.test(t.id)) problems.push(`table id "${t.id}" must be 1–20 lowercase letters, digits, - or _`);
+      if (typeof t.name !== 'string' || !t.name.trim()) problems.push(`table ${t.id}: name is required`);
+      if (!isCount(t.baseScore) || !isCount(t.minCoins)) problems.push(`table ${t.id}: baseScore and minCoins must be non-negative integers`);
+      if (!(typeof t.multiplier === 'number' && t.multiplier >= 0 && t.multiplier <= 100)) problems.push(`table ${t.id}: multiplier must be 0–100`);
+    }
+    if (!c.tables.some((t) => t.baseScore === 0 && t.minCoins === 0)) problems.push('a practice table (base 0, min 0) is required (PRD §11)');
+    if (new Set(c.tables.map((t) => t.id)).size !== c.tables.length) problems.push('duplicate table ids');
+  }
+  const p = c.privateRoom;
+  if (!p || !(p.maxBaseRatio >= 0 && p.maxBaseRatio <= 1) || !isCount(p.maxBase) || !Number.isInteger(p.maxHands) || p.maxHands < 1 || p.maxHands > 16) {
+    problems.push('privateRoom: maxBaseRatio 0–1, maxBase ≥ 0, maxHands 1–16');
+  }
+  return problems;
 }
 
 /**

@@ -4,7 +4,7 @@
  * chat-completions endpoint (e.g. Qwen via DashScope, DeepSeek, Doubao).
  */
 import type { DialogueReply, DialogueRequest } from '@mahjong/dialogue';
-import { MemorySummarySchema, ReplySchema, type LlmProvider, type MemorySummaryReply, type MemorySummaryRequest } from './provider';
+import { MemorySummarySchema, ReplySchema, type LlmProvider, type LlmSettings, type MemorySummaryReply, type MemorySummaryRequest } from './provider';
 
 export interface OpenAiCompatibleOptions {
   baseUrl: string;
@@ -20,7 +20,11 @@ const JSON_INSTRUCTION =
 export class OpenAiCompatibleLlm implements LlmProvider {
   readonly name = 'openai-compatible';
 
-  constructor(private readonly options: OpenAiCompatibleOptions) {}
+  constructor(private options: OpenAiCompatibleOptions) {}
+
+  configure(settings: LlmSettings): void {
+    this.options = { ...this.options, routineModel: settings.routineModel, highValueModel: settings.highValueModel };
+  }
 
   async generate(request: DialogueRequest): Promise<DialogueReply | null> {
     const o = this.options;

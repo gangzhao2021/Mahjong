@@ -41,6 +41,8 @@ export class Lobby {
   private rooms = new Map<string, Room>();
   /** Play-time limit timers per player (China minors / guest trial). */
   private limitTimers = new Map<string, NodeJS.Timeout[]>();
+  /** Open sockets per player, so an admin action can disconnect them. */
+  private sockets = new Map<string, Set<WebSocket>>();
   /** Settlement work in flight (tests can await it). */
   readonly settling = new Set<Promise<void>>();
   private rng: Rng;
@@ -70,6 +72,7 @@ export class Lobby {
 
   handleConnection(socket: WebSocket): void {
     let player: PlayerRow | null = null;
+    let sessionId: Promise<number | null> | null = null;
     const send = (m: ServerMessage) => {
       if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
     };
@@ -90,6 +93,13 @@ export class Lobby {
           if (msg.protocol !== PROTOCOL_VERSION) return fail('protocolMismatch', `Server speaks protocol ${PROTOCOL_VERSION}`);
           player = await this.s.accounts.authenticate(msg.token);
           if (!player) return fail('unauthorized', 'Invalid or expired session');
+          if (!this.sockets.has(player.id)) this.sockets.set(player.id, new Set());
+          this.sockets.get(player.id)!.add(socket);
+          // Play session for analytics (DAU, session length — PRD §33).
+          sessionId ??= this.s.db
+            .query<{ id: string }>('INSERT INTO play_sessions (player_id, started_at) VALUES ($1, $2) RETURNING id', [player.id, this.s.now()])
+            .then((r) => Number(r[0].id))
+            .catch(() => null);
           const room = this.rooms.get(player.id);
           send({
             type: 'welcome',
@@ -112,7 +122,12 @@ export class Lobby {
     });
 
     socket.on('close', () => {
-      if (player) this.rooms.get(player.id)?.detach(socket);
+      if (!player) return;
+      this.rooms.get(player.id)?.detach(socket);
+      this.sockets.get(player.id)?.delete(socket);
+      void sessionId?.then(async (id) => {
+        if (id !== null) await this.s.db.query('UPDATE play_sessions SET ended_at = $2 WHERE id = $1', [id, this.s.now()]).catch(() => undefined);
+      });
     });
   }
 
@@ -179,6 +194,12 @@ export class Lobby {
         const verdict = await this.deps.moderator.check(text, 'playerChat');
         if (!verdict.allowed) {
           this.chatGuard.violation(player.id);
+          await this.s.db.query("INSERT INTO moderation_events (kind, player_id, text, reason, game_id) VALUES ('blockedPlayerMessage', $1, $2, $3, $4)", [
+            player.id,
+            text,
+            verdict.reason ?? null,
+            room.id,
+          ]);
           return send({ type: 'chatRejected', reason: this.chatGuard.isSuspended(player.id) ? 'suspended' : 'blocked' });
         }
         room.playerChat(text, target);
@@ -199,9 +220,32 @@ export class Lobby {
         room.sticker(msg.id);
         return;
       }
+      case 'reportLine': {
+        const entry = room?.chatEntry(Number(msg.entryId));
+        if (!room || !entry || entry.kind !== 'ai' || !entry.text) return;
+        const characterId = room.aiSeats.find((a) => a.seat === entry.seat)?.characterId ?? null;
+        await this.s.db.query("INSERT INTO moderation_events (kind, player_id, character_id, text, game_id) VALUES ('reportedAiLine', $1, $2, $3, $4)", [
+          player.id,
+          characterId,
+          entry.text,
+          room.id,
+        ]);
+        send({ type: 'lineReported', entryId: entry.id });
+        return;
+      }
       default:
         fail('badMessage', 'Unknown message type');
     }
+  }
+
+  /** Takes a player out of any game and disconnects them (suspension). */
+  kick(playerId: string): void {
+    this.rooms.get(playerId)?.close();
+    for (const socket of this.sockets.get(playerId) ?? []) {
+      if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ type: 'error', code: 'unauthorized', message: 'Session ended' } satisfies ServerMessage));
+      socket.close();
+    }
+    this.sockets.delete(playerId);
   }
 
   private async createRoom(player: PlayerRow, plan: GamePlan, socket: WebSocket): Promise<Room> {

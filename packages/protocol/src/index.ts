@@ -190,7 +190,9 @@ export type ClientMessage =
   | { type: 'chat'; text: string; target?: Seat | 'table' }
   | { type: 'quickPhrase'; id: string }
   | { type: 'sticker'; id: StickerId }
-  | { type: 'setBanter'; level: BanterLevel };
+  | { type: 'setBanter'; level: BanterLevel }
+  /** Report an AI line as inappropriate (Appendix C). */
+  | { type: 'reportLine'; entryId: number };
 
 export type ServerMessage =
   | { type: 'welcome'; playerId: string; inGame: boolean; banterLevel: BanterLevel; catalog: ChatCatalog; account: AccountSummary }
@@ -205,6 +207,7 @@ export type ServerMessage =
   | { type: 'chat'; entry: ChatEntry }
   | { type: 'chatRejected'; reason: ChatRejection }
   | { type: 'banter'; level: BanterLevel }
+  | { type: 'lineReported'; entryId: number }
   | { type: 'error'; code: ErrorCode; message: string };
 
 export type ErrorCode = 'badMessage' | 'notInGame' | 'illegalAction' | 'protocolMismatch' | 'helloRequired' | 'unauthorized';

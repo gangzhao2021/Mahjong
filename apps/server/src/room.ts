@@ -231,6 +231,11 @@ export class Room {
     return this.coinChange;
   }
 
+  /** A recent table line by id (for reports). */
+  chatEntry(id: number) {
+    return this.talk.chatLog.find((e) => e.id === id) ?? null;
+  }
+
   /** Final game totals per seat. */
   get totals(): readonly number[] {
     return this.game.totals;

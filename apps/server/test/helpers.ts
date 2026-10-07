@@ -8,6 +8,8 @@ import { DEFAULT_CONFIG, type ServerConfig } from '../src/config';
 import { openDb } from '../src/db/db';
 import { createModerator, loadDialogueConfig, type DialogueConfig, type Region } from '../src/dialogueConfig';
 import type { EconomyConfig } from '../src/economy/config';
+import { AdminAuth, type AdminAuthConfig } from '../src/admin/auth';
+import { LiveConfig } from '../src/admin/liveConfig';
 import { buildHttp, type IdentityVerifiers } from '../src/http';
 import { NoLlm, type LlmProvider } from '../src/llm/provider';
 import { Lobby } from '../src/lobby';
@@ -40,6 +42,7 @@ export interface TestServerOptions {
   now?: () => Date;
   verifiers?: IdentityVerifiers;
   sms?: SmsSender;
+  admin?: AdminAuthConfig;
 }
 
 const servers: TestServer[] = [];
@@ -79,7 +82,12 @@ export async function startServer(config = FAST, options: TestServerOptions = {}
     services,
     seed: () => seed++ * 7919,
   });
-  const app = buildHttp(services, lobby, moderator, options.verifiers ?? FAKE_VERIFIERS);
+  const liveConfig = new LiveConfig(db, { region, economy: services.economy, dialogue, server: config, llm: options.llm ?? new NoLlm() });
+  await liveConfig.load();
+  const app = buildHttp(services, lobby, moderator, {
+    verifiers: options.verifiers ?? FAKE_VERIFIERS,
+    admin: { auth: options.admin ? new AdminAuth(db, options.admin, () => (options.now?.() ?? new Date()).getTime()) : null, config: liveConfig, secureCookies: false },
+  });
   await app.ready();
   const wss = new WebSocketServer({ server: app.server, path: '/ws' });
   wss.on('connection', (s) => lobby.handleConnection(s));

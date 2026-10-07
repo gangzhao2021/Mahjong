@@ -82,6 +82,8 @@ export const T = {
   hand: (i: number, n: number) => `第 ${i + 1} / ${n} 局`,
   swapDirection: { clockwise: '顺时针换牌', counterClockwise: '逆时针换牌', opposite: '对家换牌' },
   chat: '聊天',
+  report: '举报',
+  reported: '已举报',
   chatPlaceholder: '说点什么…',
   send: '发送',
   toTable: '整桌',

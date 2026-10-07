@@ -56,10 +56,12 @@ interface PanelProps {
   onSend(text: string, target: Seat | 'table'): void;
   onQuickPhrase(id: string): void;
   onSticker(id: StickerId): void;
+  onReport(entryId: number): void;
+  reported: number[];
   onClose(): void;
 }
 
-export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase, onSticker, onClose }: PanelProps) {
+export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase, onSticker, onReport, reported, onClose }: PanelProps) {
   const [text, setText] = useState('');
   const [target, setTarget] = useState<Seat | 'table'>('table');
   const list = useRef<FlatList<ChatEntry>>(null);
@@ -85,10 +87,21 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
         keyExtractor={(e) => String(e.id)}
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => (
-          <Text style={[styles.logLine, item.seat === mySeat && styles.mine]}>
-            <Text style={styles.logName}>{nameOf(item.seat)}</Text>
-            {item.target !== 'table' ? ` → ${nameOf(item.target)}` : ''}：{item.text ?? ''} {stickerEmoji(catalog, item.sticker)}
-          </Text>
+          <View style={styles.logRow}>
+            <Text style={[styles.logLine, item.seat === mySeat && styles.mine]}>
+              <Text style={styles.logName}>{nameOf(item.seat)}</Text>
+              {item.target !== 'table' ? ` → ${nameOf(item.target)}` : ''}：{item.text ?? ''} {stickerEmoji(catalog, item.sticker)}
+            </Text>
+            {item.kind === 'ai' && item.text ? (
+              reported.includes(item.id) ? (
+                <Text style={styles.reported}>{T.reported}</Text>
+              ) : (
+                <Pressable onPress={() => onReport(item.id)} accessibilityRole="button" accessibilityLabel={`${T.report} ${item.text}`} hitSlop={8}>
+                  <Text style={styles.report}>{T.report}</Text>
+                </Pressable>
+              )
+            ) : null}
+          </View>
         )}
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.chips}>
@@ -172,7 +185,10 @@ const styles = StyleSheet.create({
   panelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   panelTitle: { fontSize: 16, fontWeight: '800', color: '#3e2723' },
   log: { flex: 1, minHeight: 80 },
-  logLine: { color: '#37474f', fontSize: 13, paddingVertical: 2 },
+  logRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  logLine: { color: '#37474f', fontSize: 13, paddingVertical: 2, flexShrink: 1 },
+  report: { color: '#90a4ae', fontSize: 11, textDecorationLine: 'underline' },
+  reported: { color: '#90a4ae', fontSize: 11 },
   mine: { color: '#1b5e20' },
   logName: { fontWeight: '700' },
   // One horizontally scrolling row each, so the log keeps most of the height on phones.

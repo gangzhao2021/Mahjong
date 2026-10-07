@@ -3,11 +3,14 @@
   "private": true,
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p packages/engine && tsc -p packages/ai-play && tsc -p packages/dialogue && tsc -p packages/protocol && tsc -p apps/server && tsc -p apps/mobile",
+    "typecheck": "tsc -p packages/engine && tsc -p packages/ai-play && tsc -p packages/dialogue && tsc -p packages/protocol && tsc -p apps/server && tsc -p apps/mobile && tsc -p apps/admin",
     "server": "pnpm --filter @mahjong/server dev",
     "mobile": "pnpm --filter @mahjong/mobile start",
     "mobile:web": "pnpm --filter @mahjong/mobile web",
-    "lint": "pnpm --dir apps/mobile exec expo lint"
+    "lint": "pnpm --dir apps/mobile exec expo lint",
+    "admin:dev": "pnpm --filter @mahjong/admin dev",
+    "admin:build": "pnpm --filter @mahjong/admin build",
+    "admin:setup": "pnpm --filter @mahjong/server admin:setup"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

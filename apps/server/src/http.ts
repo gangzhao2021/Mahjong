@@ -3,6 +3,11 @@
  * All auth is `Authorization: Bearer <session token>`.
  */
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { registerAdminRoutes, type AdminDeps } from './admin/routes';
 import type { Moderator } from '@mahjong/dialogue';
 import { BANTER_LEVELS } from '@mahjong/dialogue';
 import type { LoginMethod } from '@mahjong/protocol';
@@ -38,10 +43,30 @@ class HttpError extends Error {
   }
 }
 
-export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, verifiers: IdentityVerifiers = defaultVerifiers(s)): FastifyInstance {
-  const app = Fastify({ bodyLimit: 16 * 1024, logger: false });
-  // Development: the web client runs on another origin. Restrict origins in production.
+export interface HttpOptions {
+  verifiers?: IdentityVerifiers;
+  /** Admin API + dashboard (PRD §28); omitted in some tests. */
+  admin?: Omit<AdminDeps, 'services' | 'lobby'>;
+  /** Trust X-Forwarded-For from the reverse proxy (needed for the admin IP allowlist). */
+  trustProxy?: boolean;
+}
+
+const ADMIN_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../admin/dist');
+
+export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, options: HttpOptions = {}): FastifyInstance {
+  const verifiers = options.verifiers ?? defaultVerifiers(s);
+  const app = Fastify({ bodyLimit: 16 * 1024, logger: false, trustProxy: options.trustProxy ?? false });
+  // The game API is called from the app / web client on other origins. Admin routes rely on a
+  // SameSite=Strict cookie and are never readable cross-origin (no credentials are allowed).
   void app.register(cors, { origin: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'] });
+
+  if (options.admin) {
+    registerAdminRoutes(app, { ...options.admin, services: s, lobby });
+    if (existsSync(ADMIN_DIST)) {
+      void app.register(fastifyStatic, { root: ADMIN_DIST, prefix: '/admin/', decorateReply: false });
+      app.get('/admin', (_req, reply) => reply.redirect('/admin/'));
+    }
+  }
 
   app.setErrorHandler((error, _req, reply) => {
     if (error instanceof HttpError) return reply.status(error.status).send({ error: error.code, ...error.extra });

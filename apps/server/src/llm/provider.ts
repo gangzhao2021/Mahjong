@@ -12,6 +12,14 @@ export interface LlmProvider {
   generate(request: DialogueRequest): Promise<DialogueReply | null>;
   /** Once per game: rewrite memory summaries and the player profile (Appendix B.2). */
   summarizeMemory?(request: MemorySummaryRequest): Promise<MemorySummaryReply | null>;
+  /** Admin changes applied at runtime (PRD §35). */
+  configure?(settings: LlmSettings): void;
+}
+
+export interface LlmSettings {
+  routineModel: string;
+  highValueModel: string;
+  dailyRequestCap: number;
 }
 
 export interface MemorySummaryRequest {
@@ -46,7 +54,7 @@ export class BudgetedLlm implements LlmProvider {
 
   constructor(
     private readonly inner: LlmProvider,
-    private readonly dailyCap: number,
+    private dailyCap: number,
     private readonly today: () => string = () => new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10),
   ) {}
 
@@ -63,6 +71,11 @@ export class BudgetedLlm implements LlmProvider {
     if (this.used >= this.dailyCap) return null;
     this.used++;
     return this.inner.generate(request);
+  }
+
+  configure(settings: LlmSettings): void {
+    this.dailyCap = settings.dailyRequestCap;
+    this.inner.configure?.(settings);
   }
 
   async summarizeMemory(request: MemorySummaryRequest): Promise<MemorySummaryReply | null> {

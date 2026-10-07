@@ -58,6 +58,8 @@ export interface GameState {
   /** Result of the game just finished. */
   gameSummary: GameSummary | null;
   notice: { kind: 'minorTimeLimit' | 'guestTrialOver'; endsAt: number; at: number } | null;
+  /** Ids of AI lines this player reported. */
+  reported: number[];
   /** Why the server last took the player out of a game, if not by choice. */
   leftReason: 'minorTimeLimit' | 'guestTrialOver' | null;
 }
@@ -74,6 +76,8 @@ export interface GameApi extends GameState {
   sendQuickPhrase(id: string): void;
   sendSticker(id: StickerId): void;
   setBanter(level: BanterLevel): void;
+  /** Report an AI line as inappropriate (Appendix C). */
+  reportLine(entryId: number): void;
   /** Replace the account after an HTTP update (profile, reward, real-name…). */
   setAccount(account: AccountSummary): void;
   dismissPendingResult(): void;
@@ -109,6 +113,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     gameSummary: null,
     notice: null,
     leftReason: null,
+    reported: [],
   });
   const socket = useRef<WebSocket | null>(null);
   const tableRef = useRef<TableSnapshot | null>(null);
@@ -194,6 +199,9 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
           case 'banter':
             setState((s) => ({ ...s, banterLevel: msg.level }));
             break;
+          case 'lineReported':
+            setState((s) => ({ ...s, reported: [...s.reported, msg.entryId] }));
+            break;
           case 'error':
             if (msg.code === 'unauthorized') {
               disposed = true;
@@ -247,6 +255,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     sendQuickPhrase: useCallback((id) => send({ type: 'quickPhrase', id }), [send]),
     sendSticker: useCallback((id) => send({ type: 'sticker', id }), [send]),
     setBanter: useCallback((level) => send({ type: 'setBanter', level }), [send]),
+    reportLine: useCallback((entryId) => send({ type: 'reportLine', entryId }), [send]),
     setAccount: useCallback((account) => setState((s) => ({ ...s, account, banterLevel: account.banterLevel })), []),
     dismissPendingResult: useCallback(() => setState((s) => ({ ...s, pendingResult: null })), []),
     dismissGameSummary: useCallback(() => setState((s) => ({ ...s, gameSummary: null })), []),

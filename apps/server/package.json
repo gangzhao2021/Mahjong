@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "start": "tsx src/main.ts"
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "start": "tsx --env-file-if-exists=.env src/main.ts",
+    "admin:setup": "tsx src/admin/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "@electric-sql/pglite": "^0.5.8",
     "@fastify/cors": "^11.3.0",
+    "@fastify/static": "^10.1.5",
     "@mahjong/ai-play": "workspace:*",
     "@mahjong/dialogue": "workspace:*",
     "@mahjong/engine": "workspace:*",

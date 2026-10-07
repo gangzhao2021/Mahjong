@@ -116,4 +116,52 @@ export const MIGRATIONS: string[] = [
     updated_at timestamptz NOT NULL DEFAULT now()
   )
   `,
+  // Phase 5: admin dashboard (PRD §28–§38, Appendix D.5).
+  `
+  ALTER TABLE players ADD COLUMN suspension_reason text;
+
+  CREATE TABLE settings (
+    key text PRIMARY KEY,
+    value jsonb NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE admin_sessions (
+    token_hash text PRIMARY KEY,
+    ip text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    last_seen_at timestamptz NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE admin_audit (
+    id bigserial PRIMARY KEY,
+    action text NOT NULL,
+    target text,
+    detail jsonb,
+    ip text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX admin_audit_time ON admin_audit(created_at);
+
+  CREATE TABLE play_sessions (
+    id bigserial PRIMARY KEY,
+    player_id text NOT NULL,
+    started_at timestamptz NOT NULL,
+    ended_at timestamptz
+  );
+  CREATE INDEX play_sessions_started ON play_sessions(started_at);
+
+  CREATE TABLE moderation_events (
+    id bigserial PRIMARY KEY,
+    kind text NOT NULL,
+    player_id text,
+    character_id text,
+    text text NOT NULL,
+    reason text,
+    game_id text,
+    status text NOT NULL DEFAULT 'open',
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX moderation_events_status ON moderation_events(status, created_at)
+  `,
 ];

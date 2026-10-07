@@ -6,7 +6,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type { DialogueReply, DialogueRequest } from '@mahjong/dialogue';
-import { MemorySummarySchema, ReplySchema, type LlmProvider, type MemorySummaryReply, type MemorySummaryRequest } from './provider';
+import { MemorySummarySchema, ReplySchema, type LlmProvider, type LlmSettings, type MemorySummaryReply, type MemorySummaryRequest } from './provider';
 
 export interface AnthropicModels {
   routine: string;
@@ -21,10 +21,14 @@ export class AnthropicLlm implements LlmProvider {
   private disabled = false;
 
   constructor(
-    private readonly models: AnthropicModels,
+    private models: AnthropicModels,
     private readonly timeoutMs: number,
     private readonly client: Anthropic = new Anthropic({ maxRetries: 1 }),
   ) {}
+
+  configure(settings: LlmSettings): void {
+    this.models = { routine: settings.routineModel, highValue: settings.highValueModel };
+  }
 
   /** Memory summaries are routine text work: the small model, once per game. */
   async summarizeMemory(request: MemorySummaryRequest): Promise<MemorySummaryReply | null> {

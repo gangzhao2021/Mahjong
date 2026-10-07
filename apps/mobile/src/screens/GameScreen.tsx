@@ -206,6 +206,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             onSend={game.sendChat}
             onQuickPhrase={game.sendQuickPhrase}
             onSticker={game.sendSticker}
+            onReport={game.reportLine}
+            reported={game.reported}
             onClose={() => setChatOpen(false)}
           />
           <View style={styles.chatBanter}>
