@@ -1,0 +1,11 @@
+{
+  "_note": "Minor play windows follow the current regulator notice; holidays must be updated each year from the official State Council holiday schedule.",
+  "utcOffsetHours": 8,
+  "minorWindows": [
+    { "days": [5, 6, 0], "start": "20:00", "end": "21:00" }
+  ],
+  "holidayWindow": { "start": "20:00", "end": "21:00" },
+  "holidays": [],
+  "guestTrialMinutes": 60,
+  "guestTrialPeriodDays": 15
+}

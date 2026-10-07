@@ -1,0 +1,17 @@
+{
+  "startingCoins": 20000,
+  "loginRewards": [1000, 1200, 1500, 1500, 2000],
+  "rewardResetHour": 4,
+  "rewardUtcOffsetHours": 8,
+  "tables": [
+    { "id": "practice", "name": "练习场", "baseScore": 0, "minCoins": 0, "multiplier": 0 },
+    { "id": "low", "name": "初级场", "baseScore": 10, "minCoins": 500, "multiplier": 1 },
+    { "id": "mid", "name": "中级场", "baseScore": 50, "minCoins": 5000, "multiplier": 1 },
+    { "id": "high", "name": "高级场", "baseScore": 200, "minCoins": 30000, "multiplier": 1 }
+  ],
+  "privateRoom": {
+    "maxBaseRatio": 0.01,
+    "maxBase": 100000,
+    "maxHands": 16
+  }
+}

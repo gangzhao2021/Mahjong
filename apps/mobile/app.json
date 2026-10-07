@@ -8,7 +8,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.example.mahjong"
+      "bundleIdentifier": "com.example.mahjong",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -22,6 +23,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-apple-authentication"
+    ]
   }
 }

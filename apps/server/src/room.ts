@@ -17,13 +17,14 @@ import {
   type Action,
   type GameEvent,
   type GameState,
+  type HandResult,
   type HandState,
   type LegalActions,
   type RuleSet,
   type Seat,
 } from '@mahjong/engine';
 import type { BanterLevel, Character, DialogueSettings, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
-import type { SeatInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
+import type { GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
 import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
 import type { LlmProvider } from './llm/provider';
@@ -60,6 +61,9 @@ export interface RoomOptions {
   store: HandLogStore;
   rng: Rng;
   talk: RoomTalkOptions;
+  stake: StakeInfo;
+  /** Called after every finished hand (coin settlement happens here). */
+  onHandEnd?: (room: Room, handIndex: number, result: HandResult) => void;
   /** Called once the whole game is over and nobody needs the room any more. */
   onClosed?: (room: Room) => void;
 }
@@ -86,6 +90,7 @@ export class Room {
   private timer: Timer | null = null;
   private closed = false;
   private readonly talk: TableTalk;
+  private coinChange = 0;
 
   constructor(private readonly opts: RoomOptions) {
     this.id = opts.gameId;
@@ -211,6 +216,29 @@ export class Room {
     return this.snapshotFor(this.humanSeat);
   }
 
+  /** Records settled coins (for display); called by the lobby after the wallet update. Returns the game total. */
+  addCoinChange(amount: number): number {
+    this.coinChange += amount;
+    return this.coinChange;
+  }
+
+  get coinTotal(): number {
+    return this.coinChange;
+  }
+
+  summary(): GameSummary {
+    return {
+      gameId: this.id,
+      stake: this.opts.stake,
+      handsPlayed: this.game.handIndex,
+      totals: this.game.totals,
+      mySeat: this.humanSeat,
+      seats: this.seats.map((s) => s.info),
+      coinChange: this.coinChange,
+      endedAt: Date.now(),
+    };
+  }
+
   // -------------------------------------------------------------------------
   // Core loop
   // -------------------------------------------------------------------------
@@ -263,6 +291,7 @@ export class Room {
       this.log.result = this.hand.result;
       this.log.endedAt = new Date().toISOString();
       void this.opts.store.save(this.log).catch((err) => console.error('Failed to save hand log', err));
+      this.opts.onHandEnd?.(this, this.handIndex, this.hand.result!);
     }
     this.publish(events);
     // Conversation sees only public information (events redacted for the human seat).
@@ -363,6 +392,8 @@ export class Room {
       fastForward: this.fastForward,
       gameOver: this.gameOver,
       chat: this.talk.chatLog,
+      stake: this.opts.stake,
+      coinChange: this.coinChange,
     };
   }
 

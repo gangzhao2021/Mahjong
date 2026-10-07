@@ -5,6 +5,7 @@
 import type { Action, GameEvent, Seat } from '@mahjong/engine';
 import {
   PROTOCOL_VERSION,
+  type AccountSummary,
   type BanterLevel,
   type ChatCatalog,
   type ChatEntry,
@@ -12,13 +13,14 @@ import {
   type ClientMessage,
   type DistributiveOmit,
   type GameOptions,
+  type GameSummary,
   type ServerMessage,
+  type StartRejection,
   type StickerId,
   type TableSnapshot,
 } from '@mahjong/protocol';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SERVER_URL } from '../config';
-import { getDeviceId } from './deviceId';
+import { SERVER_WS } from '../config';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -47,6 +49,17 @@ export interface GameState {
   catalog: ChatCatalog | null;
   banterLevel: BanterLevel;
   chatRejected: { reason: ChatRejection; at: number } | null;
+  account: AccountSummary | null;
+  /** Latest coin settlement of a hand. */
+  lastWallet: { amount: number; requested: number; handIndex: number; gameTotal: number; gameId: string | null } | null;
+  startRejected: { reason: StartRejection; detail?: string; at: number } | null;
+  /** Result of a game that finished while the player was away (PRD §14.1). */
+  pendingResult: GameSummary | null;
+  /** Result of the game just finished. */
+  gameSummary: GameSummary | null;
+  notice: { kind: 'minorTimeLimit' | 'guestTrialOver'; endsAt: number; at: number } | null;
+  /** Why the server last took the player out of a game, if not by choice. */
+  leftReason: 'minorTimeLimit' | 'guestTrialOver' | null;
 }
 
 export interface GameApi extends GameState {
@@ -61,11 +74,23 @@ export interface GameApi extends GameState {
   sendQuickPhrase(id: string): void;
   sendSticker(id: StickerId): void;
   setBanter(level: BanterLevel): void;
+  /** Replace the account after an HTTP update (profile, reward, real-name…). */
+  setAccount(account: AccountSummary): void;
+  dismissPendingResult(): void;
+  dismissGameSummary(): void;
 }
 
 const MAX_EVENTS = 30;
 
-export function useGame(): GameApi {
+/**
+ * @param token session token; no connection is made while it is null.
+ * @param onUnauthorized called when the server rejects the session.
+ */
+export function useGame(token: string | null, onUnauthorized: () => void): GameApi {
+  const unauthorized = useRef(onUnauthorized);
+  useEffect(() => {
+    unauthorized.current = onUnauthorized;
+  }, [onUnauthorized]);
   const [state, setState] = useState<GameState>({
     status: 'connecting',
     playerId: null,
@@ -77,26 +102,33 @@ export function useGame(): GameApi {
     catalog: null,
     banterLevel: 'spicy',
     chatRejected: null,
+    account: null,
+    lastWallet: null,
+    startRejected: null,
+    pendingResult: null,
+    gameSummary: null,
+    notice: null,
+    leftReason: null,
   });
   const socket = useRef<WebSocket | null>(null);
   const tableRef = useRef<TableSnapshot | null>(null);
   const eventId = useRef(0);
 
   useEffect(() => {
+    if (!token) return;
     let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let backoff = 1000;
 
-    const connect = async () => {
-      const deviceId = await getDeviceId();
+    const connect = () => {
       if (disposed) return;
       setState((s) => ({ ...s, status: s.status === 'online' ? 'connecting' : s.status }));
-      const ws = new WebSocket(SERVER_URL);
+      const ws = new WebSocket(SERVER_WS);
       socket.current = ws;
 
       ws.onopen = () => {
         backoff = 1000;
-        ws.send(JSON.stringify({ type: 'hello', deviceId, protocol: PROTOCOL_VERSION } satisfies ClientMessage));
+        ws.send(JSON.stringify({ type: 'hello', token, protocol: PROTOCOL_VERSION } satisfies ClientMessage));
       };
       ws.onmessage = (e) => {
         const msg = JSON.parse(String(e.data)) as ServerMessage;
@@ -109,6 +141,7 @@ export function useGame(): GameApi {
               table: msg.inGame ? s.table : null,
               catalog: msg.catalog,
               banterLevel: msg.banterLevel,
+              account: msg.account,
             }));
             if (!msg.inGame) tableRef.current = null;
             break;
@@ -125,7 +158,32 @@ export function useGame(): GameApi {
             break;
           case 'left':
             tableRef.current = null;
-            setState((s) => ({ ...s, table: null, events: [], chat: [] }));
+            setState((s) => ({
+              ...s,
+              table: null,
+              events: [],
+              chat: [],
+              leftReason: msg.reason === 'minorTimeLimit' || msg.reason === 'guestTrialOver' ? msg.reason : null,
+            }));
+            break;
+          case 'wallet':
+            setState((s) => ({
+              ...s,
+              account: s.account ? { ...s.account, balance: msg.balance } : s.account,
+              lastWallet: msg.change ? { ...msg.change, gameId: tableRef.current?.gameId ?? null } : s.lastWallet,
+            }));
+            break;
+          case 'startRejected':
+            setState((s) => ({ ...s, startRejected: { reason: msg.reason, detail: msg.detail, at: Date.now() } }));
+            break;
+          case 'pendingResult':
+            setState((s) => ({ ...s, pendingResult: msg.summary }));
+            break;
+          case 'gameSummary':
+            setState((s) => ({ ...s, gameSummary: msg.summary }));
+            break;
+          case 'notice':
+            setState((s) => ({ ...s, notice: { kind: msg.kind, endsAt: msg.endsAt, at: Date.now() } }));
             break;
           case 'chat':
             setState((s) => ({ ...s, chat: mergeChat(s.chat, [msg.entry], false, Date.now()) }));
@@ -137,6 +195,12 @@ export function useGame(): GameApi {
             setState((s) => ({ ...s, banterLevel: msg.level }));
             break;
           case 'error':
+            if (msg.code === 'unauthorized') {
+              disposed = true;
+              ws.close();
+              unauthorized.current();
+              return;
+            }
             setState((s) => ({ ...s, error: msg.message }));
             break;
         }
@@ -150,13 +214,14 @@ export function useGame(): GameApi {
       };
     };
 
-    void connect();
+    connect();
     return () => {
       disposed = true;
       clearTimeout(retry);
       socket.current?.close();
+      socket.current = null;
     };
-  }, []);
+  }, [token]);
 
   const send = useCallback((m: ClientMessage) => {
     const ws = socket.current;
@@ -182,6 +247,9 @@ export function useGame(): GameApi {
     sendQuickPhrase: useCallback((id) => send({ type: 'quickPhrase', id }), [send]),
     sendSticker: useCallback((id) => send({ type: 'sticker', id }), [send]),
     setBanter: useCallback((level) => send({ type: 'setBanter', level }), [send]),
+    setAccount: useCallback((account) => setState((s) => ({ ...s, account, banterLevel: account.banterLevel })), []),
+    dismissPendingResult: useCallback(() => setState((s) => ({ ...s, pendingResult: null })), []),
+    dismissGameSummary: useCallback(() => setState((s) => ({ ...s, gameSummary: null })), []),
   };
 }
 

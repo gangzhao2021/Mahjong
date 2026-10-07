@@ -54,6 +54,10 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const iWon = me.won !== null;
   const drawn = stage.kind === 'turn' && stage.seat === view.seat ? stage.drawn : null;
   const myTurnTimer = table.timer && table.timer.kind !== 'nextHand' ? countdown : null;
+  // Once a hand has ended its scores are already part of the game totals.
+  const scoreOf = (seat: Seat) => table.totals[seat] + (view.phase === 'ended' ? 0 : view.scores[seat]);
+  // Settlement arrives after the table snapshot; prefer the newer wallet total for this game.
+  const gameCoins = game.lastWallet?.gameId === table.gameId ? game.lastWallet.gameTotal : table.coinChange;
 
   const opponent = (side: Side) => {
     const seat = seatAt(side);
@@ -62,7 +66,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       <View style={[styles.opponent, side === 2 ? styles.row : styles.column]}>
         <SeatCard
           info={table.seats[seat]}
-          score={table.totals[seat] + view.scores[seat]}
+          score={scoreOf(seat)}
           voidSuit={p.voidSuit}
           dealer={view.dealer === seat}
           active={activeSeat === seat}
@@ -91,7 +95,14 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           <Btn label={`💬 ${T.chat}`} onPress={() => setChatOpen(true)} />
         </View>
         {opponent(2)}
-        <Text style={styles.handInfo}>{T.hand(table.handIndex, table.handsPerGame)}</Text>
+        <View style={styles.stake}>
+          <Text style={styles.handInfo}>{T.hand(table.handIndex, table.handsPerGame)}</Text>
+          <Text style={styles.handInfo}>
+            {table.stake.name}
+            {table.stake.inviteCode ? ` ${T.inviteCode} ${table.stake.inviteCode}` : ''} · {table.stake.multiplier ? T.baseScoreN(table.stake.baseScore) : T.noCoins}
+          </Text>
+          {table.stake.multiplier > 0 && <Text style={styles.coinLine}>{T.gameCoins(gameCoins)}</Text>}
+        </View>
       </View>
 
       {/* Middle: side players and the four ponds around the centre */}
@@ -129,7 +140,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         <View style={styles.myRow}>
           <SeatCard
             info={table.seats[view.seat]}
-            score={table.totals[view.seat] + view.scores[view.seat]}
+            score={scoreOf(view.seat)}
             voidSuit={me.voidSuit}
             dealer={view.dealer === view.seat}
             active={activeSeat === view.seat}
@@ -175,6 +186,10 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           table={table}
           result={view.result}
           countdown={table.timer?.kind === 'nextHand' ? countdown : null}
+          gameCoins={gameCoins}
+          handCoins={
+            game.lastWallet && game.lastWallet.gameId === table.gameId && game.lastWallet.handIndex === table.handIndex ? game.lastWallet.amount : null
+          }
           onNextHand={game.nextHand}
           onNewGame={onNewGame}
           onHome={game.leaveGame}
@@ -277,7 +292,9 @@ const styles = StyleSheet.create({
   felt: { flex: 1, backgroundColor: '#1f6b47', paddingHorizontal: 12, paddingVertical: 6, userSelect: 'none' },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', minHeight: 48 },
   menu: { flexDirection: 'row', gap: 6 },
-  handInfo: { color: '#c8e6c9', fontSize: 12, marginTop: 6 },
+  handInfo: { color: '#c8e6c9', fontSize: 12 },
+  stake: { alignItems: 'flex-end', marginTop: 4 },
+  coinLine: { color: '#ffe082', fontSize: 12, fontWeight: '700' },
   middle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   opponent: { alignItems: 'center', gap: 4 },
   row: { flexDirection: 'row', gap: 8 },

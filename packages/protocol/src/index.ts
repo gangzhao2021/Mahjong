@@ -8,7 +8,7 @@ import type { Action, GameEvent, HandView, Seat } from '@mahjong/engine';
 
 export type { BanterLevel, QuickPhrase, StickerId };
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export interface SeatInfo {
   seat: Seat;
@@ -39,6 +39,104 @@ export interface ChatCatalog {
 
 export type ChatRejection = 'blocked' | 'rateLimited' | 'suspended' | 'tooLong' | 'notInGame';
 
+// ---------------------------------------------------------------------------
+// Accounts and economy (Phase 3)
+// ---------------------------------------------------------------------------
+
+export type LoginMethod = 'guest' | 'apple' | 'google' | 'phone' | 'wechat';
+
+export interface RewardStatus {
+  cycle: number[];
+  /** 0-based cycle day the next claim pays. */
+  dayIndex: number;
+  claimable: boolean;
+  nextAmount: number;
+}
+
+export interface TableInfo {
+  id: string;
+  name: string;
+  baseScore: number;
+  minCoins: number;
+  /** Coins per point; 0 = practice table without coin settlement. */
+  multiplier: number;
+}
+
+/** Why the player may or may not start a game right now (China build, Appendix D). */
+export interface PlayLimit {
+  kind: 'minor' | 'guestTrial';
+  /** Epoch ms when the current allowance ends; null = not allowed now. */
+  until: number | null;
+}
+
+export interface AccountSummary {
+  playerId: string;
+  nickname: string;
+  avatar: string;
+  balance: number;
+  providers: LoginMethod[];
+  isGuest: boolean;
+  banterLevel: BanterLevel;
+  reward: RewardStatus;
+  realName: { required: boolean; verified: boolean };
+  playLimit: PlayLimit | null;
+}
+
+/** Public, unauthenticated server info for the login and lobby screens. */
+export interface ServerInfo {
+  region: 'global' | 'china';
+  protocol: number;
+  loginMethods: LoginMethod[];
+  tables: TableInfo[];
+  privateRoom: { maxBaseRatio: number; maxBase: number; maxHands: number };
+  avatars: string[];
+}
+
+/** Whitelisted RuleSet parameters a private room may change (PRD Appendix A.10). */
+export interface PrivateRules {
+  huanSanZhang: boolean;
+  maxFan: number;
+  selfDrawBonus: 'fan' | 'base';
+  callTransfer: boolean;
+  jinGouDiao: boolean;
+  jiangDui: boolean;
+  tianDiHu: boolean;
+  haiDi: boolean;
+  gangShangPao: boolean;
+  qiangGang: boolean;
+}
+
+export interface StakeInfo {
+  kind: 'public' | 'private';
+  tableId?: string;
+  name: string;
+  baseScore: number;
+  multiplier: number;
+  inviteCode?: string;
+}
+
+/** Result of a finished game, also delivered on next login if the player was away (PRD §14.1). */
+export interface GameSummary {
+  gameId: string;
+  stake: StakeInfo;
+  handsPlayed: number;
+  totals: [number, number, number, number];
+  mySeat: Seat;
+  seats: SeatInfo[];
+  /** Net coins won or lost by the player over the game. */
+  coinChange: number;
+  endedAt: number;
+}
+
+export type StartRejection =
+  | 'unknownTable'
+  | 'insufficientCoins'
+  | 'baseTooHigh'
+  | 'invalidOptions'
+  | 'realNameRequired'
+  | 'minorTimeLimit'
+  | 'guestTrialOver';
+
 export type TimerKind = 'swap' | 'dingque' | 'discard' | 'claim' | 'nextHand';
 
 export interface TimerInfo {
@@ -56,7 +154,7 @@ export interface TableSnapshot {
   handsPerGame: number;
   mySeat: Seat;
   seats: SeatInfo[];
-  /** Game totals before the current hand. */
+  /** Game totals including every finished hand (the current hand too, once it has ended). */
   totals: [number, number, number, number];
   view: HandView;
   /** Timer for the human seat's pending decision, if any. */
@@ -68,15 +166,20 @@ export interface TableSnapshot {
   gameOver: boolean;
   /** Recent table chat, oldest first. */
   chat: ChatEntry[];
+  stake: StakeInfo;
+  /** Coins the player has won or lost so far in this game. */
+  coinChange: number;
 }
 
 export interface GameOptions {
-  baseScore?: number;
-  handsPerGame?: number;
+  /** Public table id (PRD §10–§11). */
+  tableId?: string;
+  /** Private room (PRD §12–§13); free to create, base score capped by balance. */
+  private?: { baseScore: number; handsPerGame: number; rules?: Partial<PrivateRules> };
 }
 
 export type ClientMessage =
-  | { type: 'hello'; deviceId: string; protocol: number }
+  | { type: 'hello'; token: string; protocol: number }
   | { type: 'startGame'; options?: GameOptions }
   /** `version` is the view version the action was chosen from; stale actions are ignored. */
   | { type: 'action'; action: DistributiveOmit<Action, 'seat'>; version: number }
@@ -90,14 +193,20 @@ export type ClientMessage =
   | { type: 'setBanter'; level: BanterLevel };
 
 export type ServerMessage =
-  | { type: 'welcome'; playerId: string; inGame: boolean; banterLevel: BanterLevel; catalog: ChatCatalog }
+  | { type: 'welcome'; playerId: string; inGame: boolean; banterLevel: BanterLevel; catalog: ChatCatalog; account: AccountSummary }
   | { type: 'table'; table: TableSnapshot; events: GameEvent[] }
-  | { type: 'left' }
+  | { type: 'left'; reason?: 'user' | 'minorTimeLimit' | 'guestTrialOver' }
+  /** `gameTotal`: the player's net coins over the current game so far. */
+  | { type: 'wallet'; balance: number; change: { amount: number; requested: number; handIndex: number; gameTotal: number } | null }
+  | { type: 'startRejected'; reason: StartRejection; detail?: string }
+  | { type: 'pendingResult'; summary: GameSummary }
+  | { type: 'gameSummary'; summary: GameSummary }
+  | { type: 'notice'; kind: 'minorTimeLimit' | 'guestTrialOver'; endsAt: number }
   | { type: 'chat'; entry: ChatEntry }
   | { type: 'chatRejected'; reason: ChatRejection }
   | { type: 'banter'; level: BanterLevel }
   | { type: 'error'; code: ErrorCode; message: string };
 
-export type ErrorCode = 'badMessage' | 'notInGame' | 'illegalAction' | 'protocolMismatch' | 'helloRequired';
+export type ErrorCode = 'badMessage' | 'notInGame' | 'illegalAction' | 'protocolMismatch' | 'helloRequired' | 'unauthorized';
 
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;

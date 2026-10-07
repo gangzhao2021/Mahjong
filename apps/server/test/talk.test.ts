@@ -29,9 +29,9 @@ const CALM = { ...FAST, timers: { ...FAST.timers, swapMs: 60_000, dingqueMs: 60_
 
 async function joinGame(llm: LlmProvider, device = 'device-chat-1', dialogue = loadDialogueConfig('global')) {
   const server = await startServer(CALM, { llm, dialogue });
-  const client = await Client.connect(server.url);
+  const client = await Client.connect(server);
   const welcome = await client.hello(device);
-  client.send({ type: 'startGame', options: { handsPerGame: 1 } });
+  client.send({ type: 'startGame', options: { private: { baseScore: 0, handsPerGame: 1 } } });
   const table = await client.next(isTable);
   return { server, client, welcome, table };
 }
@@ -104,18 +104,18 @@ describe('player chat (PRD §7.1)', () => {
   it('"quiet" banter answers with templates only — no LLM calls', async () => {
     const llm = new FakeLlm();
     const server = await startServer(CALM, { llm });
-    const client = await Client.connect(server.url);
+    const client = await Client.connect(server);
     await client.hello('device-quiet');
     client.send({ type: 'setBanter', level: 'quiet' });
     await client.next((m): m is Extract<ServerMessage, { type: 'banter' }> => m.type === 'banter');
-    client.send({ type: 'startGame', options: { handsPerGame: 1 } });
+    client.send({ type: 'startGame', options: { private: { baseScore: 0, handsPerGame: 1 } } });
     await client.next(isTable);
     client.send({ type: 'chat', text: '你们好', target: 1 });
     await client.next(isChat((e) => e.kind === 'ai' && e.seat === 1));
     expect(llm.requests).toHaveLength(0);
 
     // The setting is remembered for the player.
-    const again = await Client.connect(server.url);
+    const again = await Client.connect(server);
     expect((await again.hello('device-quiet')).banterLevel).toBe('quiet');
   });
 });

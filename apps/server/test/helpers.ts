@@ -1,13 +1,18 @@
-import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from '@mahjong/protocol';
-import { createServer, type Server } from 'node:http';
+import { chooseAction } from '@mahjong/ai-play';
+import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage, type TableSnapshot } from '@mahjong/protocol';
 import type { AddressInfo } from 'node:net';
 import { afterEach } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
+import type { SmsSender } from '../src/accounts/providers';
 import { DEFAULT_CONFIG, type ServerConfig } from '../src/config';
-import { createModerator, loadDialogueConfig, type DialogueConfig } from '../src/dialogueConfig';
+import { openDb } from '../src/db/db';
+import { createModerator, loadDialogueConfig, type DialogueConfig, type Region } from '../src/dialogueConfig';
+import type { EconomyConfig } from '../src/economy/config';
+import { buildHttp, type IdentityVerifiers } from '../src/http';
 import { NoLlm, type LlmProvider } from '../src/llm/provider';
 import { Lobby } from '../src/lobby';
-import { MemoryHandLogStore, MemoryPlayerStore } from '../src/store';
+import { createServices, type Services } from '../src/services';
+import { MemoryHandLogStore } from '../src/store';
 
 export const FAST: ServerConfig = {
   ...DEFAULT_CONFIG,
@@ -17,10 +22,24 @@ export const FAST: ServerConfig = {
 };
 
 export interface TestServer {
+  /** WebSocket URL. */
   url: string;
+  /** HTTP base URL. */
+  http: string;
   lobby: Lobby;
   hands: MemoryHandLogStore;
+  services: Services;
   close(): Promise<void>;
+}
+
+export interface TestServerOptions {
+  llm?: LlmProvider;
+  dialogue?: DialogueConfig;
+  region?: Region;
+  economy?: EconomyConfig;
+  now?: () => Date;
+  verifiers?: IdentityVerifiers;
+  sms?: SmsSender;
 }
 
 const servers: TestServer[] = [];
@@ -28,36 +47,83 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));
 });
 
-export async function startServer(config = FAST, options: { llm?: LlmProvider; dialogue?: DialogueConfig } = {}): Promise<TestServer> {
+/** Fake identity checks: the "token" is the subject, prefixed to prove it went through the verifier. */
+export const FAKE_VERIFIERS: IdentityVerifiers = {
+  apple: async (t) => `apple-${t}`,
+  google: async (t) => `google-${t}`,
+  wechat: async (c) => `wechat-${c}`,
+};
+
+export async function startServer(config = FAST, options: TestServerOptions = {}): Promise<TestServer> {
   const hands = new MemoryHandLogStore();
   let seed = 1;
-  const dialogue = options.dialogue ?? loadDialogueConfig('global');
+  const region = options.region ?? 'global';
+  const dialogue = options.dialogue ?? loadDialogueConfig(region);
+  const db = await openDb({ dataDir: null });
+  const services = createServices({
+    region,
+    db,
+    dataDir: null,
+    env: { SESSION_SECRET: 'test-secret-test-secret-test-secret!!' },
+    economy: options.economy,
+    now: options.now,
+    sms: options.sms,
+  });
+  const moderator = createModerator(dialogue);
   const lobby = new Lobby({
     config,
     dialogue,
     llm: options.llm ?? new NoLlm(),
-    moderator: createModerator(dialogue),
+    moderator,
     hands,
-    players: new MemoryPlayerStore(),
+    services,
     seed: () => seed++ * 7919,
   });
-  const http: Server = createServer();
-  const wss = new WebSocketServer({ server: http });
+  const app = buildHttp(services, lobby, moderator, options.verifiers ?? FAKE_VERIFIERS);
+  await app.ready();
+  const wss = new WebSocketServer({ server: app.server, path: '/ws' });
   wss.on('connection', (s) => lobby.handleConnection(s));
-  await new Promise<void>((r) => http.listen(0, r));
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  const port = (app.server.address() as AddressInfo).port;
   const server: TestServer = {
-    url: `ws://localhost:${(http.address() as AddressInfo).port}`,
+    url: `ws://127.0.0.1:${port}/ws`,
+    http: `http://127.0.0.1:${port}`,
     lobby,
     hands,
+    services,
     close: async () => {
       lobby.closeAll();
       for (const c of wss.clients) c.terminate();
       await new Promise((r) => wss.close(r));
-      await new Promise((r) => http.close(r));
+      await app.close();
+      await Promise.all([...lobby.settling]);
+      await db.close();
     },
   };
   servers.push(server);
   return server;
+}
+
+export interface ApiResponse<T = Record<string, unknown>> {
+  status: number;
+  body: T;
+}
+
+/** Small JSON client for the HTTP API. */
+export async function api<T = Record<string, any>>(server: TestServer, method: string, path: string, body?: unknown, token?: string): Promise<ApiResponse<T>> {
+  const res = await fetch(`${server.http}${path}`, {
+    method,
+    headers: { ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  return { status: res.status, body: (text ? JSON.parse(text) : {}) as T };
+}
+
+export async function guestLogin(server: TestServer, deviceId: string): Promise<string> {
+  const res = await api<{ token: string }>(server, 'POST', '/auth/guest', { deviceId });
+  if (res.status !== 200) throw new Error(`guest login failed: ${JSON.stringify(res.body)}`);
+  return res.body.token;
 }
 
 export class Client {
@@ -81,10 +147,14 @@ export class Client {
     });
   }
 
-  static async connect(url: string): Promise<Client> {
-    const ws = new WebSocket(url);
+  private server: TestServer | null = null;
+
+  static async connect(server: TestServer): Promise<Client> {
+    const ws = new WebSocket(server.url);
     await new Promise((r, j) => (ws.once('open', r), ws.once('error', j)));
-    return new Client(ws);
+    const client = new Client(ws);
+    client.server = server;
+    return client;
   }
 
   send(m: ClientMessage): void {
@@ -115,9 +185,14 @@ export class Client {
     });
   }
 
+  /** Logs in as a guest over HTTP, then says hello on the socket. */
   async hello(deviceId = 'device-test-1'): Promise<Extract<ServerMessage, { type: 'welcome' }>> {
+    return this.helloWithToken(await guestLogin(this.server!, deviceId));
+  }
+
+  helloWithToken(token: string): Promise<Extract<ServerMessage, { type: 'welcome' }>> {
     const welcome = this.next((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
-    this.send({ type: 'hello', deviceId, protocol: PROTOCOL_VERSION });
+    this.send({ type: 'hello', token, protocol: PROTOCOL_VERSION });
     return welcome;
   }
 
@@ -130,3 +205,25 @@ export class Client {
 export type TableMsg = Extract<ServerMessage, { type: 'table' }>;
 export const isTable = (m: ServerMessage): m is TableMsg => m.type === 'table';
 export const gameOver = (m: ServerMessage): m is TableMsg => isTable(m) && m.table.gameOver;
+
+/** A bot "human" that answers every decision with the expert policy. */
+export function playAsBot(client: Client): void {
+  const acted = new Set<string>();
+  const rng = Math.random;
+  client.onMessage = (m) => {
+    if (!isTable(m)) return;
+    const t: TableSnapshot = m.table;
+    if (t.view.phase === 'ended' && !t.gameOver) {
+      client.send({ type: 'nextHand' });
+      return;
+    }
+    const key = `${t.handIndex}:${t.view.version}`;
+    if (acted.has(key)) return;
+    const action = chooseAction(t.view, 'expert', rng);
+    if (!action) return;
+    acted.add(key);
+    const { seat: _seat, ...rest } = action;
+    client.send({ type: 'action', action: rest, version: t.view.version });
+  };
+}
+

@@ -1,43 +1,36 @@
-import { createServer } from 'node:http';
+import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { DEFAULT_CONFIG } from './config';
+import { openDb } from './db/db';
 import { createLlmProvider, createModerator, loadDialogueConfig } from './dialogueConfig';
+import { buildHttp } from './http';
 import { Lobby } from './lobby';
-import { FileHandLogStore, FilePlayerStore } from './store';
+import { createServices } from './services';
+import { FileHandLogStore } from './store';
 
 const config = DEFAULT_CONFIG;
 const dialogue = loadDialogueConfig();
 const llm = createLlmProvider(dialogue);
-const lobby = new Lobby({
-  config,
-  dialogue,
-  llm,
-  moderator: createModerator(dialogue),
-  hands: new FileHandLogStore(config.dataDir),
-  players: new FilePlayerStore(config.dataDir),
-});
-console.log(`Region: ${dialogue.region}; dialogue provider: ${llm.name}`);
+const moderator = createModerator(dialogue);
+const db = await openDb({ databaseUrl: process.env.DATABASE_URL, dataDir: path.join(config.dataDir, 'pglite') });
+const services = createServices({ region: dialogue.region, db, dataDir: config.dataDir });
+const lobby = new Lobby({ config, dialogue, llm, moderator, hands: new FileHandLogStore(config.dataDir), services });
 
-const http = createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true }));
-    return;
-  }
-  res.writeHead(404).end();
-});
-
-const wss = new WebSocketServer({ server: http, maxPayload: 16 * 1024 });
+const app = buildHttp(services, lobby, moderator);
+await app.ready();
+const wss = new WebSocketServer({ server: app.server, path: '/ws', maxPayload: 16 * 1024 });
 wss.on('connection', (socket) => lobby.handleConnection(socket));
 
-http.listen(config.port, () => {
-  console.log(`Mahjong server listening on ws://localhost:${config.port} (data: ${config.dataDir})`);
-});
+await app.listen({ port: config.port, host: '0.0.0.0' });
+console.log(`Region: ${dialogue.region}; dialogue provider: ${llm.name}; database: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'PGlite'}`);
+console.log(`Mahjong server on http://localhost:${config.port} (WebSocket /ws)`);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => {
+  process.on(signal, async () => {
     lobby.closeAll();
     wss.close();
-    http.close(() => process.exit(0));
+    await app.close();
+    await db.close();
+    process.exit(0);
   });
 }

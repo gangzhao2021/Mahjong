@@ -2,7 +2,7 @@
 
 1 名真人 + 3 个 AI 的休闲麻将手游。需求见 [PRD](Mahjong%20Mobile%20Game%20V1%20PRD%20and%20Development%20Prompt.md)。
 
-当前进度：**第 1 阶段（核心原型）+ 第 2 阶段（AI 性格与对话）**。
+当前进度：**第 1–3 阶段**（核心原型、AI 性格与对话、账号与经济系统）。
 
 ## 目录结构
 
@@ -12,7 +12,7 @@ packages/ai-play    对局 AI：向听数 + 进张 + 防守 + 牌型价值，三
 packages/dialogue   对话引擎：触发事件、诈唬意图、模板台词、提示词、谁来说话、内容审核
 packages/protocol   客户端与服务端之间的 WebSocket 消息类型
 apps/server         权威服务端：房间、计时器、托管、断线重连、操作日志、牌桌聊天、大模型接入
-apps/server/config  AI 性格模板、角色名单、对话参数（第 5 阶段移到管理后台）
+apps/server/config  AI 角色与对话、经济参数（金币、场次、每日奖励）、国内合规参数；第 5 阶段移到管理后台
 apps/mobile         Expo (React Native) 横屏客户端，也可在浏览器里运行
 ```
 
@@ -24,7 +24,7 @@ apps/mobile         Expo (React Native) 横屏客户端，也可在浏览器里�
 pnpm install
 ```
 
-启动服务端（ws://localhost:8787，日志写入 `apps/server/data/`）：
+启动服务端（HTTP 与 WebSocket 都在 http://localhost:8787，WebSocket 路径为 `/ws`）。默认使用内置的 PGlite 数据库，数据存在 `apps/server/data/`，无需安装 PostgreSQL：
 
 ```bash
 pnpm server
@@ -36,7 +36,23 @@ pnpm server
 pnpm mobile:web
 ```
 
-在手机或模拟器上运行：先执行 `pnpm mobile`，然后用 Expo Go 扫码。真机需要把服务器地址指向电脑的局域网 IP，例如 `EXPO_PUBLIC_SERVER_URL=ws://192.168.1.20:8787`。
+在手机或模拟器上运行：先执行 `pnpm mobile`，然后用 Expo Go 扫码。真机需要把服务器地址指向电脑的局域网 IP，例如 `EXPO_PUBLIC_SERVER_URL=http://192.168.1.20:8787`。Google 和微信登录需要开发版（development build），Expo Go 里只能用游客、手机号和 Apple（iOS）。
+
+国内版本地调试：用 `REGION=china DATA_DIR=data-china` 启动服务端。短信验证码会打印在服务端日志里（`[dev SMS]`），实名认证用的是开发用校验器（只校验身份证号格式）。
+
+### 服务端环境变量
+
+| 变量 | 说明 |
+|---|---|
+| `DATABASE_URL` | 生产环境的 PostgreSQL 连接串；不设则使用 PGlite |
+| `SESSION_SECRET` | 会话签名密钥（≥32 字符）。不设时开发环境自动生成并保存在数据目录 |
+| `ID_HASH_SECRET` | 手机号与身份证号哈希用的密钥，生产必须设置 |
+| `APPLE_CLIENT_IDS` | Apple 登录的 bundle ID（逗号分隔） |
+| `APPLE_TEAM_ID`、`APPLE_KEY_ID`、`APPLE_PRIVATE_KEY` | 注销账号时撤销 Apple 授权所需（App Store 要求） |
+| `GOOGLE_CLIENT_IDS` | Google 登录的客户端 ID（逗号分隔） |
+| `WECHAT_APP_ID`、`WECHAT_APP_SECRET` | 微信登录（国内版） |
+
+客户端：`EXPO_PUBLIC_SERVER_URL`，以及 Google 登录用的 `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`、`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`、`EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME`。
 
 ### AI 对话用的大模型
 
@@ -83,12 +99,25 @@ pnpm lint
 - 嘴碎程度可在大厅或聊天面板里设为温和、毒舌或安静，设置会记住；安静模式完全不调用大模型。
 - AI 座位都有 "AI" 标识，并显示性格。
 
+## 第 3 阶段已实现
+
+- 账号：游客、Apple、Google（海外版）；手机号验证码、微信、Apple（国内版）。服务端校验所有第三方凭证；会话令牌存在系统钥匙串里。
+- 游客可绑定其他登录方式，原账号原样升级；若该登录方式已属于另一个账号，不合并，可退出后用它登录。
+- 账号注销：删除资料和钱包，撤销 Apple 授权，金币流水保留但匿名化。
+- 金币：新玩家 20,000；每手牌结算后入账，余额永远不会为负；每笔变动写入不可修改的流水，重复结算不会重复记账。
+- 场次：练习场（不结算）、初级、中级、高级，各有准入金币。私人房免费创建，底分不超过余额的 1%，可改局数和部分规则，带房号。
+- 每日奖励：5 天循环，错过不清零，领完重新开始；每天 04:00（UTC+8）刷新。
+- 离开后由托管打完的牌局，结果会在下次登录时显示。
+- 国内版：非游客必须实名；未成年人只能在规定时段游戏，时间到会提前提醒并自动托管打完；游客每台设备每 15 天试玩 1 小时。
+- 客户端：登录页、实名认证、大厅（金币、每日奖励、场次、私人房）、账号页（昵称、头像、嘴碎程度、绑定、金币记录、退出、注销），牌局内显示场次和金币变化。
+
 ## 已知限制（按 PRD 留到后续阶段）
+
+- 微信登录需要接入微信开放平台 SDK 并打包开发版；当前客户端里显示为暂不支持。短信发送和实名认证只有开发实现，正式上线需接入短信服务商和国家实名认证系统（附录 D）。
 
 - 长期记忆（第 4 阶段）：AI 现在还不记得上一场的事。
 - 内容审核目前只有本地词库加联系方式和链接过滤；第三方审核服务（附录 D.5）待选型后接入。
 - 本机没有 Claude 凭证，所以真实的大模型调用还没有跑过；请求格式由单元测试覆盖。
-- 只有积分，还没有金币钱包。服务端重启后进行中的牌局会丢失（第 3 阶段接入数据库）。
-- 中途离开的牌局由托管打完；如果期间没有重新连接，结果不会在下次打开时展示（第 3 阶段随钱包一起做）。
+- 进行中的牌局只在服务端内存里，服务端重启会丢失（账号和金币在数据库里，不受影响）。
 - 没有音效、动画和教程（第 6 阶段）。
 - `app.json` 里的 bundle ID `com.example.mahjong` 是占位，上架前要改。

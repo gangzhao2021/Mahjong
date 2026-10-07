@@ -1,37 +1,15 @@
-import { chooseAction } from '@mahjong/ai-play';
 import { replayHand, type Action } from '@mahjong/engine';
-import type { ServerMessage, TableSnapshot } from '@mahjong/protocol';
+import type { ServerMessage } from '@mahjong/protocol';
 import { describe, expect, it } from 'vitest';
-import { Client, FAST, gameOver, isTable, startServer, type TableMsg } from './helpers';
-
-/** A bot "human" that answers every decision with the expert policy. */
-function playAsBot(client: Client): void {
-  const acted = new Set<string>();
-  const rng = Math.random;
-  client.onMessage = (m) => {
-    if (!isTable(m)) return;
-    const t: TableSnapshot = m.table;
-    if (t.view.phase === 'ended' && !t.gameOver) {
-      client.send({ type: 'nextHand' });
-      return;
-    }
-    const key = `${t.handIndex}:${t.view.version}`;
-    if (acted.has(key)) return;
-    const action = chooseAction(t.view, 'expert', rng);
-    if (!action) return;
-    acted.add(key);
-    const { seat: _seat, ...rest } = action;
-    client.send({ type: 'action', action: rest, version: t.view.version });
-  };
-}
+import { Client, FAST, gameOver, isTable, playAsBot, startServer, type TableMsg } from './helpers';
 
 describe('game server', () => {
   it('plays a full game against a client and logs replayable hands', async () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, discardMs: 5_000, claimMs: 5_000, swapMs: 5_000, dingqueMs: 5_000 } });
-    const client = await Client.connect(server.url);
+    const client = await Client.connect(server);
     expect((await client.hello()).inGame).toBe(false);
     playAsBot(client);
-    client.send({ type: 'startGame', options: { handsPerGame: 3, baseScore: 2 } });
+    client.send({ type: 'startGame', options: { private: { handsPerGame: 3, baseScore: 2 } } });
     const final = await client.next(gameOver);
 
     expect(final.table.handsPerGame).toBe(3);
@@ -52,9 +30,9 @@ describe('game server', () => {
 
   it('times out an idle player, switches to auto-play after two timeouts, and finishes the game', async () => {
     const server = await startServer();
-    const client = await Client.connect(server.url);
+    const client = await Client.connect(server);
     await client.hello();
-    client.send({ type: 'startGame', options: { handsPerGame: 1 } });
+    client.send({ type: 'startGame', options: { private: { baseScore: 0, handsPerGame: 1 } } });
     const autoPlay = await client.next((m): m is TableMsg => isTable(m) && m.table.autoPlay);
     expect(autoPlay.table.timer).toBeNull();
     await client.next(gameOver);
@@ -69,7 +47,7 @@ describe('game server', () => {
 
   it('shows a countdown timer for the human decision', async () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 15_000 } });
-    const client = await Client.connect(server.url);
+    const client = await Client.connect(server);
     await client.hello();
     client.send({ type: 'startGame' });
     const first = await client.next(isTable);
@@ -80,13 +58,13 @@ describe('game server', () => {
 
   it('keeps the game running after a disconnect and lets the player take control back', async () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, discardMs: 60_000, claimMs: 60_000, swapMs: 60_000, dingqueMs: 60_000 }, ai: { minDelayMs: 50, maxDelayMs: 60, beginnerExtraMs: 0 } });
-    const a = await Client.connect(server.url);
+    const a = await Client.connect(server);
     await a.hello('device-reconnect');
-    a.send({ type: 'startGame', options: { handsPerGame: 8 } });
+    a.send({ type: 'startGame', options: { private: { baseScore: 0, handsPerGame: 8 } } });
     await a.next(isTable);
     a.close();
 
-    const b = await Client.connect(server.url);
+    const b = await Client.connect(server);
     const welcome = await b.hello('device-reconnect');
     expect(welcome.inGame).toBe(true);
     const resumed = await b.next((m): m is TableMsg => isTable(m) && m.table.autoPlay);
@@ -97,9 +75,9 @@ describe('game server', () => {
 
   it('finishes an abandoned game without anyone connected', async () => {
     const server = await startServer();
-    const client = await Client.connect(server.url);
+    const client = await Client.connect(server);
     const { playerId } = await client.hello('device-leaver');
-    client.send({ type: 'startGame', options: { handsPerGame: 2 } });
+    client.send({ type: 'startGame', options: { private: { baseScore: 0, handsPerGame: 2 } } });
     await client.next(isTable);
     client.send({ type: 'leaveGame' });
     await client.next((m): m is Extract<ServerMessage, { type: 'left' }> => m.type === 'left');
@@ -113,7 +91,7 @@ describe('game server', () => {
   it('rejects bad input', async () => {
     // Slow AIs and a long timer keep the view version still while we probe.
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 60_000 }, ai: { minDelayMs: 60_000, maxDelayMs: 60_001, beginnerExtraMs: 0 } });
-    const client = await Client.connect(server.url);
+    const client = await Client.connect(server);
     const isError = (m: ServerMessage): m is Extract<ServerMessage, { type: 'error' }> => m.type === 'error';
 
     client.send({ type: 'startGame' });
@@ -126,7 +104,7 @@ describe('game server', () => {
     client.send({ type: 'action', action: { type: 'pass' }, version: 0 });
     expect((await client.next(isError)).code).toBe('notInGame');
 
-    client.send({ type: 'startGame', options: { handsPerGame: 1 } });
+    client.send({ type: 'startGame', options: { private: { baseScore: 0, handsPerGame: 1 } } });
     const t = await client.next(isTable);
     client.send({ type: 'action', action: { type: 'discard', tile: 3 }, version: t.table.view.version });
     expect((await client.next(isError)).code).toBe('illegalAction');

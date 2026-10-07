@@ -1,10 +1,17 @@
 import { Platform } from 'react-native';
 
 /**
- * Game server WebSocket URL. Override with EXPO_PUBLIC_SERVER_URL
- * (e.g. ws://192.168.1.20:8787 when running on a physical phone).
+ * Game server base URL. Override with EXPO_PUBLIC_SERVER_URL
+ * (e.g. http://192.168.1.20:8787 when running on a physical phone).
  */
-export const SERVER_URL: string =
+export const SERVER_HTTP: string = (
   process.env.EXPO_PUBLIC_SERVER_URL ??
   // The Android emulator reaches the host machine through 10.0.2.2.
-  (Platform.OS === 'android' ? 'ws://10.0.2.2:8787' : 'ws://localhost:8787');
+  (Platform.OS === 'android' ? 'http://10.0.2.2:8787' : 'http://localhost:8787')
+).replace(/\/$/, '');
+
+export const SERVER_WS = `${SERVER_HTTP.replace(/^http/, 'ws')}/ws`;
+
+/** Google Sign-In client ids from the Google Cloud console (unset = Google login unavailable). */
+export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+export const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;

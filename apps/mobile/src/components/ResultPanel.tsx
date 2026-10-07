@@ -10,12 +10,15 @@ interface Props {
   table: TableSnapshot;
   result: HandResult;
   countdown: number | null;
+  /** Coins settled for this hand, once the wallet update has arrived. */
+  handCoins: number | null;
+  gameCoins: number;
   onNextHand(): void;
   onNewGame(): void;
   onHome(): void;
 }
 
-export function ResultPanel({ table, result, countdown, onNextHand, onNewGame, onHome }: Props) {
+export function ResultPanel({ table, result, countdown, handCoins, gameCoins, onNextHand, onNewGame, onHome }: Props) {
   const name = (seat: Seat) => table.seats[seat].name;
   const draw = result.drawSettlement;
   const tag = (seat: Seat) => {
@@ -33,6 +36,12 @@ export function ResultPanel({ table, result, countdown, onNextHand, onNewGame, o
           {table.gameOver ? T.gameResult : T.handResult} · {T.hand(table.handIndex, table.handsPerGame)} ·{' '}
           {result.reason === 'threeWon' ? T.threeWon : T.wallExhausted}
         </Text>
+        {table.stake.multiplier > 0 && (
+          <Text style={styles.coins}>
+            {handCoins !== null ? T.handCoins(handCoins) : ''}
+            {table.gameOver ? `   ${T.gameCoins(gameCoins)}` : ''}
+          </Text>
+        )}
         <ScrollView style={styles.scroll} contentContainerStyle={{ gap: 6 }}>
           {result.wins.map((w) => (
             <View key={w.order} style={styles.win}>
@@ -110,6 +119,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: { fontSize: 17, fontWeight: '800', color: '#3e2723' },
+  coins: { fontSize: 15, fontWeight: '800', color: '#bf360c' },
   scroll: { flexGrow: 0 },
   win: { backgroundColor: '#fff3e0', borderRadius: 10, padding: 8, gap: 3 },
   winText: { fontWeight: '700', color: '#4e342e' },

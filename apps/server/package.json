@@ -9,14 +9,20 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "@fastify/cors": "^11.3.0",
     "@mahjong/ai-play": "workspace:*",
+    "@mahjong/dialogue": "workspace:*",
     "@mahjong/engine": "workspace:*",
     "@mahjong/protocol": "workspace:*",
+    "fastify": "^5.12.5",
+    "jose": "^6.2.12",
+    "pg": "^8.23.1",
     "ws": "^8.22.0",
-    "zod": "^4.6.5",
-    "@mahjong/dialogue": "workspace:*"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/pg": "^8.23.1",
     "@types/ws": "^8.18.2",
     "tsx": "^4.23.15"
   }
