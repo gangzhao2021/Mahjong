@@ -50,11 +50,14 @@ export interface Player {
   playerId: string;
   name: string;
   createdAt: string;
+  /** Player's banter setting (PRD §7); null = regional default. */
+  banterLevel?: 'mild' | 'spicy' | 'quiet' | null;
 }
 
 /** Anonymous device-ID identity; becomes the guest account in Phase 3. */
 export interface PlayerStore {
   getOrCreate(deviceId: string): Promise<Player>;
+  update(playerId: string, patch: Partial<Omit<Player, 'playerId'>>): Promise<Player | null>;
 }
 
 export class FilePlayerStore implements PlayerStore {
@@ -79,13 +82,25 @@ export class FilePlayerStore implements PlayerStore {
     if (existing) return existing;
     const player = newPlayer();
     this.cache![deviceId] = player;
+    await this.flush();
+    return player;
+  }
+
+  async update(playerId: string, patch: Partial<Omit<Player, 'playerId'>>): Promise<Player | null> {
+    const entry = Object.values(this.cache ?? {}).find((p) => p.playerId === playerId);
+    if (!entry) return null;
+    Object.assign(entry, patch);
+    await this.flush();
+    return entry;
+  }
+
+  private async flush(): Promise<void> {
     const snapshot = JSON.stringify(this.cache, null, 1);
     this.writing = this.writing.then(async () => {
       await mkdir(this.dir, { recursive: true });
       await writeAtomic(this.file, snapshot);
     });
     await this.writing;
-    return player;
   }
 }
 
@@ -94,6 +109,13 @@ export class MemoryPlayerStore implements PlayerStore {
   async getOrCreate(deviceId: string): Promise<Player> {
     let p = this.players.get(deviceId);
     if (!p) this.players.set(deviceId, (p = newPlayer()));
+    return p;
+  }
+
+  async update(playerId: string, patch: Partial<Omit<Player, 'playerId'>>): Promise<Player | null> {
+    const p = [...this.players.values()].find((x) => x.playerId === playerId);
+    if (!p) return null;
+    Object.assign(p, patch);
     return p;
   }
 }

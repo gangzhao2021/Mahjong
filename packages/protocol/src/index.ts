@@ -3,17 +3,41 @@
  * The server is authoritative: clients send intents, the server sends
  * per-seat views (never the full state).
  */
+import type { BanterLevel, QuickPhrase, StickerId } from '@mahjong/dialogue';
 import type { Action, GameEvent, HandView, Seat } from '@mahjong/engine';
 
-export const PROTOCOL_VERSION = 1;
+export type { BanterLevel, QuickPhrase, StickerId };
+
+export const PROTOCOL_VERSION = 2;
 
 export interface SeatInfo {
   seat: Seat;
   name: string;
-  /** Placeholder avatar (emoji) until the avatar library exists (Phase 2/5). */
+  /** Emoji avatar until the avatar art exists (Phase 6). */
   avatar: string;
   isHuman: boolean;
+  /** AI character's personality name, e.g. 毒舌 (PRD §5). */
+  personality?: string;
 }
+
+/** One line at the table: AI speech, player chat, quick phrase or sticker. */
+export interface ChatEntry {
+  id: number;
+  seat: Seat;
+  kind: 'ai' | 'player' | 'quickPhrase' | 'sticker';
+  text: string | null;
+  sticker: StickerId | null;
+  target: Seat | 'table';
+  /** Server epoch ms. */
+  at: number;
+}
+
+export interface ChatCatalog {
+  quickPhrases: QuickPhrase[];
+  stickers: { id: StickerId; emoji: string; label: string }[];
+}
+
+export type ChatRejection = 'blocked' | 'rateLimited' | 'suspended' | 'tooLong' | 'notInGame';
 
 export type TimerKind = 'swap' | 'dingque' | 'discard' | 'claim' | 'nextHand';
 
@@ -42,6 +66,8 @@ export interface TableSnapshot {
   /** "Skip to results" is active for the rest of this hand. */
   fastForward: boolean;
   gameOver: boolean;
+  /** Recent table chat, oldest first. */
+  chat: ChatEntry[];
 }
 
 export interface GameOptions {
@@ -57,12 +83,19 @@ export type ClientMessage =
   | { type: 'setAutoPlay'; on: boolean }
   | { type: 'skipToResults' }
   | { type: 'nextHand' }
-  | { type: 'leaveGame' };
+  | { type: 'leaveGame' }
+  | { type: 'chat'; text: string; target?: Seat | 'table' }
+  | { type: 'quickPhrase'; id: string }
+  | { type: 'sticker'; id: StickerId }
+  | { type: 'setBanter'; level: BanterLevel };
 
 export type ServerMessage =
-  | { type: 'welcome'; playerId: string; inGame: boolean }
+  | { type: 'welcome'; playerId: string; inGame: boolean; banterLevel: BanterLevel; catalog: ChatCatalog }
   | { type: 'table'; table: TableSnapshot; events: GameEvent[] }
   | { type: 'left' }
+  | { type: 'chat'; entry: ChatEntry }
+  | { type: 'chatRejected'; reason: ChatRejection }
+  | { type: 'banter'; level: BanterLevel }
   | { type: 'error'; code: ErrorCode; message: string };
 
 export type ErrorCode = 'badMessage' | 'notInGame' | 'illegalAction' | 'protocolMismatch' | 'helloRequired';

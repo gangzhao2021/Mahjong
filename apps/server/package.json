@@ -8,10 +8,13 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@mahjong/ai-play": "workspace:*",
     "@mahjong/engine": "workspace:*",
     "@mahjong/protocol": "workspace:*",
-    "ws": "^8.22.0"
+    "ws": "^8.22.0",
+    "zod": "^4.6.5",
+    "@mahjong/dialogue": "workspace:*"
   },
   "devDependencies": {
     "@types/ws": "^8.18.2",

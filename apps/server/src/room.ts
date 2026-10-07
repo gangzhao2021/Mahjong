@@ -22,16 +22,29 @@ import {
   type RuleSet,
   type Seat,
 } from '@mahjong/engine';
+import type { BanterLevel, Character, DialogueSettings, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
 import type { SeatInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
 import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
+import type { LlmProvider } from './llm/provider';
 import { AiSeat, HumanSeat, type SeatController } from './seats';
 import type { HandLog, HandLogStore } from './store';
+import { TableTalk } from './talk';
 
 export interface AiSeatSpec {
-  name: string;
-  avatar: string;
+  character: Character;
+  personality: Personality;
   skill: SkillLevel;
+}
+
+/** Conversation setup for the room (PRD §6–§7). */
+export interface RoomTalkOptions {
+  settings: DialogueSettings;
+  idleEveryDiscards: number;
+  llm: LlmProvider;
+  moderator: Moderator;
+  /** The player's current banter setting (can change mid-game). */
+  banterLevel(): BanterLevel;
 }
 
 export interface RoomOptions {
@@ -46,6 +59,7 @@ export interface RoomOptions {
   ai: AiSeatSpec[];
   store: HandLogStore;
   rng: Rng;
+  talk: RoomTalkOptions;
   /** Called once the whole game is over and nobody needs the room any more. */
   onClosed?: (room: Room) => void;
 }
@@ -71,6 +85,7 @@ export class Room {
   private fastForward = false;
   private timer: Timer | null = null;
   private closed = false;
+  private readonly talk: TableTalk;
 
   constructor(private readonly opts: RoomOptions) {
     this.id = opts.gameId;
@@ -78,6 +93,7 @@ export class Room {
     this.game = createGame({ ruleSet: opts.ruleSet, baseScore: opts.baseScore, seed: opts.seed });
 
     const ai = [...opts.ai];
+    const speakers: Speaker[] = [];
     this.human = new HumanSeat(
       { seat: opts.humanSeat, name: opts.human.name, avatar: opts.human.avatar, isHuman: true },
       opts.human.playerId,
@@ -85,11 +101,34 @@ export class Room {
     this.seats = SEATS.map((seat) => {
       if (seat === opts.humanSeat) return this.human;
       const spec = ai.shift()!;
-      const info: SeatInfo = { seat, name: spec.name, avatar: spec.avatar, isHuman: false };
+      const { character, personality } = spec;
+      speakers.push({ seat, character, personality });
+      const info: SeatInfo = { seat, name: character.name, avatar: character.avatar, isHuman: false, personality: personality.name };
       return new AiSeat(info, spec.skill, opts.rng, (skill) => this.aiThinkMs(skill), (action, version) =>
         this.submit({ ...action, seat }, version, 'ai'),
       );
     });
+
+    this.talk = new TableTalk({
+      speakers,
+      humanSeat: opts.humanSeat,
+      settings: opts.talk.settings,
+      idleEveryDiscards: opts.talk.idleEveryDiscards,
+      llm: opts.talk.llm,
+      moderator: opts.talk.moderator,
+      rng: opts.rng,
+      level: opts.talk.banterLevel,
+      nameOf: (seat) => this.seats[seat].info.name,
+      viewFor: (seat) => viewFor(this.hand, seat),
+      version: () => this.hand.actionCount,
+      handIndex: () => this.handIndex,
+      emit: (entry) => this.human.send({ type: 'chat', entry }),
+    });
+  }
+
+  /** In-flight LLM dialogue requests (for tests). */
+  get pendingDialogue(): Promise<unknown> {
+    return Promise.all([...this.talk.pending]);
   }
 
   get isClosed(): boolean {
@@ -155,6 +194,19 @@ export class Room {
     else this.setAutoPlay(true);
   }
 
+  /** A moderated player chat message. */
+  playerChat(text: string, target: Seat | 'table'): void {
+    if (!this.closed) this.talk.onPlayerChat(text, target);
+  }
+
+  quickPhrase(text: string): void {
+    if (!this.closed) this.talk.onQuickPhrase(text);
+  }
+
+  sticker(id: StickerId): void {
+    if (!this.closed) this.talk.onSticker(id);
+  }
+
   snapshot(): TableSnapshot {
     return this.snapshotFor(this.humanSeat);
   }
@@ -188,6 +240,7 @@ export class Room {
       endedAt: null,
     };
     this.publish([]);
+    this.talk.onHandStart();
   }
 
   /** Applies an action from any seat. Returns null, 'stale', or an error message. */
@@ -212,6 +265,8 @@ export class Room {
       void this.opts.store.save(this.log).catch((err) => console.error('Failed to save hand log', err));
     }
     this.publish(events);
+    // Conversation sees only public information (events redacted for the human seat).
+    this.talk.onEvents(events.map((e) => redactEvent(e, this.humanSeat)));
     return null;
   }
 
@@ -307,6 +362,7 @@ export class Room {
       autoPlay: this.autoPlay,
       fastForward: this.fastForward,
       gameOver: this.gameOver,
+      chat: this.talk.chatLog,
     };
   }
 
@@ -314,6 +370,7 @@ export class Room {
     if (this.closed) return;
     this.closed = true;
     this.clearTimer();
+    this.talk.dispose();
     for (const s of this.seats) s.dispose();
     this.opts.onClosed?.(this);
   }

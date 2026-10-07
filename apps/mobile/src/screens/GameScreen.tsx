@@ -3,6 +3,7 @@ import type { TableSnapshot } from '@mahjong/protocol';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionBar, Btn } from '../components/ActionBar';
+import { BanterPicker, ChatPanel, SpeechBubbles } from '../components/Chat';
 import { PlayerHand, type HandTile } from '../components/PlayerHand';
 import { ResultPanel } from '../components/ResultPanel';
 import { Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
@@ -32,6 +33,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const countdown = useCountdown(table.timer, receivedAt);
   const [selection, setSelection] = useState<{ handKey: string; tiles: HandTile[] }>({ handKey: '', tiles: [] });
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const callouts = useCallouts(game.events, sideOf);
 
   // Selections only make sense for the hand they were made on.
@@ -86,6 +88,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         <View style={styles.menu}>
           <Btn label={T.leave} onPress={() => (table.gameOver ? game.leaveGame() : setConfirmLeave(true))} />
           <Btn label={T.autoPlay} primary={table.autoPlay} onPress={() => game.setAutoPlay(!table.autoPlay)} />
+          <Btn label={`💬 ${T.chat}`} onPress={() => setChatOpen(true)} />
         </View>
         {opponent(2)}
         <Text style={styles.handInfo}>{T.hand(table.handIndex, table.handsPerGame)}</Text>
@@ -147,6 +150,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
       </View>
 
+      <SpeechBubbles chat={game.chat} catalog={game.catalog} positionOf={(seat) => BUBBLE_POSITION[sideOf(seat)]} />
+
       {callouts.map((c) => (
         <View key={c.id} pointerEvents="none" style={[styles.callout, CALLOUT_POSITION[c.side]]}>
           <Text style={styles.calloutText}>{c.text}</Text>
@@ -174,6 +179,24 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           onNewGame={onNewGame}
           onHome={game.leaveGame}
         />
+      )}
+
+      {chatOpen && (
+        <View style={styles.chatLayer}>
+          <ChatPanel
+            chat={game.chat}
+            catalog={game.catalog}
+            seats={table.seats}
+            mySeat={view.seat}
+            onSend={game.sendChat}
+            onQuickPhrase={game.sendQuickPhrase}
+            onSticker={game.sendSticker}
+            onClose={() => setChatOpen(false)}
+          />
+          <View style={styles.chatBanter}>
+            <BanterPicker level={game.banterLevel} onChange={game.setBanter} />
+          </View>
+        </View>
       )}
 
       {confirmLeave && (
@@ -234,6 +257,14 @@ function calloutText(e: GameEvent): string | null {
   }
 }
 
+/** Where each seat's speech bubble appears. */
+const BUBBLE_POSITION = {
+  0: { left: 150, bottom: 120 },
+  1: { right: 190, top: '26%' },
+  2: { top: 56, left: '56%' },
+  3: { left: 190, top: '26%' },
+} as const;
+
 const CALLOUT_POSITION = {
   0: { bottom: '32%', alignSelf: 'center' },
   1: { right: '24%', top: '40%' },
@@ -288,6 +319,15 @@ const styles = StyleSheet.create({
   },
   bannerText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   skip: { position: 'absolute', alignSelf: 'center', bottom: '30%' },
+  chatLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  chatBanter: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    padding: 8,
+  },
   modalBackdrop: {
     position: 'absolute',
     top: 0,

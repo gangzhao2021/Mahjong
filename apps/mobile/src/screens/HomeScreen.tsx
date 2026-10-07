@@ -1,12 +1,21 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import type { BanterLevel } from '@mahjong/protocol';
 import { Btn } from '../components/ActionBar';
+import { BanterPicker } from '../components/Chat';
 import type { ConnectionStatus } from '../net/useGame';
 import { T } from '../strings';
 
 const HAND_OPTIONS = [1, 4, 8];
 
-export function HomeScreen({ status, onStart }: { status: ConnectionStatus; onStart(handsPerGame: number): void }) {
+interface Props {
+  status: ConnectionStatus;
+  banterLevel: BanterLevel;
+  onBanter(level: BanterLevel): void;
+  onStart(handsPerGame: number): void;
+}
+
+export function HomeScreen({ status, banterLevel, onBanter, onStart }: Props) {
   const [hands, setHands] = useState(4);
   const online = status === 'online';
   return (
@@ -18,6 +27,7 @@ export function HomeScreen({ status, onStart }: { status: ConnectionStatus; onSt
           <Btn key={n} label={`${n}`} primary={hands === n} onPress={() => setHands(n)} />
         ))}
       </View>
+      {online && <BanterPicker level={banterLevel} onChange={onBanter} />}
       <Btn label={T.start} big primary disabled={!online} onPress={() => onStart(hands)} />
       {!online && <Text style={styles.status}>{status === 'connecting' ? T.connecting : T.offline}</Text>}
     </View>

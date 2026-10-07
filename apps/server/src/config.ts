@@ -45,10 +45,3 @@ export const DEFAULT_CONFIG: ServerConfig = {
   defaultHandsPerGame: 4,
   maxHandsPerGame: 16,
 };
-
-/**
- * Phase 1 placeholder opponents. Phase 2 replaces these with the persistent
- * AI Character roster (PRD §9, Appendix B).
- */
-export const PLACEHOLDER_AI_NAMES = ['老王', '张姐', '阿强', '胖哥', '刘阿姨', '小美', '陈师傅', '赵老板', '二娃', '幺妹'];
-export const PLACEHOLDER_AVATARS = ['🐼', '🦊', '🐯', '🐸', '🐵', '🐧', '🐰', '🐻', '🐨', '🦁'];

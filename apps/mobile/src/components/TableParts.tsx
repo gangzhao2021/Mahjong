@@ -56,6 +56,7 @@ export function SeatCard({ info, score, voidSuit, dealer, active, won, handCount
           <Text style={styles.name} numberOfLines={1}>
             {info.name}
           </Text>
+          {!info.isHuman && <Text style={[styles.badge, styles.aiBadge]}>{T.aiBadge}</Text>}
           {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
           {voidSuit !== null && <Text style={[styles.badge, styles.voidBadge]}>缺{SUIT_NAMES[voidSuit]}</Text>}
           {won && <Text style={[styles.badge, styles.wonBadge]}>{T.hu}</Text>}
@@ -63,6 +64,7 @@ export function SeatCard({ info, score, voidSuit, dealer, active, won, handCount
         <Text style={[styles.score, score > 0 ? styles.plus : score < 0 ? styles.minus : null]}>
           {score > 0 ? `+${score}` : score}
           {!info.isHuman && !won ? `  · ${handCount}张` : ''}
+          {info.personality ? <Text style={styles.personality}>{`  ${info.personality}`}</Text> : null}
         </Text>
       </View>
     </View>
@@ -104,6 +106,9 @@ const styles = StyleSheet.create({
   name: { color: '#fff', fontWeight: '700', fontSize: 13, maxWidth: 90 },
   badge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 4, borderRadius: 4, overflow: 'hidden' },
   dealerBadge: { backgroundColor: '#ffd54f', color: '#5d4100' },
+  // AI-generated characters are always labelled as AI (Appendix D.4).
+  aiBadge: { backgroundColor: '#80deea', color: '#004d55' },
+  personality: { color: '#b2dfdb', fontSize: 11 },
   voidBadge: { backgroundColor: '#eceff1', color: '#37474f' },
   wonBadge: { backgroundColor: '#e53935', color: '#fff' },
   score: { color: '#e0f2e9', fontSize: 12, fontVariant: ['tabular-nums'] },

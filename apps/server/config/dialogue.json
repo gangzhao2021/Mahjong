@@ -1,0 +1,32 @@
+{
+  "settings": {
+    "conversationFrequency": 0.8,
+    "proactiveFrequency": 0.6,
+    "stickerFrequency": 0.6,
+    "bluffIntensity": 0.6,
+    "trashTalkIntensity": 0.8,
+    "sarcasmIntensity": 0.7,
+    "maxSpeakersPerTrigger": 2,
+    "seatCooldownMs": 7000,
+    "tableCooldownMs": 2500,
+    "relevanceWindowActions": 8,
+    "aiReplyChance": 0.3,
+    "llmPerHand": 14
+  },
+  "idleEveryDiscards": 9,
+  "chat": {
+    "maxLength": 60,
+    "minIntervalMs": 3000,
+    "perMinute": 10,
+    "violationsBeforeSuspension": 5,
+    "violationWindowMs": 86400000,
+    "suspensionMs": 86400000
+  },
+  "llm": {
+    "routineModel": "claude-haiku-4-5",
+    "highValueModel": "claude-opus-5-5",
+    "timeoutMs": 6000,
+    "dailyRequestCap": 20000
+  },
+  "extraBlocklist": []
+}

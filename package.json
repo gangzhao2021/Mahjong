@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p packages/engine && tsc -p packages/ai-play && tsc -p packages/protocol && tsc -p apps/server && tsc -p apps/mobile",
+    "typecheck": "tsc -p packages/engine && tsc -p packages/ai-play && tsc -p packages/dialogue && tsc -p packages/protocol && tsc -p apps/server && tsc -p apps/mobile",
     "server": "pnpm --filter @mahjong/server dev",
     "mobile": "pnpm --filter @mahjong/mobile start",
     "mobile:web": "pnpm --filter @mahjong/mobile web",

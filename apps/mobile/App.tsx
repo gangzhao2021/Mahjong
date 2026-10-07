@@ -1,7 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useGame } from './src/net/useGame';
+import { T } from './src/strings';
 import { GameScreen } from './src/screens/GameScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 
@@ -16,6 +17,15 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [error, clearError]);
 
+  const [rejectedAt, setRejectedAt] = useState(0);
+  const rejection = game.chatRejected;
+  useEffect(() => {
+    if (!rejection) return;
+    const timer = setTimeout(() => setRejectedAt(rejection.at), 2500);
+    return () => clearTimeout(timer);
+  }, [rejection]);
+  const showRejection = rejection && rejection.at !== rejectedAt ? T.chatRejected[rejection.reason] : null;
+
   const start = (handsPerGame: number) => {
     lastHands.current = handsPerGame;
     game.startGame({ handsPerGame });
@@ -27,11 +37,16 @@ export default function App() {
       {game.table ? (
         <GameScreen game={{ ...game, table: game.table }} onNewGame={() => start(lastHands.current)} />
       ) : (
-        <HomeScreen status={game.status} onStart={start} />
+        <HomeScreen status={game.status} banterLevel={game.banterLevel} onBanter={game.setBanter} onStart={start} />
       )}
       {game.error && (
         <View pointerEvents="none" style={styles.toast}>
           <Text style={styles.toastText}>{game.error}</Text>
+        </View>
+      )}
+      {showRejection && (
+        <View pointerEvents="none" style={styles.toast}>
+          <Text style={styles.toastText}>{showRejection}</Text>
         </View>
       )}
       {game.table && game.status !== 'online' && (

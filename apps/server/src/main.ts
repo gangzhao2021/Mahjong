@@ -1,15 +1,22 @@
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { DEFAULT_CONFIG } from './config';
+import { createLlmProvider, createModerator, loadDialogueConfig } from './dialogueConfig';
 import { Lobby } from './lobby';
 import { FileHandLogStore, FilePlayerStore } from './store';
 
 const config = DEFAULT_CONFIG;
+const dialogue = loadDialogueConfig();
+const llm = createLlmProvider(dialogue);
 const lobby = new Lobby({
   config,
+  dialogue,
+  llm,
+  moderator: createModerator(dialogue),
   hands: new FileHandLogStore(config.dataDir),
   players: new FilePlayerStore(config.dataDir),
 });
+console.log(`Region: ${dialogue.region}; dialogue provider: ${llm.name}`);
 
 const http = createServer((req, res) => {
   if (req.url === '/health') {

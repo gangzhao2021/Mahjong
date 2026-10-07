@@ -1,8 +1,10 @@
 /** Connections, identity and room lifecycle for single-player tables. */
 import type { Rng } from '@mahjong/ai-play';
+import { BANTER_LEVELS, selectCharacters, STICKERS, type BanterLevel, type Moderator, type StickerId } from '@mahjong/dialogue';
 import { createRng, DEFAULT_RULESET, isValidTile, type Action, type Seat } from '@mahjong/engine';
 import {
   PROTOCOL_VERSION,
+  type ChatCatalog,
   type ClientMessage,
   type ErrorCode,
   type GameOptions,
@@ -10,12 +12,18 @@ import {
 } from '@mahjong/protocol';
 import { randomInt, randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { PLACEHOLDER_AI_NAMES, PLACEHOLDER_AVATARS, type ServerConfig } from './config';
+import { ChatGuard } from './chatGuard';
+import type { ServerConfig } from './config';
+import type { DialogueConfig } from './dialogueConfig';
+import type { LlmProvider } from './llm/provider';
 import { Room, type AiSeatSpec } from './room';
 import type { HandLogStore, Player, PlayerStore } from './store';
 
 export interface LobbyDeps {
   config: ServerConfig;
+  dialogue: DialogueConfig;
+  llm: LlmProvider;
+  moderator: Moderator;
   hands: HandLogStore;
   players: PlayerStore;
   /** Seed source; injectable for deterministic tests. */
@@ -26,9 +34,20 @@ export class Lobby {
   /** Active room per player. */
   private rooms = new Map<string, Room>();
   private rng: Rng;
+  private chatGuard: ChatGuard;
+  private readonly catalog: ChatCatalog;
 
   constructor(private readonly deps: LobbyDeps) {
     this.rng = createRng(this.nextSeed());
+    this.chatGuard = new ChatGuard(deps.dialogue.chat);
+    this.catalog = {
+      quickPhrases: deps.dialogue.quickPhrases,
+      stickers: (Object.keys(STICKERS) as StickerId[]).map((id) => ({ id, ...STICKERS[id] })),
+    };
+  }
+
+  private banterOf(player: Player): BanterLevel {
+    return player.banterLevel ?? this.deps.dialogue.defaultBanter;
   }
 
   roomOf(playerId: string): Room | undefined {
@@ -59,7 +78,7 @@ export class Lobby {
         }
         player = await this.deps.players.getOrCreate(msg.deviceId);
         const room = this.rooms.get(player.playerId);
-        send({ type: 'welcome', playerId: player.playerId, inGame: !!room });
+        send({ type: 'welcome', playerId: player.playerId, inGame: !!room, banterLevel: this.banterOf(player), catalog: this.catalog });
         room?.attach(socket);
         return;
       }
@@ -98,6 +117,44 @@ export class Lobby {
           room?.leave();
           send({ type: 'left' });
           return;
+        case 'setBanter': {
+          if (!BANTER_LEVELS.includes(msg.level)) return fail('badMessage', 'Unknown banter level');
+          player = (await this.deps.players.update(player.playerId, { banterLevel: msg.level })) ?? player;
+          send({ type: 'banter', level: msg.level });
+          return;
+        }
+        case 'chat': {
+          if (!room) return send({ type: 'chatRejected', reason: 'notInGame' });
+          if (typeof msg.text !== 'string') return fail('badMessage', 'Malformed chat');
+          const text = msg.text.trim();
+          if ([...text].length > this.deps.dialogue.chat.maxLength) return send({ type: 'chatRejected', reason: 'tooLong' });
+          const target: Seat | 'table' = [1, 2, 3].includes(msg.target as number) ? (msg.target as Seat) : 'table';
+          const admitted = this.chatGuard.admit(player.playerId);
+          if (admitted) return send({ type: 'chatRejected', reason: admitted });
+          // Moderate before any AI or display sees it (PRD §7.1).
+          const verdict = await this.deps.moderator.check(text, 'playerChat');
+          if (!verdict.allowed) {
+            this.chatGuard.violation(player.playerId);
+            return send({ type: 'chatRejected', reason: this.chatGuard.isSuspended(player.playerId) ? 'suspended' : 'blocked' });
+          }
+          room.playerChat(text, target);
+          return;
+        }
+        case 'quickPhrase': {
+          const phrase = this.deps.dialogue.quickPhrases.find((q) => q.id === msg.id);
+          if (!room || !phrase) return;
+          const admitted = this.chatGuard.admit(player.playerId);
+          if (admitted) return send({ type: 'chatRejected', reason: admitted });
+          room.quickPhrase(phrase.text);
+          return;
+        }
+        case 'sticker': {
+          if (!room || !(msg.id in STICKERS)) return;
+          const admitted = this.chatGuard.admit(player.playerId);
+          if (admitted) return send({ type: 'chatRejected', reason: admitted });
+          room.sticker(msg.id);
+          return;
+        }
         default:
           fail('badMessage', 'Unknown message type');
       }
@@ -110,11 +167,9 @@ export class Lobby {
 
   private createRoom(player: Player, options: Required<GameOptions>, socket: WebSocket): Room {
     const humanSeat = 0 as Seat;
-    const names = shuffled(PLACEHOLDER_AI_NAMES, this.rng);
-    const avatars = shuffled(PLACEHOLDER_AVATARS, this.rng);
-    const ai: AiSeatSpec[] = [0, 1, 2].map((i) => ({
-      name: names[i],
-      avatar: avatars[i],
+    // Persistent characters; skill is chosen independently per game (PRD §3.2).
+    const ai: AiSeatSpec[] = selectCharacters(this.deps.dialogue.roster, 3, this.rng).map((c) => ({
+      ...c,
       skill: pickWeighted(this.deps.config.skillWeights, this.rng),
     }));
     const room = new Room({
@@ -128,6 +183,14 @@ export class Lobby {
       ai,
       store: this.deps.hands,
       rng: createRng(this.nextSeed()),
+      talk: {
+        settings: this.deps.dialogue.settings,
+        idleEveryDiscards: this.deps.dialogue.idleEveryDiscards,
+        llm: this.deps.llm,
+        moderator: this.deps.moderator,
+        // Read live (the store updates this same object) so a settings change applies mid-game.
+        banterLevel: () => this.banterOf(player),
+      },
       onClosed: (r) => {
         if (this.rooms.get(player.playerId) === r) this.rooms.delete(player.playerId);
       },
@@ -156,15 +219,6 @@ export function pickWeighted<K extends string>(weights: Record<K, number>, rng: 
     if ((r -= w) < 0) return k;
   }
   return entries[entries.length - 1][0];
-}
-
-function shuffled<T>(items: readonly T[], rng: Rng): T[] {
-  const a = [...items];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 function sanitizeOptions(options: GameOptions | undefined, config: ServerConfig): Required<GameOptions> {
