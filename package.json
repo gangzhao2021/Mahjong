@@ -1,6 +1,7 @@
 {
   "name": "mahjong",
   "private": true,
+  "packageManager": "pnpm@10.13.1",
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p packages/engine && tsc -p packages/ai-play && tsc -p packages/dialogue && tsc -p packages/protocol && tsc -p apps/server && tsc -p apps/mobile && tsc -p apps/admin",
