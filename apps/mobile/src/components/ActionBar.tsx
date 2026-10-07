@@ -2,6 +2,7 @@
 import { suitOf, type Action, type HandView, type Suit, type Tile } from '@mahjong/engine';
 import type { DistributiveOmit } from '@mahjong/protocol';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { playSfx } from '../audio/sound';
 import { SUIT_NAMES, T } from '../strings';
 import { Tile as TileView } from './Tile';
 
@@ -99,7 +100,10 @@ interface BtnProps {
 export function Btn({ label, onPress, disabled, primary, danger, big }: BtnProps) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        playSfx('tap', 0.5);
+        onPress();
+      }}
       disabled={disabled}
       accessibilityRole="button"
       style={({ pressed }) => [

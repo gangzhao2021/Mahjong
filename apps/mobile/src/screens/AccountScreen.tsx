@@ -3,6 +3,8 @@ import type { AccountSummary, BanterLevel, LoginMethod, ServerInfo } from '@mahj
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
+import { AboutSheet } from './AboutSheet';
+import { updateSoundSettings, useSoundSettings } from '../audio/sound';
 import { BanterPicker } from '../components/Chat';
 import { formStyles, Sheet } from '../components/Sheet';
 import { api, ApiError, type LedgerEntry } from '../net/api';
@@ -54,6 +56,9 @@ export function AccountScreen({ info, token, account, onAccount, onBanter, onLog
     }
   };
 
+  const sound = useSoundSettings();
+  const [aboutOpen, setAboutOpen] = useState(false);
+  if (aboutOpen) return <AboutSheet china={info.region === 'china'} onClose={() => setAboutOpen(false)} />;
   const linkable = info.loginMethods.filter((m): m is Exclude<LoginMethod, 'guest'> => m !== 'guest' && !account.providers.includes(m));
 
   if (confirmDelete) {
@@ -92,6 +97,11 @@ export function AccountScreen({ info, token, account, onAccount, onBanter, onLog
       </View>
       <View style={styles.banter}>
         <BanterPicker level={account.banterLevel} onChange={onBanter} />
+      </View>
+      <View style={formStyles.row}>
+        <Text style={formStyles.label}>{T.sound.title}</Text>
+        <Btn label={`${T.sound.effects}：${sound.effects ? T.sound.on : T.sound.off}`} primary={sound.effects} onPress={() => updateSoundSettings({ effects: !sound.effects })} />
+        <Btn label={`${T.sound.music}：${sound.music ? T.sound.on : T.sound.off}`} primary={sound.music} onPress={() => updateSoundSettings({ music: !sound.music })} />
       </View>
 
       <View style={formStyles.row}>
@@ -135,6 +145,7 @@ export function AccountScreen({ info, token, account, onAccount, onBanter, onLog
       </View>
 
       <View style={formStyles.row}>
+        <Btn label={T.about.title} onPress={() => setAboutOpen(true)} />
         <Btn label={T.logout} onPress={onLogout} />
         <Btn label={T.deleteAccount} danger onPress={() => setConfirmDelete(true)} />
       </View>

@@ -20,6 +20,7 @@ import {
   type TableSnapshot,
 } from '@mahjong/protocol';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { SERVER_WS } from '../config';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
@@ -136,7 +137,12 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
         ws.send(JSON.stringify({ type: 'hello', token, protocol: PROTOCOL_VERSION } satisfies ClientMessage));
       };
       ws.onmessage = (e) => {
-        const msg = JSON.parse(String(e.data)) as ServerMessage;
+        let msg: ServerMessage;
+        try {
+          msg = JSON.parse(String(e.data)) as ServerMessage;
+        } catch {
+          return; // A malformed frame is dropped rather than crashing the table.
+        }
         switch (msg.type) {
           case 'welcome':
             setState((s) => ({
@@ -223,8 +229,16 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     };
 
     connect();
+    // Coming back to the foreground: reconnect now instead of waiting out the backoff.
+    const appState = AppState.addEventListener('change', (next) => {
+      if (next !== 'active' || disposed || socket.current) return;
+      clearTimeout(retry);
+      backoff = 1000;
+      connect();
+    });
     return () => {
       disposed = true;
+      appState.remove();
       clearTimeout(retry);
       socket.current?.close();
       socket.current = null;

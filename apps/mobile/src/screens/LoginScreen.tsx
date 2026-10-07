@@ -8,7 +8,9 @@ import { Btn } from '../components/ActionBar';
 import { formStyles } from '../components/Sheet';
 import { api, ApiError } from '../net/api';
 import { getDeviceId } from '../net/deviceId';
+import { AGE_RATING } from '../config';
 import { T } from '../strings';
+import { LegalLinks } from './ConsentScreen';
 
 export function errorText(e: unknown): string {
   if (e instanceof SignInUnavailable) return T.login.unavailable;
@@ -31,9 +33,10 @@ export async function credentialsFor(method: Exclude<LoginMethod, 'guest' | 'pho
 interface Props {
   info: ServerInfo;
   onLoggedIn(token: string, account: AccountSummary): void;
+  onOpenTutorial(): void;
 }
 
-export function LoginScreen({ info, onLoggedIn }: Props) {
+export function LoginScreen({ info, onLoggedIn, onOpenTutorial }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasApple, setHasApple] = useState(false);
@@ -85,8 +88,16 @@ export function LoginScreen({ info, onLoggedIn }: Props) {
           )}
         </View>
         {error && <Text style={formStyles.error}>{error}</Text>}
+        <Btn label={`📖 ${T.tutorial.fromLogin}`} onPress={onOpenTutorial} />
         <Text style={formStyles.hint}>{T.login.privacy}</Text>
+        <LegalLinks />
       </View>
+      {info.region === 'china' && (
+        <View style={styles.advisory}>
+          <Text style={styles.advisoryText}>{T.healthAdvice}</Text>
+          <Text style={styles.ageRating}>{T.ageRating(AGE_RATING)}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -132,4 +143,7 @@ const styles = StyleSheet.create({
   box: { backgroundColor: 'rgba(253,250,242,0.96)', borderRadius: 16, padding: 16, gap: 12, alignItems: 'center', maxWidth: 560 },
   phone: { gap: 8 },
   appleButton: { width: 200, height: 40 },
+  advisory: { position: 'absolute', bottom: 8, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  advisoryText: { flex: 1, color: '#c8e6c9', fontSize: 11, textAlign: 'center' },
+  ageRating: { color: '#1f6b47', backgroundColor: '#fff8e1', fontWeight: '800', fontSize: 12, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, overflow: 'hidden' },
 });

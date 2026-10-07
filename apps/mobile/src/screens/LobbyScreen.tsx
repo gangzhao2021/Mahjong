@@ -16,9 +16,12 @@ interface Props {
   onAccount(account: AccountSummary): void;
   onStart(options: GameOptions): void;
   onOpenAccount(): void;
+  onOpenTutorial(): void;
+  /** Lessons the player has finished (from local storage). */
+  tutorialDone: number;
 }
 
-export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount }: Props) {
+export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, tutorialDone }: Props) {
   const [rewardOpen, setRewardOpen] = useState(false);
   const [privateOpen, setPrivateOpen] = useState(false);
   const online = status === 'online';
@@ -36,11 +39,17 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
           </View>
         </Pressable>
         <View style={formStyles.row}>
+          <Btn label={`📖 ${T.tutorial.entry}`} onPress={onOpenTutorial} />
           <Btn label={account.reward.claimable ? `🎁 ${T.dailyReward}` : T.dailyReward} primary={account.reward.claimable} onPress={() => setRewardOpen(true)} />
           <Btn label={T.account} onPress={onOpenAccount} />
         </View>
       </View>
 
+      {tutorialDone === 0 && (
+        <Pressable style={styles.tutorialBanner} onPress={onOpenTutorial} accessibilityRole="button">
+          <Text style={styles.tutorialText}>📖 {T.tutorial.firstTime} →</Text>
+        </Pressable>
+      )}
       {limit && <Text style={styles.limit}>{limit.kind === 'minor' ? T.minorLimit(limit.until) : T.guestLimit(limit.until)}</Text>}
       {!online && <Text style={styles.limit}>{status === 'connecting' ? T.connecting : T.offline}</Text>}
 
@@ -189,6 +198,8 @@ const styles = StyleSheet.create({
   nickname: { color: '#fff', fontWeight: '800', fontSize: 15 },
   coins: { color: '#ffe082', fontWeight: '700', fontVariant: ['tabular-nums'] },
   limit: { color: '#ffcc80', fontSize: 13 },
+  tutorialBanner: { backgroundColor: '#ffd54f', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, alignSelf: 'flex-start' },
+  tutorialText: { color: '#5d4100', fontWeight: '800' },
   heading: { color: '#e8f5e9', fontSize: 15, fontWeight: '700' },
   tables: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   table: { width: 150, minHeight: 96, borderRadius: 14, padding: 12, backgroundColor: '#fdfaf2', justifyContent: 'center', gap: 4 },

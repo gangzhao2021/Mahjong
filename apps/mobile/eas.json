@@ -1,0 +1,43 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "base": {
+      "node": "22.12.0",
+      "pnpm": "10.13.1"
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_SERVER_URL": "http://192.168.1.20:8787" }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_SERVER_URL": "https://staging.example.com" }
+    },
+    "production": {
+      "extends": "base",
+      "autoIncrement": true,
+      "env": { "EXPO_PUBLIC_SERVER_URL": "https://api.example.com" }
+    },
+    "production-china": {
+      "extends": "production",
+      "env": {
+        "EXPO_PUBLIC_SERVER_URL": "https://api.example.cn",
+        "EXPO_PUBLIC_ICP": "",
+        "EXPO_PUBLIC_APP_FILING": "",
+        "EXPO_PUBLIC_AGE_RATING": "16+"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": { "ascAppId": "REPLACE_ME" },
+      "android": { "track": "internal" }
+    }
+  }
+}

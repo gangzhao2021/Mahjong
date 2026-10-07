@@ -2,9 +2,11 @@ import { suitOf, type GameEvent, type Seat, type Tile as TileKind } from '@mahjo
 import type { TableSnapshot } from '@mahjong/protocol';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { updateSoundSettings, useSoundSettings, useTableSounds } from '../audio/sound';
 import { ActionBar, Btn } from '../components/ActionBar';
 import { BanterPicker, ChatPanel, SpeechBubbles } from '../components/Chat';
 import { PlayerHand, type HandTile } from '../components/PlayerHand';
+import { PopIn } from '../components/PopIn';
 import { ResultPanel } from '../components/ResultPanel';
 import { Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
 import { Tile } from '../components/Tile';
@@ -35,6 +37,9 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const callouts = useCallouts(game.events, sideOf);
+  useTableSounds(game.events, game.chat, view.seat);
+  const sound = useSoundSettings();
+  const muted = !sound.effects && !sound.music;
 
   // Selections only make sense for the hand they were made on.
   const handKey = `${table.handIndex}:${view.phase}:${(me.hand ?? []).join(',')}`;
@@ -93,6 +98,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           <Btn label={T.leave} onPress={() => (table.gameOver ? game.leaveGame() : setConfirmLeave(true))} />
           <Btn label={T.autoPlay} primary={table.autoPlay} onPress={() => game.setAutoPlay(!table.autoPlay)} />
           <Btn label={`💬 ${T.chat}`} onPress={() => setChatOpen(true)} />
+          <Btn label={muted ? '🔇' : '🔊'} onPress={() => updateSoundSettings({ effects: muted, music: muted })} />
         </View>
         {opponent(2)}
         <View style={styles.stake}>
@@ -164,9 +170,9 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       <SpeechBubbles chat={game.chat} catalog={game.catalog} positionOf={(seat) => BUBBLE_POSITION[sideOf(seat)]} />
 
       {callouts.map((c) => (
-        <View key={c.id} pointerEvents="none" style={[styles.callout, CALLOUT_POSITION[c.side]]}>
+        <PopIn key={c.id} pointerEvents="none" from={0.3} style={[styles.callout, CALLOUT_POSITION[c.side]]}>
           <Text style={styles.calloutText}>{c.text}</Text>
-        </View>
+        </PopIn>
       ))}
 
       {table.autoPlay && (

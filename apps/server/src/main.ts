@@ -36,6 +36,14 @@ await app.listen({ port: config.port, host: '0.0.0.0' });
 console.log(`Region: ${dialogue.region}; dialogue provider: ${llm.name}; database: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'PGlite'}`);
 console.log(`Mahjong server on http://localhost:${config.port} (WebSocket /ws)`);
 
+// Last-resort error handling: log everything; an uncaught exception leaves the process in an
+// unknown state, so exit and let the process manager restart it.
+process.on('unhandledRejection', (reason) => console.error('Unhandled promise rejection:', reason));
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception, exiting:', error);
+  process.exit(1);
+});
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {
     lobby.closeAll();

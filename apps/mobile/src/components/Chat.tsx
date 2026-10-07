@@ -6,6 +6,7 @@ import type { LocalChatEntry } from '../net/useGame';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
 import { T } from '../strings';
 import { Btn } from './ActionBar';
+import { PopIn } from './PopIn';
 
 const BUBBLE_MS = 4500;
 
@@ -39,10 +40,10 @@ export function SpeechBubbles({
   return (
     <>
       {visible.map((e) => (
-        <View key={e.id} pointerEvents="none" style={[styles.bubble, positionOf(e.seat)]}>
+        <PopIn key={e.id} pointerEvents="none" from={0.8} style={[styles.bubble, positionOf(e.seat)]}>
           {e.text ? <Text style={styles.bubbleText}>{e.text}</Text> : null}
           {e.sticker ? <Text style={styles.bubbleSticker}>{stickerEmoji(catalog, e.sticker)}</Text> : null}
-        </View>
+        </PopIn>
       ))}
     </>
   );

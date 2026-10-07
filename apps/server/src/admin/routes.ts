@@ -289,6 +289,11 @@ export function registerAdminRoutes(app: FastifyInstance, d: AdminDeps): void {
         return { ok: true };
       });
 
+      admin.get('/crashes', async (req) => {
+        const days = Math.min(90, Math.max(1, Number((req.query as { days?: string }).days ?? 7) || 7));
+        return { groups: await s.crashes.groups(days) };
+      });
+
       admin.get('/audit', async () => {
         const rows = await db.query('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 200');
         return { entries: rows.map((r) => ({ id: Number(r.id), action: r.action, target: r.target, detail: r.detail, ip: r.ip, createdAt: iso(r.created_at) })) };

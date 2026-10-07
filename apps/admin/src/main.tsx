@@ -5,6 +5,7 @@ import { AiSettings } from './pages/AiSettings';
 import { Analytics } from './pages/Analytics';
 import { Audit } from './pages/Audit';
 import { CoinLog } from './pages/CoinLog';
+import { Crashes } from './pages/Crashes';
 import { Economy } from './pages/Economy';
 import { Libraries } from './pages/Libraries';
 import { Moderation } from './pages/Moderation';
@@ -21,6 +22,7 @@ const PAGES = {
   roster: { title: '性格与角色', render: () => <Roster /> },
   libraries: { title: '名字与头像库', render: () => <Libraries /> },
   moderation: { title: '内容审核', render: () => <Moderation /> },
+  crashes: { title: '崩溃报告', render: () => <Crashes /> },
   audit: { title: '操作日志', render: () => <Audit /> },
 } as const;
 type PageId = keyof typeof PAGES;

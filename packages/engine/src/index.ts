@@ -7,3 +7,4 @@ export * from './scoring';
 export * from './engine';
 export * from './view';
 export * from './game';
+export * from './custom';

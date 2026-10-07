@@ -7,6 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { legalPage } from './legal';
 import { registerAdminRoutes, type AdminDeps } from './admin/routes';
 import type { Moderator } from '@mahjong/dialogue';
 import { BANTER_LEVELS } from '@mahjong/dialogue';
@@ -118,7 +119,19 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
   const respond = async (player: PlayerRow, token?: string) => ({ ...(token ? { token } : {}), account: await accountSummary(s, player) });
 
   app.get('/health', async () => ({ ok: true }));
+
+  /** Client crash reports; the session is optional (crashes can happen before login). */
+  app.post('/telemetry/errors', async (req, reply: FastifyReply) => {
+    const header = req.headers.authorization ?? '';
+    const player = header.startsWith('Bearer ') ? await s.accounts.authenticate(header.slice(7)).catch(() => null) : null;
+    const accepted = await s.crashes.record(req.ip, player?.id ?? null, req.body);
+    return reply.status(accepted ? 202 : 429).send({ ok: accepted });
+  });
   app.get('/config', async () => serverInfo(s));
+
+  for (const name of ['privacy', 'terms', 'sdks'] as const) {
+    app.get(`/legal/${name}`, (_req, reply) => reply.type('text/html; charset=utf-8').send(legalPage(name, s.region)));
+  }
 
   app.post('/auth/:method', async (req) => {
     const { method } = req.params as { method: string };

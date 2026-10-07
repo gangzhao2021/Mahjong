@@ -4,14 +4,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Btn } from './src/components/ActionBar';
 import { Sheet } from './src/components/Sheet';
+import { setMusicWanted } from './src/audio/sound';
 import { api } from './src/net/api';
+import { setCrashReportToken } from './src/net/crash';
 import { loadToken, saveToken } from './src/net/session';
 import { useGame } from './src/net/useGame';
 import { AccountScreen } from './src/screens/AccountScreen';
+import { ConsentScreen, loadConsent } from './src/screens/ConsentScreen';
 import { GameScreen } from './src/screens/GameScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RealNameScreen } from './src/screens/RealNameScreen';
+import { loadTutorialProgress, TutorialScreen } from './src/tutorial/TutorialScreen';
 import { T } from './src/strings';
 
 /** Shows the latest value of `key` for a few seconds. */
@@ -29,6 +33,16 @@ export default function App() {
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialDone, setTutorialDone] = useState(-1);
+  const [consented, setConsented] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    void loadConsent().then(setConsented);
+  }, []);
+  useEffect(() => setCrashReportToken(token ?? null), [token]);
+  useEffect(() => {
+    if (!tutorialOpen) void loadTutorialProgress().then((d) => setTutorialDone(d.length));
+  }, [tutorialOpen]);
   const lastOptions = useRef<GameOptions>({ tableId: 'practice' });
 
   useEffect(() => {
@@ -72,13 +86,23 @@ export default function App() {
     game.startGame(options);
   };
 
+  // Background music in the lobby, the game and the tutorial.
+  const musicOn = tutorialOpen || (!!token && !!game.account);
+  useEffect(() => setMusicWanted(musicOn), [musicOn]);
+
   const errorToast = useToast(game.error, game.error ? game.error.length : undefined);
   const chatToast = useToast(game.chatRejected ? T.chatRejected[game.chatRejected.reason] : null, game.chatRejected?.at, 2500);
   const startToast = useToast(game.startRejected ? T.startRejected[game.startRejected.reason] : null, game.startRejected?.at, 4000);
   const noticeToast = useToast(game.notice ? T.limitEnding : null, game.notice?.at, 6000);
 
   let screen: React.ReactNode;
-  if (!info || token === undefined || (token && !game.account)) {
+  if (tutorialOpen) {
+    // Runs locally: works offline and before signing in.
+    screen = <TutorialScreen onExit={() => setTutorialOpen(false)} />;
+  } else if (consented === false) {
+    // Nothing is collected until the player agrees (PRD Appendix D.7).
+    screen = <ConsentScreen onAgree={() => setConsented(true)} onOpenTutorial={() => setTutorialOpen(true)} />;
+  } else if (!info || token === undefined || consented === undefined || (token && !game.account)) {
     screen = (
       <View style={styles.splash}>
         <Text style={styles.splashTitle}>{T.appTitle}</Text>
@@ -86,7 +110,7 @@ export default function App() {
       </View>
     );
   } else if (!token) {
-    screen = <LoginScreen info={info} onLoggedIn={onLoggedIn} />;
+    screen = <LoginScreen info={info} onLoggedIn={onLoggedIn} onOpenTutorial={() => setTutorialOpen(true)} />;
   } else if (game.account!.realName.required && !game.account!.realName.verified) {
     screen = <RealNameScreen token={token} onVerified={setAccount} onLogout={logout} />;
   } else if (game.table) {
@@ -101,6 +125,8 @@ export default function App() {
         onAccount={setAccount}
         onStart={start}
         onOpenAccount={() => setAccountOpen(true)}
+        onOpenTutorial={() => setTutorialOpen(true)}
+        tutorialDone={tutorialDone}
       />
     );
   }

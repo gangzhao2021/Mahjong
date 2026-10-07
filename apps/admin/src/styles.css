@@ -396,3 +396,22 @@ tr.clickable:hover {
     grid-template-columns: 1fr;
   }
 }
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+pre.stack {
+  margin: 8px 0 0;
+  padding: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  background: var(--surface-2);
+  border-radius: 6px;
+}

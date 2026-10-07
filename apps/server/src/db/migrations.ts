@@ -164,4 +164,19 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX moderation_events_status ON moderation_events(status, created_at)
   `,
+  // Phase 6: client crash reports.
+  `
+  CREATE TABLE client_errors (
+    id bigserial PRIMARY KEY,
+    fingerprint text NOT NULL,
+    message text NOT NULL,
+    stack text,
+    platform text,
+    app_version text,
+    player_id text,
+    context jsonb,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX client_errors_fingerprint ON client_errors(fingerprint, created_at)
+  `,
 ];

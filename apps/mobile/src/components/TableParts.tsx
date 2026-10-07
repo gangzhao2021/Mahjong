@@ -4,6 +4,7 @@ import type { SeatInfo, TimerInfo } from '@mahjong/protocol';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SUIT_NAMES, T } from '../strings';
+import { PopIn } from './PopIn';
 import { Tile } from './Tile';
 
 export function Melds({ melds, tileWidth }: { melds: Meld[]; tileWidth: number }) {
@@ -31,7 +32,10 @@ export function Pond({ discards, tileWidth, perRow, lastDiscard }: { discards: D
   return (
     <View style={[styles.pond, { width: perRow * (tileWidth + 2) }]}>
       {visible.map((d, i) => (
-        <Tile key={i} tile={d.tile} width={tileWidth} highlighted={lastDiscard && i === visible.length - 1} style={{ margin: 1 }} />
+        // Each discard pops in once, when it first lands in the pond.
+        <PopIn key={i} from={1.4}>
+          <Tile tile={d.tile} width={tileWidth} highlighted={lastDiscard && i === visible.length - 1} style={{ margin: 1 }} />
+        </PopIn>
       ))}
     </View>
   );
