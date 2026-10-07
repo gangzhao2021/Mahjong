@@ -1,0 +1,84 @@
+/**
+ * UI text. Chinese only in Phase 1; this file becomes the i18n catalog
+ * (zh-CN default, English for the global build) in Phase 6.
+ */
+import type { Pattern, Suit } from '@mahjong/engine';
+
+export const SUIT_NAMES: Record<Suit, string> = { 0: '万', 1: '条', 2: '筒' };
+export const RANK_NAMES = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+
+export const PATTERN_NAMES: Record<Pattern, string> = {
+  pingHu: '平胡',
+  duiDuiHu: '对对胡',
+  qingYiSe: '清一色',
+  qiDui: '七对',
+  jinGouDiao: '金钩钓',
+  jiangDui: '将对',
+  qingDui: '清对',
+  longQiDui: '龙七对',
+  qingQiDui: '清七对',
+  qingLongQiDui: '清龙七对',
+  gen: '根',
+  gangShangHua: '杠上花',
+  gangShangPao: '杠上炮',
+  qiangGang: '抢杠胡',
+  haiDi: '海底捞月',
+  ziMo: '自摸',
+  tianHu: '天胡',
+  diHu: '地胡',
+};
+
+export const PAYMENT_NAMES: Record<string, string> = {
+  win: '胡牌',
+  directKong: '直杠',
+  addedKong: '补杠',
+  concealedKong: '暗杠',
+  callTransfer: '呼叫转移',
+  huaZhu: '查花猪',
+  daJiao: '查大叫',
+  kongRefund: '退税',
+};
+
+export const T = {
+  appTitle: '四川麻将 · 血战到底',
+  start: '开始游戏',
+  hands: '局数',
+  baseScore: '底分',
+  connecting: '正在连接服务器…',
+  offline: '无法连接服务器，正在重试…',
+  swapHint: '选择同一花色的三张牌交换',
+  swapConfirm: '确认换牌',
+  swapWaiting: '等待其他玩家换牌…',
+  dingqueHint: '选择要打缺的花色',
+  dingqueWaiting: '等待其他玩家定缺…',
+  pong: '碰',
+  kong: '杠',
+  hu: '胡',
+  zimo: '自摸',
+  pass: '过',
+  discard: '出牌',
+  discardHint: '双击或上滑出牌',
+  voidFirst: '请先打完缺门牌',
+  autoPlayOn: '托管中 — 点击取回控制',
+  autoPlay: '托管',
+  skipToResults: '跳过，直接看结算',
+  leave: '离开',
+  leaveConfirmTitle: '离开牌局？',
+  leaveConfirmBody: '离开后由系统托管打完本局，结算照常进行。',
+  cancel: '取消',
+  confirm: '确定',
+  wall: '剩余',
+  dealer: '庄',
+  handResult: '本局结算',
+  gameResult: '整场结算',
+  nextHand: '下一局',
+  newGame: '再来一场',
+  backHome: '返回大厅',
+  threeWon: '三家胡牌',
+  wallExhausted: '流局',
+  huaZhu: '花猪',
+  ready: '听牌',
+  notReady: '未听',
+  hand: (i: number, n: number) => `第 ${i + 1} / ${n} 局`,
+  swapDirection: { clockwise: '顺时针换牌', counterClockwise: '逆时针换牌', opposite: '对家换牌' },
+} as const;

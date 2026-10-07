@@ -1,0 +1,17 @@
+{
+  "name": "mahjong",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/engine && tsc -p packages/ai-play && tsc -p packages/protocol && tsc -p apps/server && tsc -p apps/mobile",
+    "server": "pnpm --filter @mahjong/server dev",
+    "mobile": "pnpm --filter @mahjong/mobile start",
+    "mobile:web": "pnpm --filter @mahjong/mobile web",
+    "lint": "pnpm --dir apps/mobile exec expo lint"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
