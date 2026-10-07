@@ -5,11 +5,12 @@
  */
 import { rankOf, suitOf, type Seat, type Tile } from '@mahjong/engine';
 import type { Rng } from './roster';
+import { reunionFlavor, type CharacterMemory } from './memory';
 import type { BanterLevel, Personality, SpeechIntent, TemplateSet, Trigger, TriggerKind } from './types';
 
 export type Role = 'subject' | 'object' | 'other';
 
-type TemplateKey = `${TriggerKind}.${Role}` | `intent.${string}`;
+type TemplateKey = `${TriggerKind}.${string}` | `intent.${string}` | `memory.${string}`;
 
 export const DEFAULT_TEMPLATES: Partial<Record<TemplateKey, TemplateSet>> = {
   'handStart.other': {
@@ -50,6 +51,17 @@ export const DEFAULT_TEMPLATES: Partial<Record<TemplateKey, TemplateSet>> = {
   'playerQuickPhrase.other': { mild: ['好嘞。', '知道啦。'], spicy: ['催什么催。'] },
   'playerSticker.other': { mild: ['哈哈。'] },
   'aiSpoke.other': { mild: ['你说得对。', '那可不一定。'], spicy: ['你就吹吧。'] },
+  // Memory callbacks (PRD §8). {player} is the human player.
+  'reunion.grudge': {
+    mild: ['又是你？上次那把我可还记着呢。', '{player}，咱们的账还没算完。'],
+    spicy: ['又是你？上次你害我输惨了，今天我要报仇。', '{player}，冤家路窄啊，这次看我怎么收拾你。'],
+  },
+  'reunion.rival': { mild: ['老对手又见面了。', '{player}，又是我们俩较劲。'], spicy: ['又碰上你了，今天看谁笑到最后。'] },
+  'reunion.beaten': { mild: ['{player}，上次输给你了，这次可不会。', '你手气别太好啊。'], spicy: ['今天我要把上次输的都赢回来。'] },
+  'reunion.beatThem': { mild: ['{player}，又来给我送分啦？', '老朋友，今天手下留情哈。'], spicy: ['又是你？上次被我胡得挺惨吧。'] },
+  'reunion.friendly': { mild: ['{player}，好久不见！', '哟，又一起打牌了。'] },
+  'memory.dealtInAgain': { mild: ['又是你点的炮，跟上次一样。', '{player}，你怎么老喂我？'], spicy: ['{player}，你是专门来给我送分的吧？'] },
+  'memory.lostAgain': { mild: ['又被你胡了……上次也是这样。', '{player}，你是不是专盯着我？'], spicy: ['又是你！这仇我记下了。'] },
   'intent.bluffCloseToWin': { mild: ['我快听了，你们小心点。', '这把稳了。'], spicy: ['我马上就胡，你们准备掏钱。'] },
   'intent.complainBadHand': { mild: ['这牌烂得没法看……', '今天手气太差了。'] },
   'intent.feignIndifference': { mild: ['{suit}？我才不要。', '{suit}随便打，我不要。'] },
@@ -91,6 +103,20 @@ export interface TemplateContext {
   level: BanterLevel;
   nameOf(seat: Seat): string;
   catchphrases?: string[];
+  /** What this character remembers about the human (Phase 4). */
+  memory?: CharacterMemory | null;
+  humanSeat?: Seat;
+}
+
+/** A memory-specific template key for this moment, if the character has history with the player. */
+function memoryKey(ctx: TemplateContext): TemplateKey | null {
+  const { trigger, seat, memory: m, humanSeat } = ctx;
+  if (!m || humanSeat === undefined) return null;
+  if (trigger.kind === 'reunion') return `reunion.${reunionFlavor(m)}`;
+  if (trigger.kind !== 'dealtIn') return null;
+  if (trigger.subject === seat && trigger.object === humanSeat && m.dealtInByPlayer > 0) return 'memory.dealtInAgain';
+  if (trigger.subject === humanSeat && trigger.object === seat && m.dealtInToPlayer > 0) return 'memory.lostAgain';
+  return null;
 }
 
 /** Renders a template line, or null if nothing suitable exists. */
@@ -101,15 +127,19 @@ export function templateLine(ctx: TemplateContext, rng: Rng): string | null {
   const own = personality.templates ?? {};
 
   let pool: string[] = [];
-  if (key) pool = linesFor(DEFAULT_TEMPLATES[key], level);
+  const remembered = memoryKey(ctx);
+  if (remembered) pool = linesFor(DEFAULT_TEMPLATES[remembered], level);
+  if (!pool.length && key) pool = linesFor(DEFAULT_TEMPLATES[key], level);
   if (!pool.length) pool = linesFor(own[trigger.kind], level);
   if (!pool.length) pool = linesFor(DEFAULT_TEMPLATES[`${trigger.kind}.${role}`], level);
   if (!pool.length && role !== 'other') pool = linesFor(DEFAULT_TEMPLATES[`${trigger.kind}.other`], level);
-  if (ctx.catchphrases?.length && rng() < 0.15) pool = ctx.catchphrases;
+  // A catchphrase now and then — but a memory callback always wins.
+  if (!remembered && ctx.catchphrases?.length && rng() < 0.15) pool = ctx.catchphrases;
   if (!pool.length) return null;
 
   const line = pool[Math.floor(rng() * pool.length)];
   return line
+    .replaceAll('{player}', ctx.humanSeat !== undefined ? ctx.nameOf(ctx.humanSeat) : '')
     .replaceAll('{subject}', trigger.subject !== undefined ? ctx.nameOf(trigger.subject) : '')
     .replaceAll('{object}', trigger.object !== undefined ? ctx.nameOf(trigger.object) : '')
     .replaceAll('{tile}', trigger.tile !== undefined ? publicTileName(trigger.tile) : '')

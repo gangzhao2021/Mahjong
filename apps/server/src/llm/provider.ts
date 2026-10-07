@@ -10,7 +10,21 @@ import { STICKER_IDS } from '@mahjong/dialogue';
 export interface LlmProvider {
   readonly name: string;
   generate(request: DialogueRequest): Promise<DialogueReply | null>;
+  /** Once per game: rewrite memory summaries and the player profile (Appendix B.2). */
+  summarizeMemory?(request: MemorySummaryRequest): Promise<MemorySummaryReply | null>;
 }
+
+export interface MemorySummaryRequest {
+  system: string;
+  user: string;
+}
+
+export const MemorySummarySchema = z.object({
+  events: z.array(z.object({ id: z.number().int(), summary: z.string() })),
+  profile: z.object({ playStyle: z.string(), habits: z.array(z.string()) }),
+});
+
+export type MemorySummaryReply = z.infer<typeof MemorySummarySchema>;
 
 export const ReplySchema = z.object({
   text: z.string().describe('One short spoken line in Chinese. Empty string to stay silent.'),
@@ -49,5 +63,13 @@ export class BudgetedLlm implements LlmProvider {
     if (this.used >= this.dailyCap) return null;
     this.used++;
     return this.inner.generate(request);
+  }
+
+  async summarizeMemory(request: MemorySummaryRequest): Promise<MemorySummaryReply | null> {
+    if (!this.inner.summarizeMemory) return null;
+    const day = this.today();
+    if (day === this.day && this.used >= this.dailyCap) return null;
+    this.used++;
+    return this.inner.summarizeMemory(request);
   }
 }

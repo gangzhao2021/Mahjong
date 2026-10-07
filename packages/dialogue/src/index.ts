@@ -7,3 +7,4 @@ export * from './prompt';
 export * from './moderation';
 export * from './catalog';
 export * from './director';
+export * from './memory';

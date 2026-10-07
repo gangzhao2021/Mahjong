@@ -65,4 +65,55 @@ export const MIGRATIONS: string[] = [
     sent_at timestamptz NOT NULL
   )
   `,
+  // Phase 4: long-term AI memory (PRD Appendix B). Rows are keyed by player so
+  // account deletion removes them (ON DELETE CASCADE).
+  `
+  CREATE TABLE relationships (
+    character_id text NOT NULL,
+    player_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    games_together int NOT NULL DEFAULT 0,
+    hands_together int NOT NULL DEFAULT 0,
+    character_wins int NOT NULL DEFAULT 0,
+    player_wins int NOT NULL DEFAULT 0,
+    dealt_in_by_player int NOT NULL DEFAULT 0,
+    dealt_in_to_player int NOT NULL DEFAULT 0,
+    points_net bigint NOT NULL DEFAULT 0,
+    rivalry real NOT NULL DEFAULT 0,
+    grudge_reason text,
+    grudge_strength real NOT NULL DEFAULT 0,
+    grudge_at timestamptz,
+    last_seen_at timestamptz,
+    PRIMARY KEY (character_id, player_id)
+  );
+  CREATE INDEX relationships_player ON relationships(player_id);
+
+  CREATE TABLE memory_events (
+    id bigserial PRIMARY KEY,
+    character_id text,
+    player_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    kind text NOT NULL,
+    summary text NOT NULL,
+    importance real NOT NULL,
+    game_id text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    last_referenced_at timestamptz,
+    reference_count int NOT NULL DEFAULT 0
+  );
+  CREATE INDEX memory_events_player ON memory_events(player_id, character_id);
+
+  CREATE TABLE player_profiles (
+    player_id text PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+    hands_played int NOT NULL DEFAULT 0,
+    games_played int NOT NULL DEFAULT 0,
+    deal_ins int NOT NULL DEFAULT 0,
+    wins int NOT NULL DEFAULT 0,
+    self_draws int NOT NULL DEFAULT 0,
+    big_wins int NOT NULL DEFAULT 0,
+    hua_zhu int NOT NULL DEFAULT 0,
+    chat_messages int NOT NULL DEFAULT 0,
+    play_style text,
+    habits jsonb,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )
+  `,
 ];

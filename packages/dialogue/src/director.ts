@@ -4,6 +4,7 @@
  * per event, and when an LLM call is worth it versus a template or sticker.
  */
 import type { Seat } from '@mahjong/engine';
+import type { CharacterMemory } from './memory';
 import type { Rng } from './roster';
 import { roleOf } from './templates';
 import type { BanterLevel, Character, DialogueSettings, Personality, Trigger, TriggerKind } from './types';
@@ -12,6 +13,8 @@ export interface Speaker {
   seat: Seat;
   character: Character;
   personality: Personality;
+  /** What this character remembers about the human at the table (Phase 4). */
+  memory?: CharacterMemory | null;
 }
 
 export interface DirectorState {
@@ -49,6 +52,7 @@ const KIND_WEIGHT: Record<TriggerKind, number> = {
   playerQuickPhrase: 0.7,
   playerSticker: 0.4,
   aiSpoke: 1,
+  reunion: 1,
 };
 
 const ROLE_WEIGHT = { subject: 1, object: 1, other: 0.45 } as const;
@@ -73,6 +77,12 @@ export function planSpeech(trigger: Trigger, speakers: Speaker[], ctx: PlanConte
 
   const frequency = trigger.kind === 'idle' ? s.proactiveFrequency : s.conversationFrequency;
   const quietFactor = ctx.level === 'quiet' ? 0.4 : 1;
+
+  // A reunion greeting comes from the one character chosen for it.
+  if (trigger.kind === 'reunion') {
+    const sp = speakers.find((x) => x.seat === trigger.subject);
+    return sp ? [{ seat: sp.seat, mode: chooseMode(trigger, sp, ctx) }] : [];
+  }
 
   const candidates = speakers
     .filter((sp) => sp.seat !== trigger.subject || trigger.kind !== 'aiSpoke') // don't answer yourself

@@ -17,6 +17,7 @@ import type { Db } from './db/db';
 import { loadEconomyConfig, privateRoomMaxBase, type EconomyConfig } from './economy/config';
 import { Rewards } from './economy/rewards';
 import { Wallet } from './economy/wallet';
+import { MemoryStore } from './memory/store';
 import type { Region } from './dialogueConfig';
 
 export interface AuthConfig {
@@ -34,6 +35,7 @@ export interface Services {
   wallet: Wallet;
   accounts: Accounts;
   rewards: Rewards;
+  memory: MemoryStore;
   sms: SmsCodes;
   realName: RealNameVerifier;
   economy: EconomyConfig;
@@ -72,6 +74,7 @@ export function createServices(o: ServiceOptions): Services {
     wallet,
     accounts: new Accounts(o.db, wallet, tokens, () => economy.startingCoins, now),
     rewards: new Rewards(o.db, wallet, economy),
+    memory: new MemoryStore(o.db, now),
     sms: new SmsCodes(o.db, o.sms ?? new ConsoleSmsSender(), () => now().getTime()),
     realName: o.realName ?? new DevRealNameVerifier(),
     economy,

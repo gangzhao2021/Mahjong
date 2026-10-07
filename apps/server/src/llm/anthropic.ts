@@ -6,7 +6,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type { DialogueReply, DialogueRequest } from '@mahjong/dialogue';
-import { ReplySchema, type LlmProvider } from './provider';
+import { MemorySummarySchema, ReplySchema, type LlmProvider, type MemorySummaryReply, type MemorySummaryRequest } from './provider';
 
 export interface AnthropicModels {
   routine: string;
@@ -25,6 +25,28 @@ export class AnthropicLlm implements LlmProvider {
     private readonly timeoutMs: number,
     private readonly client: Anthropic = new Anthropic({ maxRetries: 1 }),
   ) {}
+
+  /** Memory summaries are routine text work: the small model, once per game. */
+  async summarizeMemory(request: MemorySummaryRequest): Promise<MemorySummaryReply | null> {
+    if (this.disabled) return null;
+    try {
+      const response = await this.client.beta.messages.parse(
+        {
+          model: this.models.routine,
+          max_tokens: 1500,
+          system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: request.user }],
+          output_config: { format: betaZodOutputFormat(MemorySummarySchema) },
+        },
+        { timeout: this.timeoutMs * 3 },
+      );
+      if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') return null;
+      return (response.parsed_output as MemorySummaryReply | null) ?? null;
+    } catch (error) {
+      this.handleError(error);
+      return null;
+    }
+  }
 
   async generate(request: DialogueRequest): Promise<DialogueReply | null> {
     if (this.disabled) return null;
@@ -50,7 +72,13 @@ export class AnthropicLlm implements LlmProvider {
       if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') return null;
       return (response.parsed_output as DialogueReply | null) ?? null;
     } catch (error) {
-      if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
+      this.handleError(error);
+      return null;
+    }
+  }
+
+  private handleError(error: unknown): void {
+    if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
         // Misconfigured credentials won't fix themselves: stop calling and use templates.
         this.disabled = true;
         console.error(`Claude dialogue disabled: ${error.message}`);
@@ -64,7 +92,5 @@ export class AnthropicLlm implements LlmProvider {
         this.disabled = true;
         console.error('Claude dialogue disabled:', error instanceof Error ? error.message : error);
       }
-      return null;
-    }
   }
 }

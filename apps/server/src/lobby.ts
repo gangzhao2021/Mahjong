@@ -1,6 +1,6 @@
 /** Authenticated connections, game start checks, coin settlement and room lifecycle. */
 import type { Rng } from '@mahjong/ai-play';
-import { BANTER_LEVELS, selectCharacters, STICKERS, type Moderator, type StickerId } from '@mahjong/dialogue';
+import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, type Moderator, type StickerId } from '@mahjong/dialogue';
 import { createRng, isValidTile, type Action, type HandResult, type Seat } from '@mahjong/engine';
 import {
   PROTOCOL_VERSION,
@@ -17,6 +17,7 @@ import { ChatGuard } from './chatGuard';
 import type { ServerConfig } from './config';
 import type { DialogueConfig } from './dialogueConfig';
 import type { LlmProvider } from './llm/provider';
+import { summarizeGame } from './memory/summarizer';
 import { Room, type AiSeatSpec } from './room';
 import { accountSummary, checkStart, type GamePlan, type Services } from './services';
 import type { HandLogStore } from './store';
@@ -136,7 +137,7 @@ export class Lobby {
         const check = await checkStart(this.s, player, msg.options);
         if (!check.ok) return send({ type: 'startRejected', reason: check.reason, detail: check.detail });
         room?.close();
-        this.createRoom(player, check.plan, socket);
+        await this.createRoom(player, check.plan, socket);
         return;
       }
       case 'action': {
@@ -203,12 +204,19 @@ export class Lobby {
     }
   }
 
-  private createRoom(player: PlayerRow, plan: GamePlan, socket: WebSocket): Room {
+  private async createRoom(player: PlayerRow, plan: GamePlan, socket: WebSocket): Promise<Room> {
     const humanSeat = 0 as Seat;
     // Persistent characters; skill is chosen independently per game (PRD §3.2).
-    const ai: AiSeatSpec[] = selectCharacters(this.deps.dialogue.roster, 3, this.rng).map((c) => ({
+    const chosen = selectCharacters(this.deps.dialogue.roster, 3, this.rng);
+    // What each character remembers about this player (PRD §8). Memory is a bonus: never block a game on it.
+    const memories = await this.s.memory.load(player.id, chosen.map((c) => c.character.id)).catch((error) => {
+      console.error('Loading AI memory failed:', error);
+      return new Map();
+    });
+    const ai: AiSeatSpec[] = chosen.map((c) => ({
       ...c,
       skill: pickWeighted(this.deps.config.skillWeights, this.rng),
+      memory: memories.get(c.character.id) ?? null,
     }));
     const room = new Room({
       gameId: `g_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
@@ -228,8 +236,13 @@ export class Lobby {
         llm: this.deps.llm,
         moderator: this.deps.moderator,
         banterLevel: () => this.banterOf(player),
+        onMemoryUsed: (ids) => void this.s.memory.markReferenced(ids).catch((e) => console.error('Memory update failed:', e)),
+        onPlayerQuote: (text, target) => {
+          const characterId = target === 'table' ? null : (room.aiSeats.find((a) => a.seat === target)?.characterId ?? null);
+          void this.s.memory.recordQuote(player.id, characterId, text, room.id).catch((e) => console.error('Memory update failed:', e));
+        },
       },
-      onHandEnd: (r, handIndex, result) => this.track(this.settle(player.id, r, plan, handIndex, result)),
+      onHandEnd: (r, handIndex, result) => this.track(this.afterHand(player, r, plan, handIndex, result)),
       onClosed: (r) => {
         if (this.rooms.get(player.id) === r) this.rooms.delete(player.id);
         this.clearLimit(player.id);
@@ -239,6 +252,31 @@ export class Lobby {
     this.scheduleLimit(player.id, room, plan);
     room.start(socket);
     return room;
+  }
+
+  /** Coins first (what the player sees), then memory (best effort). */
+  private async afterHand(player: PlayerRow, room: Room, plan: GamePlan, handIndex: number, result: HandResult): Promise<void> {
+    await this.settle(player.id, room, plan, handIndex, result);
+    await this.remember(player, room, plan, result).catch((error) => console.error('Recording AI memory failed:', error));
+  }
+
+  /** Long-term memory write path (PRD Appendix B.2). */
+  private async remember(player: PlayerRow, room: Room, plan: GamePlan, result: HandResult): Promise<void> {
+    const memory = extractHandMemory({ humanSeat: room.humanSeat, characters: room.aiSeats, result, playerName: player.nickname });
+    await this.s.memory.recordHand(player.id, room.id, memory.relationships, memory.events, memory.stats);
+    if (!room.gameOver) return;
+    const totals = room.totals;
+    await this.s.memory.finishGame(
+      player.id,
+      room.aiSeats.map((a) => ({ characterId: a.characterId, delta: gameEndRivalry(totals[room.humanSeat], totals[a.seat], plan.baseScore) })),
+    );
+    // One LLM call per game polishes the summaries; templates are kept if it fails.
+    await summarizeGame(this.s.memory, this.deps.llm, this.deps.moderator, {
+      playerId: player.id,
+      gameId: room.id,
+      playerName: player.nickname,
+      characterNames: new Map(room.aiSeats.map((a) => [a.characterId, a.name])),
+    });
   }
 
   /**

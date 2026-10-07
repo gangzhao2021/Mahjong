@@ -221,7 +221,7 @@ describe('templates', () => {
     const p = personality('p');
     for (const key of Object.keys(DEFAULT_TEMPLATES)) {
       const [kind, role] = key.split('.');
-      if (kind === 'intent') continue;
+      if (kind === 'intent' || kind === 'memory' || kind === 'reunion') continue; // need memory: see memory.test.ts
       const trigger: Trigger = { kind: kind as Trigger['kind'], importance: 'low', subject: 2, object: 3, tile: 4, fan: 3, version: 0, handIndex: 0 };
       const seat = (role === 'subject' ? 2 : role === 'object' ? 3 : 1) as Seat;
       for (let i = 0; i < 20; i++) {

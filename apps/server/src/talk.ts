@@ -6,6 +6,7 @@
 import { assessHand } from '@mahjong/ai-play';
 import {
   buildDialogueRequest,
+  reunionWeight,
   chooseIntent,
   detectTriggers,
   newDirectorState,
@@ -43,9 +44,15 @@ export interface TalkDeps {
   handIndex(): number;
   emit(entry: ChatEntry): void;
   now?(): number;
+  /** Memory events that went into an LLM prompt (so they are not repeated too often). */
+  onMemoryUsed?(eventIds: number[]): void;
+  /** A moderated player line, offered to long-term memory. */
+  onPlayerQuote?(text: string, target: Seat | 'table'): void;
 }
 
 const CHAT_LOG_SIZE = 30;
+
+const weight = (s: Speaker) => (s.memory ? reunionWeight(s.memory) : 0);
 /** Minimum spacing between two displayed AI lines. */
 const LINE_GAP_MS = 1200;
 
@@ -73,6 +80,14 @@ export class TableTalk {
   onHandStart(): void {
     this.state.llmRequestsThisHand = 0;
     this.discardsSinceLine = 0;
+    // First hand of a game: the character with the most history greets the player (PRD §8).
+    if (this.deps.handIndex() === 0) {
+      const best = [...this.deps.speakers].sort((a, b) => weight(b) - weight(a))[0];
+      if (best && weight(best) > 0) {
+        this.handle({ ...this.trigger('reunion', 'high'), subject: best.seat, object: this.deps.humanSeat });
+        return;
+      }
+    }
     this.handle(this.trigger('handStart', 'low'));
   }
 
@@ -97,6 +112,7 @@ export class TableTalk {
   /** A moderated player message (PRD §7.1). */
   onPlayerChat(text: string, target: Seat | 'table'): void {
     this.record({ seat: this.deps.humanSeat, kind: 'player', text, sticker: null, target });
+    this.deps.onPlayerQuote?.(text, target);
     this.handle({ ...this.trigger('playerChat', 'high'), subject: this.deps.humanSeat, object: target === 'table' ? undefined : target, text });
   }
 
@@ -152,6 +168,8 @@ export class TableTalk {
           level,
           nameOf: this.deps.nameOf,
           catchphrases: speaker.character.catchphrases,
+          memory: speaker.memory,
+          humanSeat: this.deps.humanSeat,
         },
         this.deps.rng,
       );
@@ -185,7 +203,9 @@ export class TableTalk {
       nameOf: this.deps.nameOf,
       recentChat: this.recentChat(),
       handIndex: this.deps.handIndex(),
+      memory: speaker.memory,
     });
+    if (speaker.memory?.events.length) this.deps.onMemoryUsed?.(speaker.memory.events.map((e) => e.id));
     const job = this.deps.llm
       .generate(request)
       .then(async (reply) => {

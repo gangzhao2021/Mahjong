@@ -23,7 +23,7 @@ import {
   type RuleSet,
   type Seat,
 } from '@mahjong/engine';
-import type { BanterLevel, Character, DialogueSettings, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
+import type { BanterLevel, Character, CharacterMemory, DialogueSettings, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
 import type { GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
 import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
@@ -36,6 +36,8 @@ export interface AiSeatSpec {
   character: Character;
   personality: Personality;
   skill: SkillLevel;
+  /** What this character remembers about the player (Phase 4). */
+  memory?: CharacterMemory | null;
 }
 
 /** Conversation setup for the room (PRD §6–§7). */
@@ -46,6 +48,8 @@ export interface RoomTalkOptions {
   moderator: Moderator;
   /** The player's current banter setting (can change mid-game). */
   banterLevel(): BanterLevel;
+  onMemoryUsed?(eventIds: number[]): void;
+  onPlayerQuote?(text: string, target: Seat | 'table'): void;
 }
 
 export interface RoomOptions {
@@ -91,6 +95,8 @@ export class Room {
   private closed = false;
   private readonly talk: TableTalk;
   private coinChange = 0;
+  /** AI seats and the characters sitting in them. */
+  readonly aiSeats: { seat: Seat; characterId: string; name: string }[];
 
   constructor(private readonly opts: RoomOptions) {
     this.id = opts.gameId;
@@ -107,7 +113,7 @@ export class Room {
       if (seat === opts.humanSeat) return this.human;
       const spec = ai.shift()!;
       const { character, personality } = spec;
-      speakers.push({ seat, character, personality });
+      speakers.push({ seat, character, personality, memory: spec.memory ?? null });
       const info: SeatInfo = { seat, name: character.name, avatar: character.avatar, isHuman: false, personality: personality.name };
       return new AiSeat(info, spec.skill, opts.rng, (skill) => this.aiThinkMs(skill), (action, version) =>
         this.submit({ ...action, seat }, version, 'ai'),
@@ -128,7 +134,10 @@ export class Room {
       version: () => this.hand.actionCount,
       handIndex: () => this.handIndex,
       emit: (entry) => this.human.send({ type: 'chat', entry }),
+      onMemoryUsed: opts.talk.onMemoryUsed,
+      onPlayerQuote: opts.talk.onPlayerQuote,
     });
+    this.aiSeats = speakers.map((s) => ({ seat: s.seat, characterId: s.character.id, name: s.character.name }));
   }
 
   /** In-flight LLM dialogue requests (for tests). */
@@ -220,6 +229,11 @@ export class Room {
   addCoinChange(amount: number): number {
     this.coinChange += amount;
     return this.coinChange;
+  }
+
+  /** Final game totals per seat. */
+  get totals(): readonly number[] {
+    return this.game.totals;
   }
 
   get coinTotal(): number {

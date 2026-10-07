@@ -81,7 +81,9 @@ export type TriggerKind =
   | 'playerChat'
   | 'playerQuickPhrase'
   | 'playerSticker'
-  | 'aiSpoke';
+  | 'aiSpoke'
+  /** Game start: a character who remembers the player greets them (PRD §8). */
+  | 'reunion';
 
 export interface Trigger {
   kind: TriggerKind;
