@@ -10,7 +10,7 @@ import type { MemoryStore } from './store';
 const MAX_EVENTS = 8;
 const MAX_SUMMARY_CHARS = 60;
 
-const SYSTEM = [
+export const SUMMARY_SYSTEM = [
   '你在为一款四川麻将游戏整理 AI 牌友对真人玩家的长期记忆。',
   '任务一：把每条记忆改写成一句自然、简短的中文（不超过 40 字）。带角色名的记忆用该角色的第一人称“我”来写；“所有人”的记忆用第三人称写。只改措辞，不能增加、改变或编造任何事实，数字和牌名保持不变。',
   '任务二：根据统计数据和记忆，用一句话概括这个玩家的打牌风格（playStyle），并给出最多 4 个简短的习惯标签（habits，每个不超过 8 个字）。只依据给出的信息，语气中性，不做人身评价。',
@@ -46,7 +46,7 @@ export async function summarizeGame(store: MemoryStore, llm: LlmProvider, modera
   }
   lines.push('</data>');
 
-  const reply = await llm.summarizeMemory({ system: SYSTEM, user: lines.join('\n') });
+  const reply = await llm.summarizeMemory({ system: SUMMARY_SYSTEM, user: lines.join('\n') });
   if (!reply) return false;
 
   const known = new Set(events.map((e) => e.id));

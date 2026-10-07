@@ -1,6 +1,19 @@
 import type { HandAssessment } from '@mahjong/ai-play';
 import type { Pattern, Seat, Suit, Tile } from '@mahjong/engine';
 
+/** Language a table talks in (follows the player's UI language). */
+export type Language = 'zh' | 'en';
+
+/**
+ * Display length of a line: CJK characters count 1, other characters 0.4,
+ * so Chinese and English lines of similar spoken length get the same limits.
+ */
+export function textLength(text: string): number {
+  let n = 0;
+  for (const ch of text) n += /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 1 : 0.4;
+  return Math.ceil(n);
+}
+
 /** Player-chosen banter strength (PRD §7). */
 export type BanterLevel = 'mild' | 'spicy' | 'quiet';
 export const BANTER_LEVELS: readonly BanterLevel[] = ['mild', 'spicy', 'quiet'];
@@ -11,6 +24,8 @@ export type StickerId = 'laugh' | 'angry' | 'cry' | 'cool' | 'think' | 'clap' | 
 export interface Personality {
   id: string;
   name: string;
+  /** English display name (English tables). */
+  nameEn?: string;
   description: string;
   /** Behaviour instructions injected into the LLM character card. */
   systemPrompt: string;
@@ -35,6 +50,9 @@ export interface Character {
   weight: number;
   enabled: boolean;
   catchphrases?: string[];
+  /** English name and catchphrases for English tables. */
+  nameEn?: string;
+  catchphrasesEn?: string[];
 }
 
 export interface TemplateSet {

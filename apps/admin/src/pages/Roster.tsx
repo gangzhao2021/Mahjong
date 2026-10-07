@@ -6,6 +6,7 @@ import { useLoad, useSave } from '../hooks';
 interface Personality {
   id: string;
   name: string;
+  nameEn?: string;
   description: string;
   systemPrompt: string;
   conversationStyle: string;
@@ -26,6 +27,8 @@ interface Character {
   weight: number;
   enabled: boolean;
   catchphrases?: string[];
+  nameEn?: string;
+  catchphrasesEn?: string[];
 }
 
 interface Library {
@@ -204,6 +207,8 @@ function PersonalityForm({ value, onCancel, onSave }: { value: Personality; onCa
       <div className="card grid-form">
         <label htmlFor="pname">名称</label>
         <input id="pname" value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} />
+        <label htmlFor="pnameen">英文名称（英文界面显示）</label>
+        <input id="pnameen" value={p.nameEn ?? ''} onChange={(e) => setP({ ...p, nameEn: e.target.value || undefined })} />
         <label htmlFor="pdesc">描述</label>
         <input id="pdesc" value={p.description} onChange={(e) => setP({ ...p, description: e.target.value })} />
         <label htmlFor="pprompt">行为指令（系统提示词）</label>
@@ -269,6 +274,8 @@ function CharacterForm({
             </button>
           ))}
         </div>
+        <label htmlFor="cnameen">英文名（英文界面显示）</label>
+        <input id="cnameen" value={c.nameEn ?? ''} onChange={(e) => setC({ ...c, nameEn: e.target.value || undefined })} />
         <label htmlFor="cpers">性格</label>
         <select id="cpers" value={c.personalityId} onChange={(e) => setC({ ...c, personalityId: e.target.value })}>
           {personalities.map((p) => (
@@ -280,6 +287,8 @@ function CharacterForm({
         </select>
         <label htmlFor="ccatch">口头禅（每行一句）</label>
         <textarea id="ccatch" value={(c.catchphrases ?? []).join('\n')} onChange={(e) => setC({ ...c, catchphrases: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })} />
+        <label htmlFor="ccatchen">英文口头禅（每行一句）</label>
+        <textarea id="ccatchen" value={(c.catchphrasesEn ?? []).join('\n')} onChange={(e) => setC({ ...c, catchphrasesEn: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })} />
         <label htmlFor="cweight">权重</label>
         <input id="cweight" value={c.weight} onChange={(e) => setC({ ...c, weight: Number(e.target.value.replace(/[^\d.]/g, '')) || 0 })} />
         <label htmlFor="cenabled">启用</label>

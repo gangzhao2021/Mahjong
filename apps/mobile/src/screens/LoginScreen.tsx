@@ -11,6 +11,7 @@ import { getDeviceId } from '../net/deviceId';
 import { AGE_RATING } from '../config';
 import { T } from '../strings';
 import { LegalLinks } from './ConsentScreen';
+import { LanguagePicker } from '../components/LanguagePicker';
 
 export function errorText(e: unknown): string {
   if (e instanceof SignInUnavailable) return T.login.unavailable;
@@ -91,6 +92,7 @@ export function LoginScreen({ info, onLoggedIn, onOpenTutorial }: Props) {
         <Btn label={`📖 ${T.tutorial.fromLogin}`} onPress={onOpenTutorial} />
         <Text style={formStyles.hint}>{T.login.privacy}</Text>
         <LegalLinks />
+        {info.region !== 'china' && <LanguagePicker label={false} />}
       </View>
       {info.region === 'china' && (
         <View style={styles.advisory}>

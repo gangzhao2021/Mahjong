@@ -3,6 +3,8 @@
  * regional vendor services (Appendix D.5) plug in behind it. The local
  * blocklist always runs first and also catches personal contact info.
  */
+import { textLength } from './types';
+
 export type ModerationKind = 'playerChat' | 'aiLine' | 'nickname';
 
 export interface ModerationResult {
@@ -29,6 +31,11 @@ export const DEFAULT_BLOCKLIST = [
   'kys',
   'iwillkillyou',
   'fuckyou',
+  'motherfucker',
+  'nigger',
+  'faggot',
+  'retard',
+  'cunt',
 ];
 
 const normalize = (text: string) => text.toLowerCase().replace(/[\s\p{P}\p{S}_]+/gu, '');
@@ -43,7 +50,7 @@ export class LocalModerator implements Moderator {
   async check(text: string, kind: ModerationKind): Promise<ModerationResult> {
     const trimmed = text.trim();
     if (!trimmed) return { allowed: false, reason: 'empty' };
-    if ([...trimmed].length > this.maxLength) return { allowed: false, reason: 'tooLong' };
+    if (textLength(trimmed) > this.maxLength) return { allowed: false, reason: 'tooLong' };
     const flat = normalize(trimmed);
     if (this.blocked.some((w) => flat.includes(w))) return { allowed: false, reason: 'blocklist' };
     if (kind !== 'aiLine') {

@@ -1,56 +1,101 @@
 /**
- * UI text. Chinese only in Phase 1; this file becomes the i18n catalog
- * (zh-CN default, English for the global build) in Phase 6.
+ * UI text catalog: Simplified Chinese (default, and always in the China
+ * build) and English. `T` and the name tables are mutable objects that
+ * `setLocale` refills, so components keep importing them directly; the app
+ * root remounts its tree when the language changes.
  */
 import type { Pattern, Suit } from '@mahjong/engine';
 
-export const SUIT_NAMES: Record<Suit, string> = { 0: '万', 1: '条', 2: '筒' };
-export const RANK_NAMES = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+export type Locale = 'zh' | 'en';
 
-export const PATTERN_NAMES: Record<Pattern, string> = {
-  pingHu: '平胡',
-  duiDuiHu: '对对胡',
-  qingYiSe: '清一色',
-  qiDui: '七对',
-  jinGouDiao: '金钩钓',
-  jiangDui: '将对',
-  qingDui: '清对',
-  longQiDui: '龙七对',
-  qingQiDui: '清七对',
-  qingLongQiDui: '清龙七对',
-  gen: '根',
-  gangShangHua: '杠上花',
-  gangShangPao: '杠上炮',
-  qiangGang: '抢杠胡',
-  haiDi: '海底捞月',
-  ziMo: '自摸',
-  tianHu: '天胡',
-  diHu: '地胡',
+const zhNames = {
+  suits: { 0: '万', 1: '条', 2: '筒' } as Record<Suit, string>,
+  /** Short suit mark printed on tile faces. */
+  tileSuits: { 0: '万', 1: '条', 2: '筒' } as Record<Suit, string>,
+  ranks: ['一', '二', '三', '四', '五', '六', '七', '八', '九'],
+  patterns: {
+    pingHu: '平胡',
+    duiDuiHu: '对对胡',
+    qingYiSe: '清一色',
+    qiDui: '七对',
+    jinGouDiao: '金钩钓',
+    jiangDui: '将对',
+    qingDui: '清对',
+    longQiDui: '龙七对',
+    qingQiDui: '清七对',
+    qingLongQiDui: '清龙七对',
+    gen: '根',
+    gangShangHua: '杠上花',
+    gangShangPao: '杠上炮',
+    qiangGang: '抢杠胡',
+    haiDi: '海底捞月',
+    ziMo: '自摸',
+    tianHu: '天胡',
+    diHu: '地胡',
+  } as Record<Pattern, string>,
+  payments: {
+    win: '胡牌',
+    directKong: '直杠',
+    addedKong: '补杠',
+    concealedKong: '暗杠',
+    callTransfer: '呼叫转移',
+    huaZhu: '查花猪',
+    daJiao: '查大叫',
+    kongRefund: '退税',
+  } as Record<string, string>,
 };
 
-export const PAYMENT_NAMES: Record<string, string> = {
-  win: '胡牌',
-  directKong: '直杠',
-  addedKong: '补杠',
-  concealedKong: '暗杠',
-  callTransfer: '呼叫转移',
-  huaZhu: '查花猪',
-  daJiao: '查大叫',
-  kongRefund: '退税',
+const enNames: typeof zhNames = {
+  suits: { 0: 'Characters', 1: 'Bamboo', 2: 'Dots' },
+  tileSuits: { 0: 'Crak', 1: 'Bam', 2: 'Dot' },
+  ranks: ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+  patterns: {
+    pingHu: 'Plain Win',
+    duiDuiHu: 'All Pongs',
+    qingYiSe: 'Pure Suit',
+    qiDui: 'Seven Pairs',
+    jinGouDiao: 'Golden Hook',
+    jiangDui: '2-5-8 Pongs',
+    qingDui: 'Pure All Pongs',
+    longQiDui: 'Dragon Seven Pairs',
+    qingQiDui: 'Pure Seven Pairs',
+    qingLongQiDui: 'Pure Dragon Seven Pairs',
+    gen: 'Root',
+    gangShangHua: 'Win on Kong Draw',
+    gangShangPao: 'Win on Kong Discard',
+    qiangGang: 'Robbing the Kong',
+    haiDi: 'Last Tile Win',
+    ziMo: 'Self-Draw',
+    tianHu: 'Heavenly Hand',
+    diHu: 'Earthly Hand',
+  },
+  payments: {
+    win: 'Win',
+    directKong: 'Exposed Kong',
+    addedKong: 'Added Kong',
+    concealedKong: 'Concealed Kong',
+    callTransfer: 'Kong Transfer',
+    huaZhu: 'Flower Pig',
+    daJiao: 'Not Ready',
+    kongRefund: 'Kong Refund',
+  },
 };
 
-export const T = {
+const zh = {
   appTitle: '四川麻将 · 血战到底',
   start: '开始游戏',
   hands: '局数',
   baseScore: '底分',
   connecting: '正在连接服务器…',
   offline: '无法连接服务器，正在重试…',
+  reconnecting: '正在重新连接…',
   swapHint: '选择同一花色的三张牌交换',
   swapConfirm: '确认换牌',
   swapWaiting: '等待其他玩家换牌…',
   dingqueHint: '选择要打缺的花色',
   dingqueWaiting: '等待其他玩家定缺…',
+  voidSuit: (suit: string) => `缺${suit}`,
+  tileShort: (rank: number, suit: string) => `${rank}${suit}`,
   pong: '碰',
   kong: '杠',
   hu: '胡',
@@ -69,6 +114,8 @@ export const T = {
   confirm: '确定',
   wall: '剩余',
   dealer: '庄',
+  tilesInHand: (n: number) => `${n}张`,
+  robbed: '被抢杠!',
   handResult: '本局结算',
   gameResult: '整场结算',
   nextHand: '下一局',
@@ -79,9 +126,15 @@ export const T = {
   huaZhu: '花猪',
   ready: '听牌',
   notReady: '未听',
+  me: '（我）',
+  dealtInBy: (name: string) => `（${name} 点炮）`,
+  fan: (n: number) => `${n} 番`,
+  colon: '：',
+  listSeparator: '　',
   hand: (i: number, n: number) => `第 ${i + 1} / ${n} 局`,
-  swapDirection: { clockwise: '顺时针换牌', counterClockwise: '逆时针换牌', opposite: '对家换牌' },
+  swapDirection: { clockwise: '顺时针换牌', counterClockwise: '逆时针换牌', opposite: '对家换牌' } as Record<string, string>,
   sound: { title: '声音', effects: '音效', music: '音乐', on: '开', off: '关' },
+  language: { title: '语言', zh: '中文', en: 'English' },
   tutorial: {
     title: '新手教程',
     subtitle: '6 节小课，每节一两分钟，在真实牌桌上一步步跟着做。不联网也能学。',
@@ -104,12 +157,12 @@ export const T = {
   close: '关闭',
   aiBadge: 'AI',
   banter: '牌友嘴碎程度',
-  banterLevels: { mild: '温和', spicy: '毒舌', quiet: '安静' },
+  banterLevels: { mild: '温和', spicy: '毒舌', quiet: '安静' } as Record<string, string>,
   banterHint: {
     mild: '友好调侃，不嘲讽你',
     spicy: '斗嘴、嘲讽、阴阳怪气（不越界）',
     quiet: '只用表情和简短反应',
-  },
+  } as Record<string, string>,
   // Accounts and economy (Phase 3)
   login: {
     title: '登录',
@@ -126,7 +179,6 @@ export const T = {
     submit: '登录',
     unavailable: '当前版本暂不支持此登录方式',
     privacy: '登录即表示同意《用户协议》和《隐私政策》',
-    readLegal: '查看协议',
   },
   loginErrors: {
     network: '连接服务器失败，请稍后再试',
@@ -139,6 +191,7 @@ export const T = {
     methodUnavailable: '当前地区不支持此登录方式',
     suspended: '账号已被暂停使用',
     identityInUse: '该账号已绑定到另一个游戏账号',
+    nicknameRejected: '昵称不可用',
     serverError: '服务器出错了',
   } as Record<string, string>,
   realName: {
@@ -157,6 +210,7 @@ export const T = {
   rewardDay: (d: number) => `第 ${d} 天`,
   rewardNote: '错过的天数不会清零，领完一轮重新开始。',
   tables: '选择场次',
+  tableNames: { practice: '练习场', low: '初级场', mid: '中级场', high: '高级场' } as Record<string, string>,
   baseScoreN: (n: number) => `底分 ${n}`,
   minCoinsN: (n: number) => `准入 ${n.toLocaleString()}`,
   noCoins: '不结算金币',
@@ -186,7 +240,7 @@ export const T = {
   crashTitle: '出了点问题',
   crashText: '应用遇到了一个错误，已自动上报。点下面的按钮回到游戏。',
   crashRetry: '重新加载',
-  legal: { privacy: '隐私政策', terms: '用户协议', sdks: '第三方 SDK 清单' },
+  legal: { privacy: '《隐私政策》', terms: '《用户协议》', sdks: '《第三方 SDK 清单》' },
   consent: {
     title: '欢迎来到四川麻将',
     body: '在开始之前，请阅读《用户协议》和《隐私政策》。我们会收集账号标识、游戏记录和聊天内容来提供游戏服务；牌桌上的 AI 角色由大模型生成对话。我们不出售你的个人信息，不做跨应用追踪。',
@@ -230,5 +284,248 @@ export const T = {
     suspended: '聊天功能暂时不可用',
     tooLong: '消息太长了',
     notInGame: '不在牌局中',
+  } as Record<string, string>,
+};
+
+export type Strings = typeof zh;
+
+const en: Strings = {
+  appTitle: 'Sichuan Mahjong · Bloody Battle',
+  start: 'Start',
+  hands: 'Hands',
+  baseScore: 'Base score',
+  connecting: 'Connecting to the server…',
+  offline: "Can't reach the server, retrying…",
+  reconnecting: 'Reconnecting…',
+  swapHint: 'Pick three tiles of one suit to swap',
+  swapConfirm: 'Swap',
+  swapWaiting: 'Waiting for the others to swap…',
+  dingqueHint: 'Pick the suit you will give up (void suit)',
+  dingqueWaiting: 'Waiting for the others to pick their void suit…',
+  voidSuit: (suit: string) => `Void: ${suit}`,
+  tileShort: (rank: number, suit: string) => `${rank} ${suit}`,
+  pong: 'Pong',
+  kong: 'Kong',
+  hu: 'Win',
+  zimo: 'Self-draw',
+  pass: 'Pass',
+  discard: 'Discard',
+  discardHint: 'Double-tap or swipe up to discard',
+  voidFirst: 'Discard your void-suit tiles first',
+  autoPlayOn: 'Auto-play on — tap to take back control',
+  autoPlay: 'Auto',
+  skipToResults: 'Skip to results',
+  leave: 'Leave',
+  leaveConfirmTitle: 'Leave the game?',
+  leaveConfirmBody: 'Auto-play will finish the game for you and coins settle as usual.',
+  cancel: 'Cancel',
+  confirm: 'OK',
+  wall: 'Wall',
+  dealer: 'Dealer',
+  tilesInHand: (n: number) => `${n} tiles`,
+  robbed: 'Robbed!',
+  handResult: 'Hand result',
+  gameResult: 'Game result',
+  nextHand: 'Next hand',
+  newGame: 'Play again',
+  backHome: 'Back to lobby',
+  threeWon: 'Three players won',
+  wallExhausted: 'Wall exhausted',
+  huaZhu: 'Flower Pig',
+  ready: 'Ready',
+  notReady: 'Not ready',
+  me: ' (me)',
+  dealtInBy: (name: string) => ` (from ${name})`,
+  fan: (n: number) => `${n} fan`,
+  colon: ': ',
+  listSeparator: '  ',
+  hand: (i: number, n: number) => `Hand ${i + 1} / ${n}`,
+  swapDirection: { clockwise: 'Swap clockwise', counterClockwise: 'Swap counter-clockwise', opposite: 'Swap across' },
+  sound: { title: 'Sound', effects: 'Effects', music: 'Music', on: 'on', off: 'off' },
+  language: { title: 'Language', zh: '中文', en: 'English' },
+  tutorial: {
+    title: 'Tutorial',
+    subtitle: 'Six short lessons, a minute or two each, played step by step on a real table. Works offline.',
+    back: 'Back',
+    next: 'Next',
+    continue: 'Continue',
+    lessonDone: 'Lesson complete!',
+    entry: 'Tutorial',
+    firstTime: 'New to Sichuan Mahjong? Learn it in 5 minutes',
+    fromLogin: 'Try the tutorial first',
   },
-} as const;
+  chat: 'Chat',
+  report: 'Report',
+  reported: 'Reported',
+  chatPlaceholder: 'Say something…',
+  send: 'Send',
+  toTable: 'Everyone',
+  quickPhrases: 'Phrases',
+  stickers: 'Stickers',
+  close: 'Close',
+  aiBadge: 'AI',
+  banter: 'Table talk',
+  banterLevels: { mild: 'Friendly', spicy: 'Spicy', quiet: 'Quiet' },
+  banterHint: {
+    mild: 'Friendly teasing, never at your expense',
+    spicy: 'Trash talk and sarcasm (within limits)',
+    quiet: 'Only stickers and short reactions',
+  },
+  login: {
+    title: 'Sign in',
+    guest: 'Play as guest',
+    guestTrial: 'Guest trial (1 hour per 15 days)',
+    apple: 'Sign in with Apple',
+    google: 'Sign in with Google',
+    wechat: 'Sign in with WeChat',
+    phone: 'Phone number',
+    phonePlaceholder: 'Phone number',
+    codePlaceholder: 'Code',
+    sendCode: 'Send code',
+    resend: (s: number) => `Resend in ${s}s`,
+    submit: 'Sign in',
+    unavailable: 'This sign-in method is not available in this version',
+    privacy: 'By signing in you agree to the Terms of Service and Privacy Policy',
+  },
+  loginErrors: {
+    network: "Couldn't reach the server, please try again later",
+    invalidPhone: 'Invalid phone number',
+    invalidCode: 'Wrong or expired code',
+    tooManyAttempts: 'Too many attempts, request a new code',
+    rateLimited: 'Too many requests, please try again later',
+    invalidToken: 'Sign-in failed, please try again',
+    notConfigured: 'This sign-in method is not set up on the server',
+    methodUnavailable: 'This sign-in method is not available in your region',
+    suspended: 'This account has been suspended',
+    identityInUse: 'This sign-in is already linked to another game account',
+    nicknameRejected: 'That nickname is not allowed',
+    serverError: 'Something went wrong on the server',
+  },
+  realName: {
+    title: 'Identity verification',
+    hint: 'Game accounts must complete real-name verification. Your ID number is only used for verification.',
+    name: 'Full name',
+    idNumber: 'ID number',
+    submit: 'Verify',
+    invalid: 'Invalid ID number',
+    failed: 'Verification failed, please check your details',
+  },
+  coins: 'Coins',
+  dailyReward: 'Daily reward',
+  claim: (n: number) => `Claim ${n.toLocaleString()} coins`,
+  claimed: 'Claimed today',
+  rewardDay: (d: number) => `Day ${d}`,
+  rewardNote: "Missed days don't reset your progress; the cycle restarts after the last day.",
+  tables: 'Choose a table',
+  tableNames: { practice: 'Practice', low: 'Beginner', mid: 'Intermediate', high: 'High Roller' },
+  baseScoreN: (n: number) => `Base ${n}`,
+  minCoinsN: (n: number) => `Min ${n.toLocaleString()}`,
+  noCoins: 'No coins at stake',
+  privateRoom: 'Private room',
+  privateRoomHint: 'Free to create: choose base score, hands and rules',
+  privateCreate: 'Create',
+  inviteCode: 'Room',
+  maxBaseHint: (n: number) => `Base score up to ${n.toLocaleString()} (1% of your coins); 0 means no coins`,
+  rules: {
+    huanSanZhang: 'Swap three',
+    callTransfer: 'Kong transfer',
+    selfDrawFan: 'Self-draw adds a fan (off: adds base)',
+    maxFan: 'Fan cap',
+  },
+  startRejected: {
+    unknownTable: 'That table does not exist',
+    insufficientCoins: 'Not enough coins for this table',
+    baseTooHigh: 'Base score is too high',
+    invalidOptions: 'Invalid room settings',
+    realNameRequired: 'Please complete identity verification first',
+    minorTimeLimit: 'Minors may only play 20:00–21:00 on Fridays, weekends and public holidays',
+    guestTrialOver: 'Your guest trial is over; sign in to keep playing',
+  },
+  minorLimit: (until: number | null) => (until ? `Minor play time until ${new Date(until).toLocaleTimeString().slice(0, 5)}` : 'Minors may only play 20:00–21:00 on Fridays, weekends and public holidays'),
+  guestLimit: (until: number | null) => (until ? `Guest trial until ${new Date(until).toLocaleTimeString().slice(0, 5)}` : 'Guest trial is over; please sign in'),
+  limitEnding: 'Play time is almost over; auto-play will finish the game',
+  crashTitle: 'Something went wrong',
+  crashText: 'The app hit an error and reported it automatically. Tap below to get back to the game.',
+  crashRetry: 'Reload',
+  legal: { privacy: 'Privacy Policy', terms: 'Terms of Service', sdks: 'Third-party SDKs' },
+  consent: {
+    title: 'Welcome to Sichuan Mahjong',
+    body: 'Before you start, please read the Terms of Service and Privacy Policy. We collect account identifiers, game records and chat messages to run the game; the AI players at the table talk using a large language model. We never sell your personal information and do not track you across apps.',
+    agree: 'Agree and continue',
+    decline: 'Decline',
+    declined: "Without agreeing you can't sign in or save progress. You can still take the offline tutorial, or read the documents again and decide.",
+    reread: 'Read again',
+  },
+  healthAdvice: '',
+  ageRating: (age: string) => `Age rating: ${age}`,
+  about: {
+    title: 'About',
+    version: (v: string) => `Version ${v}`,
+    ai: 'The other players at the table are AI characters. What they say is generated by AI, for fun only. Long-press a speech bubble to report anything inappropriate.',
+    coins: 'Coins are for fun only: they cannot be bought, exchanged or transferred.',
+    icp: (n: string) => `ICP: ${n}`,
+    appFiling: (n: string) => `App filing: ${n}`,
+  },
+  account: 'Account',
+  nickname: 'Nickname',
+  save: 'Save',
+  avatar: 'Avatar',
+  linked: 'Linked',
+  link: 'Link',
+  linkHint: 'Guest data lives on this device and is lost if you uninstall. Link an account to keep it.',
+  linkConflict: 'That sign-in already belongs to another game account. To switch, sign out first and sign in with it (this account is not affected).',
+  methodNames: { guest: 'Guest', apple: 'Apple', google: 'Google', phone: 'Phone', wechat: 'WeChat' },
+  history: 'Coin history',
+  ledgerTypes: { startingCoins: 'Welcome coins', handSettlement: 'Hand settlement', loginReward: 'Daily reward', adminAdjustment: 'Support adjustment' },
+  logout: 'Sign out',
+  deleteAccount: 'Delete account',
+  deleteConfirmTitle: 'Delete your account?',
+  deleteConfirmBody: 'Your profile, coins and memories with the AI players will be deleted. This cannot be undone.',
+  handCoins: (n: number) => `This hand ${n > 0 ? '+' : ''}${n.toLocaleString()} coins`,
+  gameCoins: (n: number) => `This game ${n > 0 ? '+' : ''}${n.toLocaleString()} coins`,
+  awayResult: 'While you were away, auto-play finished your last game',
+  ok: 'OK',
+  chatRejected: {
+    blocked: 'Message not sent',
+    rateLimited: "You're sending too fast, take a breather",
+    suspended: 'Chat is temporarily unavailable',
+    tooLong: 'Message is too long',
+    notInGame: 'Not in a game',
+  },
+};
+
+export const SUIT_NAMES: Record<Suit, string> = { ...zhNames.suits };
+export const TILE_SUITS: Record<Suit, string> = { ...zhNames.tileSuits };
+export const RANK_NAMES: string[] = [...zhNames.ranks];
+export const PATTERN_NAMES: Record<Pattern, string> = { ...zhNames.patterns };
+export const PAYMENT_NAMES: Record<string, string> = { ...zhNames.payments };
+export const T: Strings = { ...zh };
+
+let current: Locale = 'zh';
+
+export function getLocale(): Locale {
+  return current;
+}
+
+/** Switches every catalog in place; callers re-render (the app root remounts on change). */
+export function setLocale(locale: Locale): void {
+  current = locale;
+  const names = locale === 'en' ? enNames : zhNames;
+  Object.assign(T, locale === 'en' ? en : zh);
+  Object.assign(SUIT_NAMES, names.suits);
+  Object.assign(TILE_SUITS, names.tileSuits);
+  RANK_NAMES.splice(0, RANK_NAMES.length, ...names.ranks);
+  Object.assign(PATTERN_NAMES, names.patterns);
+  Object.assign(PAYMENT_NAMES, names.payments);
+}
+
+/** Table names: the server's (admin-editable, Chinese) names, or the English names in English. */
+export function tableName(stake: { kind?: string; tableId?: string; id?: string; name: string }): string {
+  if (stake.kind === 'private') return T.privateRoom;
+  const id = stake.tableId ?? stake.id;
+  return current === 'en' && id ? (T.tableNames[id] ?? stake.name) : stake.name;
+}
+
+/** Text that has both languages inline (tutorial scripts). */
+export type Bilingual = { zh: string; en: string };
+export const tr = (text: Bilingual): string => text[current];

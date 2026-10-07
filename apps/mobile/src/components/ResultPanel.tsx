@@ -46,7 +46,7 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, on
           {result.wins.map((w) => (
             <View key={w.order} style={styles.win}>
               <Text style={styles.winText}>
-                {name(w.seat)} {w.selfDraw ? T.zimo : `${T.hu}（${name(w.from!)} 点炮）`} · {w.fan} 番 · {w.score}
+                {name(w.seat)} {w.selfDraw ? T.zimo : `${T.hu}${T.dealtInBy(name(w.from!))}`} · {T.fan(w.fan)} · {w.score}
               </Text>
               <Text style={styles.patterns}>{w.patterns.map((p) => PATTERN_NAMES[p]).join(' + ')}</Text>
               <View style={styles.tiles}>
@@ -60,8 +60,8 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, on
             <Text style={styles.details}>
               {result.payments
                 .filter((p) => p.reason !== 'win')
-                .map((p) => `${PAYMENT_NAMES[p.reason]}：${name(p.from)} → ${name(p.to)} ${p.amount}`)
-                .join('　')}
+                .map((p) => `${PAYMENT_NAMES[p.reason]}${T.colon}${name(p.from)} → ${name(p.to)} ${p.amount}`)
+                .join(T.listSeparator)}
             </Text>
           )}
           <View style={styles.scores}>
@@ -71,7 +71,7 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, on
                 <View key={s.seat} style={styles.scoreRow}>
                   <Text style={styles.cell}>
                     {s.avatar} {s.name}
-                    {s.isHuman ? '（我）' : ''} {tag(s.seat)}
+                    {s.isHuman ? T.me : ''} {tag(s.seat)}
                   </Text>
                   <Text style={[styles.num, delta > 0 ? styles.plus : delta < 0 ? styles.minus : null]}>
                     {delta > 0 ? `+${delta}` : delta}

@@ -3,7 +3,7 @@ import { suitOf, type Action, type HandView, type Suit, type Tile } from '@mahjo
 import type { DistributiveOmit } from '@mahjong/protocol';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { playSfx } from '../audio/sound';
-import { SUIT_NAMES, T } from '../strings';
+import { SUIT_NAMES, T, TILE_SUITS } from '../strings';
 import { Tile as TileView } from './Tile';
 
 type Intent = DistributiveOmit<Action, 'seat'>;
@@ -43,7 +43,7 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
       <Bar>
         <Hint text={T.dingqueHint} />
         {([0, 1, 2] as Suit[]).map((suit) => (
-          <Btn key={suit} label={`缺${SUIT_NAMES[suit]} (${counts[suit]})`} primary={suit === suggested} onPress={() => onAct({ type: 'dingque', suit })} />
+          <Btn key={suit} label={`${T.voidSuit(SUIT_NAMES[suit])} (${counts[suit]})`} primary={suit === suggested} onPress={() => onAct({ type: 'dingque', suit })} />
         ))}
       </Bar>
     );
@@ -69,7 +69,7 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
         <Hint text={voidFirst ? T.voidFirst : T.discardHint} />
         {legal.zimo && <Btn label={T.zimo} big danger onPress={() => onAct({ type: 'zimo' })} />}
         {legal.selfKong?.map((tile) => (
-          <Btn key={tile} label={`${T.kong} ${tile % 9 + 1}${SUIT_NAMES[suitOf(tile)]}`} onPress={() => onAct({ type: 'selfKong', tile })} />
+          <Btn key={tile} label={`${T.kong} ${T.tileShort((tile % 9) + 1, TILE_SUITS[suitOf(tile)])}`} onPress={() => onAct({ type: 'selfKong', tile })} />
         ))}
         {selected !== null && legal.discard.includes(selected) && (
           <Btn label={T.discard} primary onPress={() => onAct({ type: 'discard', tile: selected })} />

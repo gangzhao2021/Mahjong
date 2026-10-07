@@ -6,7 +6,8 @@
 import { rankOf, suitOf, type Seat, type Tile } from '@mahjong/engine';
 import type { Rng } from './roster';
 import { reunionFlavor, type CharacterMemory } from './memory';
-import type { BanterLevel, Personality, SpeechIntent, TemplateSet, Trigger, TriggerKind } from './types';
+import { EN_TEMPLATES } from './templatesEn';
+import type { BanterLevel, Language, Personality, SpeechIntent, TemplateSet, Trigger, TriggerKind } from './types';
 
 export type Role = 'subject' | 'object' | 'other';
 
@@ -70,8 +71,10 @@ export const DEFAULT_TEMPLATES: Partial<Record<TemplateKey, TemplateSet>> = {
 };
 
 const SUIT_NAMES = ['万', '条', '筒'];
-export const suitName = (s: number) => `${SUIT_NAMES[s]}子`;
-export const publicTileName = (t: Tile) => `${rankOf(t)}${SUIT_NAMES[suitOf(t)]}`;
+const SUIT_NAMES_EN = ['Characters', 'Bamboo', 'Dots'];
+export const suitName = (s: number, language: Language = 'zh') => (language === 'en' ? SUIT_NAMES_EN[s] : `${SUIT_NAMES[s]}子`);
+export const publicTileName = (t: Tile, language: Language = 'zh') =>
+  language === 'en' ? `${rankOf(t)} ${SUIT_NAMES_EN[suitOf(t)]}` : `${rankOf(t)}${SUIT_NAMES[suitOf(t)]}`;
 
 export function roleOf(trigger: Trigger, seat: Seat): Role {
   if (trigger.subject === seat) return 'subject';
@@ -106,6 +109,7 @@ export interface TemplateContext {
   /** What this character remembers about the human (Phase 4). */
   memory?: CharacterMemory | null;
   humanSeat?: Seat;
+  language?: Language;
 }
 
 /** A memory-specific template key for this moment, if the character has history with the player. */
@@ -124,15 +128,18 @@ export function templateLine(ctx: TemplateContext, rng: Rng): string | null {
   const { trigger, seat, intent, personality, level } = ctx;
   const role = roleOf(trigger, seat);
   const key = intentKey(intent);
-  const own = personality.templates ?? {};
+  const language = ctx.language ?? 'zh';
+  // Personality templates are written in Chinese only.
+  const own = language === 'zh' ? (personality.templates ?? {}) : {};
+  const lib: Partial<Record<string, TemplateSet>> = language === 'en' ? EN_TEMPLATES : DEFAULT_TEMPLATES;
 
   let pool: string[] = [];
   const remembered = memoryKey(ctx);
-  if (remembered) pool = linesFor(DEFAULT_TEMPLATES[remembered], level);
-  if (!pool.length && key) pool = linesFor(DEFAULT_TEMPLATES[key], level);
+  if (remembered) pool = linesFor(lib[remembered], level);
+  if (!pool.length && key) pool = linesFor(lib[key], level);
   if (!pool.length) pool = linesFor(own[trigger.kind], level);
-  if (!pool.length) pool = linesFor(DEFAULT_TEMPLATES[`${trigger.kind}.${role}`], level);
-  if (!pool.length && role !== 'other') pool = linesFor(DEFAULT_TEMPLATES[`${trigger.kind}.other`], level);
+  if (!pool.length) pool = linesFor(lib[`${trigger.kind}.${role}`], level);
+  if (!pool.length && role !== 'other') pool = linesFor(lib[`${trigger.kind}.other`], level);
   // A catchphrase now and then — but a memory callback always wins.
   if (!remembered && ctx.catchphrases?.length && rng() < 0.15) pool = ctx.catchphrases;
   if (!pool.length) return null;
@@ -142,7 +149,7 @@ export function templateLine(ctx: TemplateContext, rng: Rng): string | null {
     .replaceAll('{player}', ctx.humanSeat !== undefined ? ctx.nameOf(ctx.humanSeat) : '')
     .replaceAll('{subject}', trigger.subject !== undefined ? ctx.nameOf(trigger.subject) : '')
     .replaceAll('{object}', trigger.object !== undefined ? ctx.nameOf(trigger.object) : '')
-    .replaceAll('{tile}', trigger.tile !== undefined ? publicTileName(trigger.tile) : '')
+    .replaceAll('{tile}', trigger.tile !== undefined ? publicTileName(trigger.tile, language) : '')
     .replaceAll('{fan}', String(trigger.fan ?? ''))
-    .replaceAll('{suit}', intent.kind === 'feignIndifference' ? suitName(intent.suit) : '');
+    .replaceAll('{suit}', intent.kind === 'feignIndifference' ? suitName(intent.suit, language) : '');
 }

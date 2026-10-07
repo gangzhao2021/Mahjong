@@ -11,7 +11,7 @@ import { ResultPanel } from '../components/ResultPanel';
 import { Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
 import { Tile } from '../components/Tile';
 import type { GameApi, TimedEvent } from '../net/useGame';
-import { T } from '../strings';
+import { T, tableName } from '../strings';
 
 /** Position of a seat relative to the viewer: 0 bottom, 1 right, 2 top, 3 left (turn order is counter-clockwise). */
 type Side = 0 | 1 | 2 | 3;
@@ -104,7 +104,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         <View style={styles.stake}>
           <Text style={styles.handInfo}>{T.hand(table.handIndex, table.handsPerGame)}</Text>
           <Text style={styles.handInfo}>
-            {table.stake.name}
+            {tableName(table.stake)}
             {table.stake.inviteCode ? ` ${T.inviteCode} ${table.stake.inviteCode}` : ''} · {table.stake.multiplier ? T.baseScoreN(table.stake.baseScore) : T.noCoins}
           </Text>
           {table.stake.multiplier > 0 && <Text style={styles.coinLine}>{T.gameCoins(gameCoins)}</Text>}
@@ -272,7 +272,7 @@ function calloutText(e: GameEvent): string | null {
     case 'kong':
       return `${T.kong}!`;
     case 'kongRobbed':
-      return '被抢杠!';
+      return T.robbed;
     case 'win':
       return e.win.selfDraw ? `${T.zimo}!` : `${T.hu}!`;
     default:

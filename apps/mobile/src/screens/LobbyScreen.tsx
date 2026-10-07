@@ -6,7 +6,7 @@ import { Btn } from '../components/ActionBar';
 import { formStyles, Sheet } from '../components/Sheet';
 import { api } from '../net/api';
 import type { ConnectionStatus } from '../net/useGame';
-import { T } from '../strings';
+import { T, tableName } from '../strings';
 
 interface Props {
   info: ServerInfo;
@@ -65,7 +65,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
               onPress={() => onStart({ tableId: t.id })}
               style={({ pressed }) => [styles.table, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
             >
-              <Text style={styles.tableName}>{t.name}</Text>
+              <Text style={styles.tableName}>{tableName(t)}</Text>
               <Text style={styles.tableInfo}>{t.multiplier === 0 ? T.noCoins : T.baseScoreN(t.baseScore)}</Text>
               {t.minCoins > 0 && <Text style={[styles.tableInfo, !affordable && styles.short]}>{T.minCoinsN(t.minCoins)}</Text>}
             </Pressable>

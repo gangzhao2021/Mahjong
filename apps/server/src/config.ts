@@ -24,6 +24,8 @@ export interface ServerConfig {
   defaultBaseScore: number;
   defaultHandsPerGame: number;
   maxHandsPerGame: number;
+  /** After a server restart, restored games wait this long for the player to reconnect before play resumes. */
+  restoreGraceMs: number;
 }
 
 export const DEFAULT_CONFIG: ServerConfig = {
@@ -44,4 +46,5 @@ export const DEFAULT_CONFIG: ServerConfig = {
   defaultBaseScore: 1,
   defaultHandsPerGame: 4,
   maxHandsPerGame: 16,
+  restoreGraceMs: 60_000,
 };

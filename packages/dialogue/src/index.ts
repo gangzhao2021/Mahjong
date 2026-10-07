@@ -3,6 +3,7 @@ export * from './roster';
 export * from './triggers';
 export * from './intents';
 export * from './templates';
+export * from './templatesEn';
 export * from './prompt';
 export * from './moderation';
 export * from './catalog';

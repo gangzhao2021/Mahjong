@@ -6,14 +6,24 @@ import { viewFor, type GameEvent, type HandState, type Seat } from '@mahjong/eng
 import type { SeatInfo, TableSnapshot } from '@mahjong/protocol';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameApi, LocalChatEntry, TimedEvent } from '../net/useGame';
+import { getLocale, tr } from '../strings';
 import { type Intent, type Lesson } from './lessons';
 import { autoPlay, tryPlayerMove } from './runner';
 
-const SEATS: SeatInfo[] = [
-  { seat: 0, name: '我', avatar: '🙂', isHuman: true },
-  { seat: 1, name: '黄叔', avatar: '🐨', isHuman: false, personality: '热心' },
-  { seat: 2, name: '小美', avatar: '🐰', isHuman: false, personality: '话痨' },
-  { seat: 3, name: '阿强', avatar: '🐯', isHuman: false, personality: '嘴炮' },
+const SEATS: { zh: SeatInfo; en: SeatInfo }[] = [
+  { zh: { seat: 0, name: '我', avatar: '🙂', isHuman: true }, en: { seat: 0, name: 'Me', avatar: '🙂', isHuman: true } },
+  {
+    zh: { seat: 1, name: '黄叔', avatar: '🐨', isHuman: false, personality: '热心' },
+    en: { seat: 1, name: 'Uncle Huang', avatar: '🐨', isHuman: false, personality: 'Kind' },
+  },
+  {
+    zh: { seat: 2, name: '小美', avatar: '🐰', isHuman: false, personality: '话痨' },
+    en: { seat: 2, name: 'Mei', avatar: '🐰', isHuman: false, personality: 'Chatty' },
+  },
+  {
+    zh: { seat: 3, name: '阿强', avatar: '🐯', isHuman: false, personality: '嘴炮' },
+    en: { seat: 3, name: 'Qiang', avatar: '🐯', isHuman: false, personality: 'Trash talker' },
+  },
 ];
 
 /** Pause between opponent moves so the player can follow them. */
@@ -85,7 +95,7 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
       timers.current.push(
         setTimeout(() => {
           const id = ids.current++;
-          setChat((cur) => [...cur, { id, seat: line.seat as Seat, kind: 'ai', text: line.text, sticker: null, target: 'table', at: Date.now(), localAt: Date.now() }]);
+          setChat((cur) => [...cur, { id, seat: line.seat as Seat, kind: 'ai', text: tr(line.text), sticker: null, target: 'table', at: Date.now(), localAt: Date.now() }]);
         }, 300 + i * 1300),
       );
     });
@@ -104,7 +114,7 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
       if (busy || !step?.expect) return;
       const t = tryPlayerMove(handRef.current, step, intent);
       if (!t) {
-        setHint(step.hint ?? null);
+        setHint(step.hint ? tr(step.hint) : null);
         return;
       }
       setHint(null);
@@ -127,7 +137,7 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
     handIndex: 0,
     handsPerGame: 1,
     mySeat: 0,
-    seats: SEATS,
+    seats: SEATS.map((s) => s[getLocale()]),
     totals: [0, 0, 0, 0],
     view: viewFor(hand, 0),
     timer: null,

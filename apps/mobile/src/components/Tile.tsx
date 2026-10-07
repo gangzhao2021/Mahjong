@@ -1,7 +1,7 @@
 import { HIDDEN_TILE, rankOf, suitOf, type Tile as TileKind } from '@mahjong/engine';
 import { memo } from 'react';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { RANK_NAMES, SUIT_NAMES } from '../strings';
+import { RANK_NAMES, SUIT_NAMES, TILE_SUITS } from '../strings';
 
 const SUIT_COLORS = ['#b3261e', '#1e7a3c', '#1d4f9a'] as const;
 
@@ -29,13 +29,15 @@ function TileView({ tile, width, back, dimmed, highlighted, rotated, style }: Ti
   const suit = suitOf(tile);
   const color = SUIT_COLORS[suit];
   const big = Math.round(width * 0.48);
+  // Word marks (English) shrink to their initial on small tiles so they stay legible.
+  const mark = TILE_SUITS[suit].length > 1 && width < 34 ? TILE_SUITS[suit][0] : TILE_SUITS[suit];
   return (
     <View
       style={[styles.tile, styles.face, box, highlighted && styles.highlighted, dimmed && styles.dimmed, style]}
-      accessibilityLabel={`${RANK_NAMES[rankOf(tile) - 1]}${SUIT_NAMES[suit]}`}
+      accessibilityLabel={`${RANK_NAMES[rankOf(tile) - 1]} ${SUIT_NAMES[suit]}`}
     >
       <Text style={[styles.rank, { color, fontSize: big, lineHeight: big * 1.1 }]}>{rankOf(tile)}</Text>
-      <Text style={[styles.suit, { color, fontSize: Math.round(width * 0.3) }]}>{SUIT_NAMES[suit]}</Text>
+      <Text style={[styles.suit, { color, fontSize: Math.round(width * (mark.length > 1 ? 0.22 : 0.3)) }]}>{mark}</Text>
     </View>
   );
 }

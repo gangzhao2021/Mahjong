@@ -32,6 +32,9 @@ await app.ready();
 const wss = new WebSocketServer({ server: app.server, path: '/ws', maxPayload: 16 * 1024 });
 wss.on('connection', (socket) => lobby.handleConnection(socket));
 
+const restored = await lobby.restoreGames();
+if (restored) console.log(`Restored ${restored} game(s) in progress.`);
+
 await app.listen({ port: config.port, host: '0.0.0.0' });
 console.log(`Region: ${dialogue.region}; dialogue provider: ${llm.name}; database: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'PGlite'}`);
 console.log(`Mahjong server on http://localhost:${config.port} (WebSocket /ws)`);
@@ -46,7 +49,7 @@ process.on('uncaughtException', (error) => {
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {
-    lobby.closeAll();
+    await lobby.closeAll();
     wss.close();
     await app.close();
     await db.close();

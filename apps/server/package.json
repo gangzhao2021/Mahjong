@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
     "start": "tsx --env-file-if-exists=.env src/main.ts",
-    "admin:setup": "tsx src/admin/cli.ts"
+    "admin:setup": "tsx src/admin/cli.ts",
+    "llm:smoke": "tsx --env-file-if-exists=.env src/llm/smokeCli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

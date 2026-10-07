@@ -9,7 +9,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { formStyles } from '../components/Sheet';
 import { SERVER_HTTP } from '../config';
-import { T } from '../strings';
+import { getLocale, T } from '../strings';
 
 const KEY = 'mahjong.consent';
 /** Bump when the policy changes materially, so players are asked again. */
@@ -23,19 +23,19 @@ export async function loadConsent(): Promise<boolean> {
   }
 }
 
-export const openLegal = (page: 'privacy' | 'terms' | 'sdks') => void Linking.openURL(`${SERVER_HTTP}/legal/${page}`).catch(() => undefined);
+export const openLegal = (page: 'privacy' | 'terms' | 'sdks') => void Linking.openURL(`${SERVER_HTTP}/legal/${page}?lang=${getLocale()}`).catch(() => undefined);
 
 export function LegalLinks() {
   return (
     <View style={formStyles.row}>
       <Text style={styles.link} accessibilityRole="link" onPress={() => openLegal('terms')}>
-        《{T.legal.terms}》
+        {T.legal.terms}
       </Text>
       <Text style={styles.link} accessibilityRole="link" onPress={() => openLegal('privacy')}>
-        《{T.legal.privacy}》
+        {T.legal.privacy}
       </Text>
       <Text style={styles.link} accessibilityRole="link" onPress={() => openLegal('sdks')}>
-        《{T.legal.sdks}》
+        {T.legal.sdks}
       </Text>
     </View>
   );

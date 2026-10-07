@@ -15,7 +15,10 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDialogueRequest,
   chooseIntent,
+  characterSystemPrompt,
   DEFAULT_TEMPLATES,
+  EN_TEMPLATES,
+  textLength,
   detectTriggers,
   LocalModerator,
   newDirectorState,
@@ -293,5 +296,29 @@ describe('moderation', () => {
   it('allows normal banter, and numbers in AI lines', async () => {
     expect((await m.check('你这张五条打得好啊', 'playerChat')).allowed).toBe(true);
     expect((await m.check('这把 12345678 分', 'aiLine')).allowed).toBe(true);
+  });
+});
+
+describe('English table talk', () => {
+  it('has an English line set for every Chinese template key, with no Chinese in it', () => {
+    for (const key of Object.keys(DEFAULT_TEMPLATES)) {
+      const en = EN_TEMPLATES[key];
+      expect(en, key).toBeDefined();
+      for (const line of [...en.mild, ...(en.spicy ?? [])]) expect(line, key).not.toMatch(/[一-鿿]/);
+    }
+  });
+
+  it('measures Chinese and English lines on a comparable scale', () => {
+    expect(textLength('打得漂亮！')).toBe(5);
+    expect(textLength('Nicely played!')).toBe(6);
+    expect(textLength('x'.repeat(100))).toBe(40);
+  });
+
+  it('asks the model to answer in English for English tables', () => {
+    const roster = { name: 'Old Wang' };
+    const prompt = characterSystemPrompt({ id: 'w', name: '老王', nameEn: roster.name, avatar: '🐼', personalityId: 'p', weight: 1, enabled: true }, { id: 'p', name: '毒舌', description: '', systemPrompt: '', conversationStyle: '', trashTalk: 0.5, talkFrequency: 0.5, bluffTendency: 0.5, stickerTendency: 0.5, stickers: [], weight: 1, enabled: true }, 'en');
+    expect(prompt).toContain('英语');
+    expect(prompt).toContain('Old Wang');
+    expect(characterSystemPrompt({ id: 'w', name: '老王', avatar: '🐼', personalityId: 'p', weight: 1, enabled: true }, { id: 'p', name: '毒舌', description: '', systemPrompt: '', conversationStyle: '', trashTalk: 0.5, talkFrequency: 0.5, bluffTendency: 0.5, stickerTendency: 0.5, stickers: [], weight: 1, enabled: true })).not.toContain('英语');
   });
 });

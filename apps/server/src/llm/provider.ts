@@ -35,7 +35,7 @@ export const MemorySummarySchema = z.object({
 export type MemorySummaryReply = z.infer<typeof MemorySummarySchema>;
 
 export const ReplySchema = z.object({
-  text: z.string().describe('One short spoken line in Chinese. Empty string to stay silent.'),
+  text: z.string().describe('One short spoken line, in the language the system prompt asks for. Empty string to stay silent.'),
   target: z.enum(['table', '0', '1', '2', '3']),
   sticker: z.enum(['none', ...STICKER_IDS] as unknown as [string, ...string[]]),
 });

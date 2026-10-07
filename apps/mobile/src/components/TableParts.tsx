@@ -62,12 +62,12 @@ export function SeatCard({ info, score, voidSuit, dealer, active, won, handCount
           </Text>
           {!info.isHuman && <Text style={[styles.badge, styles.aiBadge]}>{T.aiBadge}</Text>}
           {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
-          {voidSuit !== null && <Text style={[styles.badge, styles.voidBadge]}>缺{SUIT_NAMES[voidSuit]}</Text>}
+          {voidSuit !== null && <Text style={[styles.badge, styles.voidBadge]}>{T.voidSuit(SUIT_NAMES[voidSuit])}</Text>}
           {won && <Text style={[styles.badge, styles.wonBadge]}>{T.hu}</Text>}
         </View>
         <Text style={[styles.score, score > 0 ? styles.plus : score < 0 ? styles.minus : null]}>
           {score > 0 ? `+${score}` : score}
-          {!info.isHuman && !won ? `  · ${handCount}张` : ''}
+          {!info.isHuman && !won ? `  · ${T.tilesInHand(handCount)}` : ''}
           {info.personality ? <Text style={styles.personality}>{`  ${info.personality}`}</Text> : null}
         </Text>
       </View>

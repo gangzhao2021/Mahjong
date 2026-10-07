@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { AboutSheet } from './AboutSheet';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { updateSoundSettings, useSoundSettings } from '../audio/sound';
 import { BanterPicker } from '../components/Chat';
 import { formStyles, Sheet } from '../components/Sheet';
@@ -41,7 +42,7 @@ export function AccountScreen({ info, token, account, onAccount, onBanter, onLog
     try {
       onAccount((await api.updateProfile(token, p)).account);
     } catch (e) {
-      setMessage(e instanceof ApiError && e.code === 'nicknameRejected' ? '昵称不可用' : errorText(e));
+      setMessage(e instanceof ApiError && e.code === 'nicknameRejected' ? T.loginErrors.nicknameRejected : errorText(e));
     }
   };
 
@@ -100,9 +101,10 @@ export function AccountScreen({ info, token, account, onAccount, onBanter, onLog
       </View>
       <View style={formStyles.row}>
         <Text style={formStyles.label}>{T.sound.title}</Text>
-        <Btn label={`${T.sound.effects}：${sound.effects ? T.sound.on : T.sound.off}`} primary={sound.effects} onPress={() => updateSoundSettings({ effects: !sound.effects })} />
-        <Btn label={`${T.sound.music}：${sound.music ? T.sound.on : T.sound.off}`} primary={sound.music} onPress={() => updateSoundSettings({ music: !sound.music })} />
+        <Btn label={`${T.sound.effects}${T.colon}${sound.effects ? T.sound.on : T.sound.off}`} primary={sound.effects} onPress={() => updateSoundSettings({ effects: !sound.effects })} />
+        <Btn label={`${T.sound.music}${T.colon}${sound.music ? T.sound.on : T.sound.off}`} primary={sound.music} onPress={() => updateSoundSettings({ music: !sound.music })} />
       </View>
+      {info.region !== 'china' && <LanguagePicker />}
 
       <View style={formStyles.row}>
         <Text style={formStyles.label}>{T.linked}</Text>

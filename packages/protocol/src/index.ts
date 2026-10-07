@@ -179,7 +179,8 @@ export interface GameOptions {
 }
 
 export type ClientMessage =
-  | { type: 'hello'; token: string; protocol: number }
+  /** `locale` is the UI language; AI players talk in it (the China build is always Chinese). */
+  | { type: 'hello'; token: string; protocol: number; locale?: 'zh' | 'en' }
   | { type: 'startGame'; options?: GameOptions }
   /** `version` is the view version the action was chosen from; stale actions are ignored. */
   | { type: 'action'; action: DistributiveOmit<Action, 'seat'>; version: number }

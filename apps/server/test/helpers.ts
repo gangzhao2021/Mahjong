@@ -5,7 +5,7 @@ import { afterEach } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { SmsSender } from '../src/accounts/providers';
 import { DEFAULT_CONFIG, type ServerConfig } from '../src/config';
-import { openDb } from '../src/db/db';
+import { openDb, type Db } from '../src/db/db';
 import { createModerator, loadDialogueConfig, type DialogueConfig, type Region } from '../src/dialogueConfig';
 import type { EconomyConfig } from '../src/economy/config';
 import { AdminAuth, type AdminAuthConfig } from '../src/admin/auth';
@@ -43,6 +43,8 @@ export interface TestServerOptions {
   verifiers?: IdentityVerifiers;
   sms?: SmsSender;
   admin?: AdminAuthConfig;
+  /** Share a database between servers (restart tests); it is then not closed with the server. */
+  db?: Db;
 }
 
 const servers: TestServer[] = [];
@@ -62,7 +64,7 @@ export async function startServer(config = FAST, options: TestServerOptions = {}
   let seed = 1;
   const region = options.region ?? 'global';
   const dialogue = options.dialogue ?? loadDialogueConfig(region);
-  const db = await openDb({ dataDir: null });
+  const db = options.db ?? (await openDb({ dataDir: null }));
   const services = createServices({
     region,
     db,
@@ -89,6 +91,7 @@ export async function startServer(config = FAST, options: TestServerOptions = {}
     admin: { auth: options.admin ? new AdminAuth(db, options.admin, () => (options.now?.() ?? new Date()).getTime()) : null, config: liveConfig, secureCookies: false },
   });
   await app.ready();
+  await lobby.restoreGames();
   const wss = new WebSocketServer({ server: app.server, path: '/ws' });
   wss.on('connection', (s) => lobby.handleConnection(s));
   await app.listen({ port: 0, host: '127.0.0.1' });
@@ -100,12 +103,12 @@ export async function startServer(config = FAST, options: TestServerOptions = {}
     hands,
     services,
     close: async () => {
-      lobby.closeAll();
+      await lobby.closeAll();
       for (const c of wss.clients) c.terminate();
       await new Promise((r) => wss.close(r));
       await app.close();
       await Promise.all([...lobby.settling]);
-      await db.close();
+      if (!options.db) await db.close();
     },
   };
   servers.push(server);
@@ -194,13 +197,13 @@ export class Client {
   }
 
   /** Logs in as a guest over HTTP, then says hello on the socket. */
-  async hello(deviceId = 'device-test-1'): Promise<Extract<ServerMessage, { type: 'welcome' }>> {
-    return this.helloWithToken(await guestLogin(this.server!, deviceId));
+  async hello(deviceId = 'device-test-1', locale?: 'zh' | 'en'): Promise<Extract<ServerMessage, { type: 'welcome' }>> {
+    return this.helloWithToken(await guestLogin(this.server!, deviceId), locale);
   }
 
-  helloWithToken(token: string): Promise<Extract<ServerMessage, { type: 'welcome' }>> {
+  helloWithToken(token: string, locale?: 'zh' | 'en'): Promise<Extract<ServerMessage, { type: 'welcome' }>> {
     const welcome = this.next((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
-    this.send({ type: 'hello', token, protocol: PROTOCOL_VERSION });
+    this.send({ type: 'hello', token, protocol: PROTOCOL_VERSION, locale });
     return welcome;
   }
 

@@ -179,4 +179,13 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX client_errors_fingerprint ON client_errors(fingerprint, created_at)
   `,
+  // In-progress games survive a server restart.
+  `
+  CREATE TABLE active_games (
+    player_id text PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+    game_id text NOT NULL,
+    state jsonb NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )
+  `,
 ];

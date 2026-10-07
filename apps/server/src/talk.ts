@@ -17,6 +17,7 @@ import {
   type BanterLevel,
   type ChatLine,
   type DialogueSettings,
+  type Language,
   type Moderator,
   type Rng,
   type Speaker,
@@ -38,6 +39,8 @@ export interface TalkDeps {
   rng: Rng;
   level(): BanterLevel;
   nameOf(seat: Seat): string;
+  /** Language the table talks in. */
+  language?: Language;
   viewFor(seat: Seat): HandView;
   /** Current engine action count and hand index (relevance window). */
   version(): number;
@@ -75,6 +78,12 @@ export class TableTalk {
 
   get chatLog(): ChatEntry[] {
     return [...this.log];
+  }
+
+  /** Continues a table conversation saved before a server restart. */
+  restoreLog(entries: ChatEntry[]): void {
+    this.log = entries.slice(-CHAT_LOG_SIZE);
+    this.nextId = Math.max(0, ...entries.map((e) => e.id)) + 1;
   }
 
   onHandStart(): void {
@@ -167,9 +176,10 @@ export class TableTalk {
           personality: speaker.personality,
           level,
           nameOf: this.deps.nameOf,
-          catchphrases: speaker.character.catchphrases,
+          catchphrases: this.deps.language === 'en' ? speaker.character.catchphrasesEn : speaker.character.catchphrases,
           memory: speaker.memory,
           humanSeat: this.deps.humanSeat,
+          language: this.deps.language,
         },
         this.deps.rng,
       );
@@ -204,6 +214,7 @@ export class TableTalk {
       recentChat: this.recentChat(),
       handIndex: this.deps.handIndex(),
       memory: speaker.memory,
+      language: this.deps.language,
     });
     if (speaker.memory?.events.length) this.deps.onMemoryUsed?.(speaker.memory.events.map((e) => e.id));
     const job = this.deps.llm

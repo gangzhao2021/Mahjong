@@ -1,13 +1,19 @@
 import { registerRootComponent } from 'expo';
-
 import { createElement } from 'react';
 import App from './App';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { useLocale } from './src/i18n';
 import { installCrashHandlers } from './src/net/crash';
 
 installCrashHandlers();
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(() => createElement(ErrorBoundary, null, createElement(App)));
+/** Waits for the language, and remounts the app when it changes so every screen picks up the new text. */
+function Root() {
+  const locale = useLocale();
+  if (!locale) return null;
+  return createElement(ErrorBoundary, null, createElement(App, { key: locale }));
+}
+
+// registerRootComponent calls AppRegistry.registerComponent('main', () => Root);
+// it also sets up the environment for Expo Go and native builds alike.
+registerRootComponent(Root);

@@ -4,7 +4,7 @@ import type { BanterLevel, ChatCatalog, ChatEntry, SeatInfo, StickerId } from '@
 import { useEffect, useRef, useState } from 'react';
 import type { LocalChatEntry } from '../net/useGame';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
-import { T } from '../strings';
+import { getLocale, T } from '../strings';
 import { Btn } from './ActionBar';
 import { PopIn } from './PopIn';
 
@@ -91,7 +91,7 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
           <View style={styles.logRow}>
             <Text style={[styles.logLine, item.seat === mySeat && styles.mine]}>
               <Text style={styles.logName}>{nameOf(item.seat)}</Text>
-              {item.target !== 'table' ? ` → ${nameOf(item.target)}` : ''}：{item.text ?? ''} {stickerEmoji(catalog, item.sticker)}
+              {item.target !== 'table' ? ` → ${nameOf(item.target)}` : ''}{T.colon}{item.text ?? ''} {stickerEmoji(catalog, item.sticker)}
             </Text>
             {item.kind === 'ai' && item.text ? (
               reported.includes(item.id) ? (
@@ -132,7 +132,7 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
           value={text}
           onChangeText={setText}
           placeholder={T.chatPlaceholder}
-          maxLength={60}
+          maxLength={getLocale() === 'en' ? 150 : 60}
           onSubmitEditing={send}
           returnKeyType="send"
         />

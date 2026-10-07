@@ -48,7 +48,8 @@ export class Accounts {
   ) {}
 
   /** Logs in with an identity, creating the account (and its starting coins) on first use. */
-  async login(provider: Provider, subject: string, secret?: string | null): Promise<{ player: PlayerRow; token: string; created: boolean }> {
+  /** `english` picks the default nickname style for a new account ("Player1a2b" instead of "玩家1a2b"). */
+  async login(provider: Provider, subject: string, secret?: string | null, english = false): Promise<{ player: PlayerRow; token: string; created: boolean }> {
     const { player, created } = await this.db.tx(async (q) => {
       const found = await q.query<PlayerRow>(
         'SELECT p.* FROM identities i JOIN players p ON p.id = i.player_id WHERE i.provider = $1 AND i.subject = $2',
@@ -59,7 +60,7 @@ export class Accounts {
         return { player: found[0], created: false };
       }
       const id = `p_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
-      const nickname = `玩家${id.slice(-4)}`;
+      const nickname = `${english ? 'Player' : '玩家'}${id.slice(-4)}`;
       const avatar = PLAYER_AVATARS[Math.floor(Math.random() * PLAYER_AVATARS.length)];
       const rows = await q.query<PlayerRow>('INSERT INTO players (id, nickname, avatar) VALUES ($1, $2, $3) RETURNING *', [id, nickname, avatar]);
       await q.query('INSERT INTO identities (provider, subject, player_id, secret) VALUES ($1, $2, $3, $4)', [provider, subject, id, secret ?? null]);

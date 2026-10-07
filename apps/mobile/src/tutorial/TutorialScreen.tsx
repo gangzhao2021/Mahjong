@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { GameScreen } from '../screens/GameScreen';
-import { T } from '../strings';
+import { T, tr } from '../strings';
 import { LESSONS, type Lesson } from './lessons';
 import { useTutorial } from './useTutorial';
 
@@ -62,9 +62,9 @@ export function TutorialScreen({ onExit }: { onExit(): void }) {
         {LESSONS.map((l) => (
           <Pressable key={l.id} style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => setLesson(l)} accessibilityRole="button">
             <Text style={styles.cardTitle}>
-              {l.title} {done.includes(l.id) ? '✓' : ''}
+              {tr(l.title)} {done.includes(l.id) ? '✓' : ''}
             </Text>
-            <Text style={styles.cardText}>{l.summary}</Text>
+            <Text style={styles.cardText}>{tr(l.summary)}</Text>
           </Pressable>
         ))}
       </View>
@@ -81,14 +81,14 @@ function LessonView({ lesson, onExit, onFinish }: { lesson: Lesson; onExit(): vo
       <View style={styles.coach} pointerEvents="box-none">
         <View style={styles.coachCard}>
           <Text style={styles.coachStep}>
-            {lesson.title} · {Math.min(t.stepIndex + 1, lesson.steps.length)}/{lesson.steps.length}
+            {tr(lesson.title)} · {Math.min(t.stepIndex + 1, lesson.steps.length)}/{lesson.steps.length}
           </Text>
-          {t.done ? <Text style={styles.coachText}>{T.tutorial.lessonDone}</Text> : <Text style={styles.coachText}>{step.text}</Text>}
+          {t.done ? <Text style={styles.coachText}>{T.tutorial.lessonDone}</Text> : <Text style={styles.coachText}>{tr(step.text)}</Text>}
           {/* The card can cover a speech bubble, so the lines are repeated here. */}
           {!t.done &&
             step.say?.map((line, i) => (
               <Text key={i} style={styles.coachSay}>
-                {t.game.table.seats[line.seat].avatar} {t.game.table.seats[line.seat].name}：「{line.text}」
+                {t.game.table.seats[line.seat].avatar} {t.game.table.seats[line.seat].name}{T.colon}“{tr(line.text)}”
               </Text>
             ))}
           {t.hint && <Text style={styles.coachHint}>{t.hint}</Text>}

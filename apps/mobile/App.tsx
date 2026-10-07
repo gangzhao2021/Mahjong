@@ -16,7 +16,8 @@ import { LobbyScreen } from './src/screens/LobbyScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RealNameScreen } from './src/screens/RealNameScreen';
 import { loadTutorialProgress, TutorialScreen } from './src/tutorial/TutorialScreen';
-import { T } from './src/strings';
+import { changeLocale } from './src/i18n';
+import { getLocale, T } from './src/strings';
 
 /** Shows the latest value of `key` for a few seconds. */
 function useToast<V>(value: V | null, key: number | undefined, ms = 3000): V | null {
@@ -40,6 +41,10 @@ export default function App() {
     void loadConsent().then(setConsented);
   }, []);
   useEffect(() => setCrashReportToken(token ?? null), [token]);
+  // The China build is Chinese only.
+  useEffect(() => {
+    if (info?.region === 'china' && getLocale() !== 'zh') changeLocale('zh', false);
+  }, [info]);
   useEffect(() => {
     if (!tutorialOpen) void loadTutorialProgress().then((d) => setTutorialDone(d.length));
   }, [tutorialOpen]);
@@ -164,7 +169,7 @@ export default function App() {
       )}
       {token && game.account && game.status !== 'online' && (
         <View pointerEvents="none" style={styles.toast}>
-          <Text style={styles.toastText}>正在重新连接…</Text>
+          <Text style={styles.toastText}>{T.reconnecting}</Text>
         </View>
       )}
     </View>

@@ -16,13 +16,15 @@
 
 ## 国际版
 
-- [ ] 在服务端配好 `ANTHROPIC_API_KEY`，跑一局确认 AI 对话正常。
+- [ ] 在服务端配好 `ANTHROPIC_API_KEY`，运行 `pnpm llm:smoke` 全部通过，再跑一局确认 AI 对话正常（中文和英文界面各一局）。
+- [ ] 英文文案（界面、教程、协议页、角色英文名）请母语者审校。
 - [ ] 配好 Google 登录的 client ID（`EXPO_PUBLIC_GOOGLE_*`）。
 
 ## 中国大陆版（`eas build --profile production-china`）
 
 - [ ] 版号、软著、ICP 备案、APP 备案、生成式 AI 相关备案（附录 D.1 / D.4）。
 - [ ] 在 `eas.json` 的 `production-china` 里填入 `EXPO_PUBLIC_ICP`、`EXPO_PUBLIC_APP_FILING`，并按适龄评定结果填 `EXPO_PUBLIC_AGE_RATING`（现在默认 16+，必须和商店页一致）。
+- [ ] 配好 `LLM_API_KEY` 后运行 `pnpm llm:smoke` 全部通过。
 - [ ] 接入短信服务商、国家防沉迷实名认证系统、微信开放平台 SDK、第三方内容安全服务。
 - [ ] 服务器、数据库和大模型都在境内；登录日志和聊天记录保留至少 6 个月。
 - [ ] 安卓包里没有 Google Play 服务依赖。

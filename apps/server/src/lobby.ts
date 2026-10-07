@@ -1,6 +1,6 @@
 /** Authenticated connections, game start checks, coin settlement and room lifecycle. */
 import type { Rng } from '@mahjong/ai-play';
-import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, type Moderator, type StickerId } from '@mahjong/dialogue';
+import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, textLength, type Language, type Moderator, type StickerId } from '@mahjong/dialogue';
 import { createRng, isValidTile, type Action, type HandResult, type Seat } from '@mahjong/engine';
 import {
   PROTOCOL_VERSION,
@@ -18,7 +18,7 @@ import type { ServerConfig } from './config';
 import type { DialogueConfig } from './dialogueConfig';
 import type { LlmProvider } from './llm/provider';
 import { summarizeGame } from './memory/summarizer';
-import { Room, type AiSeatSpec } from './room';
+import { Room, type AiSeatSpec, type RoomCheckpoint } from './room';
 import { accountSummary, checkStart, type GamePlan, type Services } from './services';
 import type { HandLogStore } from './store';
 
@@ -35,6 +35,14 @@ export interface LobbyDeps {
 
 /** Warning before a play-time limit ends a game (Appendix D.3). */
 const LIMIT_WARNING_MS = 5 * 60_000;
+/** Checkpoint writes are batched: at most one per table this often. */
+const CHECKPOINT_DEBOUNCE_MS = 250;
+
+interface SavedGame {
+  room: RoomCheckpoint;
+  plan: GamePlan;
+  language?: Language;
+}
 
 export class Lobby {
   /** Active room per player. */
@@ -45,17 +53,31 @@ export class Lobby {
   private sockets = new Map<string, Set<WebSocket>>();
   /** Settlement work in flight (tests can await it). */
   readonly settling = new Set<Promise<void>>();
+  /** Pending checkpoint writes per player. */
+  private saveTimers = new Map<string, { timer: NodeJS.Timeout; write: () => Promise<void> }>();
+  /** Shutting down: rooms close but their checkpoints are kept for the next start. */
+  private stopping = false;
   private rng: Rng;
   private chatGuard: ChatGuard;
-  private readonly catalog: ChatCatalog;
+  /** UI language per player, from their latest hello. */
+  private languages = new Map<string, Language>();
 
   constructor(private readonly deps: LobbyDeps) {
     this.rng = createRng(this.nextSeed());
     this.chatGuard = new ChatGuard(deps.dialogue.chat);
-    this.catalog = {
-      quickPhrases: deps.dialogue.quickPhrases,
-      stickers: (Object.keys(STICKERS) as StickerId[]).map((id) => ({ id, ...STICKERS[id] })),
+  }
+
+  /** Chat catalog in the player's language (quick phrases are admin-configurable, so built per request). */
+  private catalogFor(language: Language): ChatCatalog {
+    const en = language === 'en';
+    return {
+      quickPhrases: this.deps.dialogue.quickPhrases.map((q) => ({ id: q.id, text: (en && q.textEn) || q.text })),
+      stickers: (Object.keys(STICKERS) as StickerId[]).map((id) => ({ id, emoji: STICKERS[id].emoji, label: en ? STICKERS[id].labelEn : STICKERS[id].label })),
     };
+  }
+
+  private languageOf(playerId: string): Language {
+    return this.languages.get(playerId) ?? 'zh';
   }
 
   private get s(): Services {
@@ -93,6 +115,9 @@ export class Lobby {
           if (msg.protocol !== PROTOCOL_VERSION) return fail('protocolMismatch', `Server speaks protocol ${PROTOCOL_VERSION}`);
           player = await this.s.accounts.authenticate(msg.token);
           if (!player) return fail('unauthorized', 'Invalid or expired session');
+          // The China build talks Chinese only (Appendix D); older clients send no locale.
+          const language: Language = this.s.region !== 'china' && msg.locale === 'en' ? 'en' : 'zh';
+          this.languages.set(player.id, language);
           if (!this.sockets.has(player.id)) this.sockets.set(player.id, new Set());
           this.sockets.get(player.id)!.add(socket);
           // Play session for analytics (DAU, session length — PRD §33).
@@ -106,7 +131,7 @@ export class Lobby {
             playerId: player.id,
             inGame: !!room && !room.isClosed,
             banterLevel: this.banterOf(player),
-            catalog: this.catalog,
+            catalog: this.catalogFor(language),
             account: await accountSummary(this.s, player),
           });
           if (room && !room.isClosed) room.attach(socket);
@@ -186,7 +211,7 @@ export class Lobby {
         if (!room) return send({ type: 'chatRejected', reason: 'notInGame' });
         if (typeof msg.text !== 'string') return fail('badMessage', 'Malformed chat');
         const text = msg.text.trim();
-        if ([...text].length > this.deps.dialogue.chat.maxLength) return send({ type: 'chatRejected', reason: 'tooLong' });
+        if (textLength(text) > this.deps.dialogue.chat.maxLength) return send({ type: 'chatRejected', reason: 'tooLong' });
         const target: Seat | 'table' = [1, 2, 3].includes(msg.target as number) ? (msg.target as Seat) : 'table';
         const admitted = this.chatGuard.admit(player.id);
         if (admitted) return send({ type: 'chatRejected', reason: admitted });
@@ -210,7 +235,7 @@ export class Lobby {
         if (!room || !phrase) return;
         const admitted = this.chatGuard.admit(player.id);
         if (admitted) return send({ type: 'chatRejected', reason: admitted });
-        room.quickPhrase(phrase.text);
+        room.quickPhrase((this.languageOf(player.id) === 'en' && phrase.textEn) || phrase.text);
         return;
       }
       case 'sticker': {
@@ -249,26 +274,37 @@ export class Lobby {
   }
 
   private async createRoom(player: PlayerRow, plan: GamePlan, socket: WebSocket): Promise<Room> {
-    const humanSeat = 0 as Seat;
     // Persistent characters; skill is chosen independently per game (PRD §3.2).
     const chosen = selectCharacters(this.deps.dialogue.roster, 3, this.rng);
-    // What each character remembers about this player (PRD §8). Memory is a bonus: never block a game on it.
-    const memories = await this.s.memory.load(player.id, chosen.map((c) => c.character.id)).catch((error) => {
-      console.error('Loading AI memory failed:', error);
-      return new Map();
-    });
+    const memories = await this.loadMemories(player.id, chosen.map((c) => c.character.id));
     const ai: AiSeatSpec[] = chosen.map((c) => ({
       ...c,
       skill: pickWeighted(this.deps.config.skillWeights, this.rng),
       memory: memories.get(c.character.id) ?? null,
     }));
-    const room = new Room({
-      gameId: `g_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
+    const room = this.buildRoom(player, plan, ai, this.languageOf(player.id));
+    room.start(socket);
+    return room;
+  }
+
+  /** What each character remembers about this player (PRD §8). Memory is a bonus: never block a game on it. */
+  private loadMemories(playerId: string, characterIds: string[]) {
+    return this.s.memory.load(playerId, characterIds).catch((error) => {
+      console.error('Loading AI memory failed:', error);
+      return new Map();
+    });
+  }
+
+  private buildRoom(player: PlayerRow, plan: GamePlan, ai: AiSeatSpec[], language: Language, restore?: { checkpoint: RoomCheckpoint; coinChange: number }): Room {
+    const room: Room = new Room({
+      gameId: restore?.checkpoint.gameId ?? `g_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
       config: this.deps.config,
       ruleSet: plan.ruleSet,
       baseScore: plan.baseScore,
       seed: this.nextSeed(),
-      humanSeat,
+      humanSeat: restore?.checkpoint.humanSeat ?? (0 as Seat),
+      restore: restore?.checkpoint,
+      coinChange: restore?.coinChange,
       human: { playerId: player.id, name: player.nickname, avatar: player.avatar },
       ai,
       store: this.deps.hands,
@@ -280,6 +316,7 @@ export class Lobby {
         llm: this.deps.llm,
         moderator: this.deps.moderator,
         banterLevel: () => this.banterOf(player),
+        language,
         onMemoryUsed: (ids) => void this.s.memory.markReferenced(ids).catch((e) => console.error('Memory update failed:', e)),
         onPlayerQuote: (text, target) => {
           const characterId = target === 'table' ? null : (room.aiSeats.find((a) => a.seat === target)?.characterId ?? null);
@@ -287,15 +324,94 @@ export class Lobby {
         },
       },
       onHandEnd: (r, handIndex, result) => this.track(this.afterHand(player, r, plan, handIndex, result)),
+      onChange: (r) => this.scheduleCheckpoint(player.id, r, plan, language),
       onClosed: (r) => {
         if (this.rooms.get(player.id) === r) this.rooms.delete(player.id);
         this.clearLimit(player.id);
+        if (!this.stopping) this.dropCheckpoint(player.id, r.id);
       },
     });
     this.rooms.set(player.id, room);
     this.scheduleLimit(player.id, room, plan);
-    room.start(socket);
     return room;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Restart safety: in-progress games are checkpointed and restored on start.
+  // ---------------------------------------------------------------------------
+
+  private scheduleCheckpoint(playerId: string, room: Room, plan: GamePlan, language: Language): void {
+    if (this.saveTimers.has(playerId)) return;
+    const write = async () => {
+      this.saveTimers.delete(playerId);
+      if (room.isClosed && !this.stopping) return;
+      // A finished game (settled within the debounce window) has nothing to resume.
+      if (room.gameOver) return void (await this.s.db.query('DELETE FROM active_games WHERE player_id = $1 AND game_id = $2', [playerId, room.id]).catch(() => undefined));
+      const saved: SavedGame = { room: room.checkpoint(), plan, language };
+      await this.s.db
+        .query(
+          `INSERT INTO active_games (player_id, game_id, state, updated_at) VALUES ($1, $2, $3, now())
+           ON CONFLICT (player_id) DO UPDATE SET game_id = $2, state = $3, updated_at = now()`,
+          [playerId, room.id, JSON.stringify(saved)],
+        )
+        .catch((error) => console.error('Saving game checkpoint failed:', error));
+    };
+    this.saveTimers.set(playerId, { timer: setTimeout(() => void write(), CHECKPOINT_DEBOUNCE_MS), write });
+  }
+
+  private dropCheckpoint(playerId: string, gameId: string): void {
+    const pending = this.saveTimers.get(playerId);
+    if (pending) clearTimeout(pending.timer);
+    this.saveTimers.delete(playerId);
+    void this.s.db.query('DELETE FROM active_games WHERE player_id = $1 AND game_id = $2', [playerId, gameId]).catch(() => undefined);
+  }
+
+  /** Rebuilds the games that were in progress when the server stopped. Returns how many were restored. */
+  async restoreGames(): Promise<number> {
+    const rows = await this.s.db.query<{ player_id: string; game_id: string; state: SavedGame }>('SELECT player_id, game_id, state FROM active_games');
+    let restored = 0;
+    for (const row of rows) {
+      try {
+        if (await this.restoreGame(row.player_id, row.state)) restored++;
+        else this.dropCheckpoint(row.player_id, row.game_id);
+      } catch (error) {
+        console.error(`Restoring game ${row.game_id} failed:`, error);
+        this.dropCheckpoint(row.player_id, row.game_id);
+      }
+    }
+    return restored;
+  }
+
+  private async restoreGame(playerId: string, saved: SavedGame): Promise<boolean> {
+    const player = await this.s.accounts.get(playerId);
+    if (!player) return false;
+    const { roster } = this.deps.dialogue;
+    const ai: AiSeatSpec[] = [];
+    for (const a of saved.room.ai) {
+      const character = roster.characters.find((c) => c.id === a.characterId);
+      const personality = character && roster.personalities.find((p) => p.id === character.personalityId);
+      if (!character || !personality) return false; // deleted by an admin since
+      ai.push({ character, personality, skill: a.skill });
+    }
+    const memories = await this.loadMemories(playerId, ai.map((a) => a.character.id));
+    for (const a of ai) a.memory = memories.get(a.character.id) ?? null;
+    const [{ total }] = await this.s.db.query<{ total: string }>(
+      "SELECT COALESCE(sum(amount), 0) AS total FROM ledger WHERE player_id = $1 AND type = 'handSettlement' AND ref LIKE $2",
+      [playerId, `${saved.room.gameId}:%`],
+    );
+    const room = this.buildRoom(player, saved.plan, ai, saved.language ?? 'zh', { checkpoint: saved.room, coinChange: Number(total) });
+    // The server may have stopped before the last hand was settled; settlement is idempotent.
+    if (room.handEnded) {
+      const settled = this.settle(playerId, room, saved.plan, room.currentHandIndex, room.lastResult!);
+      this.track(settled);
+      if (room.gameOver) {
+        await settled;
+        room.close();
+        return false;
+      }
+    }
+    room.resume(this.deps.config.restoreGraceMs);
+    return true;
   }
 
   /** Coins first (what the player sees), then memory (best effort). */
@@ -403,9 +519,16 @@ export class Lobby {
     return this.deps.seed ? this.deps.seed() : randomInt(0, 2 ** 32 - 1);
   }
 
-  closeAll(): void {
+  /** Stops every room; their latest state is checkpointed so the next start can resume them. */
+  async closeAll(): Promise<void> {
+    this.stopping = true;
+    const writes = [...this.saveTimers.values()].map(({ timer, write }) => {
+      clearTimeout(timer);
+      return write();
+    });
     for (const room of this.rooms.values()) room.close();
     for (const id of [...this.limitTimers.keys()]) this.clearLimit(id);
+    await Promise.all(writes);
   }
 }
 

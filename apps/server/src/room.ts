@@ -23,8 +23,8 @@ import {
   type RuleSet,
   type Seat,
 } from '@mahjong/engine';
-import type { BanterLevel, Character, CharacterMemory, DialogueSettings, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
-import type { GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
+import type { BanterLevel, Character, CharacterMemory, DialogueSettings, Language, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
+import type { ChatEntry, GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
 import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
 import type { LlmProvider } from './llm/provider';
@@ -48,6 +48,8 @@ export interface RoomTalkOptions {
   moderator: Moderator;
   /** The player's current banter setting (can change mid-game). */
   banterLevel(): BanterLevel;
+  /** Language the AI players talk in. */
+  language?: Language;
   onMemoryUsed?(eventIds: number[]): void;
   onPlayerQuote?(text: string, target: Seat | 'table'): void;
 }
@@ -70,9 +72,27 @@ export interface RoomOptions {
   onHandEnd?: (room: Room, handIndex: number, result: HandResult) => void;
   /** Called once the whole game is over and nobody needs the room any more. */
   onClosed?: (room: Room) => void;
+  /** Called whenever the game state changed (for checkpointing). */
+  onChange?: (room: Room) => void;
+  /** Rebuild from a checkpoint instead of starting a new game; call `resume` instead of `start`. */
+  restore?: RoomCheckpoint;
+  /** Settled coins so far in a restored game. */
+  coinChange?: number;
 }
 
 type Source = HandLog['sources'][number];
+
+/** Everything needed to rebuild a room after a server restart (engine state is plain data). */
+export interface RoomCheckpoint {
+  gameId: string;
+  humanSeat: Seat;
+  ai: { characterId: string; skill: SkillLevel }[];
+  game: GameState;
+  hand: HandState;
+  log: HandLog;
+  autoPlay: boolean;
+  chat: ChatEntry[];
+}
 
 interface Timer {
   handle: NodeJS.Timeout;
@@ -95,13 +115,16 @@ export class Room {
   private closed = false;
   private readonly talk: TableTalk;
   private coinChange = 0;
+  /** A restored room waits for its player (or the grace period) before play continues. */
+  private paused = false;
+  private graceTimer: NodeJS.Timeout | null = null;
   /** AI seats and the characters sitting in them. */
   readonly aiSeats: { seat: Seat; characterId: string; name: string }[];
 
   constructor(private readonly opts: RoomOptions) {
     this.id = opts.gameId;
     this.humanSeat = opts.humanSeat;
-    this.game = createGame({ ruleSet: opts.ruleSet, baseScore: opts.baseScore, seed: opts.seed });
+    this.game = opts.restore?.game ?? createGame({ ruleSet: opts.ruleSet, baseScore: opts.baseScore, seed: opts.seed });
 
     const ai = [...opts.ai];
     const speakers: Speaker[] = [];
@@ -114,7 +137,14 @@ export class Room {
       const spec = ai.shift()!;
       const { character, personality } = spec;
       speakers.push({ seat, character, personality, memory: spec.memory ?? null });
-      const info: SeatInfo = { seat, name: character.name, avatar: character.avatar, isHuman: false, personality: personality.name };
+      const en = opts.talk.language === 'en';
+      const info: SeatInfo = {
+        seat,
+        name: (en && character.nameEn) || character.name,
+        avatar: character.avatar,
+        isHuman: false,
+        personality: (en && personality.nameEn) || personality.name,
+      };
       return new AiSeat(info, spec.skill, opts.rng, (skill) => this.aiThinkMs(skill), (action, version) =>
         this.submit({ ...action, seat }, version, 'ai'),
       );
@@ -130,6 +160,7 @@ export class Room {
       rng: opts.rng,
       level: opts.talk.banterLevel,
       nameOf: (seat) => this.seats[seat].info.name,
+      language: opts.talk.language,
       viewFor: (seat) => viewFor(this.hand, seat),
       version: () => this.hand.actionCount,
       handIndex: () => this.handIndex,
@@ -138,6 +169,57 @@ export class Room {
       onPlayerQuote: opts.talk.onPlayerQuote,
     });
     this.aiSeats = speakers.map((s) => ({ seat: s.seat, characterId: s.character.id, name: s.character.name }));
+
+    const r = opts.restore;
+    if (r) {
+      this.hand = r.hand;
+      this.handIndex = r.hand.phase === 'ended' ? r.game.handIndex - 1 : r.game.handIndex;
+      this.log = r.log;
+      this.autoPlay = r.autoPlay;
+      this.coinChange = opts.coinChange ?? 0;
+      this.talk.restoreLog(r.chat);
+    }
+  }
+
+  checkpoint(): RoomCheckpoint {
+    return {
+      gameId: this.id,
+      humanSeat: this.humanSeat,
+      ai: this.seats.filter((s): s is AiSeat => s instanceof AiSeat).map((s, i) => ({ characterId: this.aiSeats[i].characterId, skill: s.skill })),
+      game: this.game,
+      hand: this.hand,
+      log: this.log,
+      autoPlay: this.autoPlay,
+      chat: this.talk.chatLog,
+    };
+  }
+
+  /** Continues a restored game once the player reconnects, or after `graceMs` without them. */
+  resume(graceMs: number): void {
+    this.paused = true;
+    this.graceTimer = setTimeout(() => this.unpause(), graceMs);
+  }
+
+  private unpause(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    if (this.graceTimer) clearTimeout(this.graceTimer);
+    this.graceTimer = null;
+    if (!this.human.connected) this.autoPlay = true;
+    this.publish([]);
+  }
+
+  /** The hand on the table has finished (a restored room may need its settlement re-run). */
+  get handEnded(): boolean {
+    return this.hand.phase === 'ended';
+  }
+
+  get currentHandIndex(): number {
+    return this.handIndex;
+  }
+
+  get lastResult(): HandResult | null {
+    return this.hand.result;
   }
 
   /** In-flight LLM dialogue requests (for tests). */
@@ -165,13 +247,14 @@ export class Room {
 
   attach(socket: WebSocket): void {
     this.human.attach(socket);
-    this.publish([]);
+    if (this.paused) this.unpause();
+    else this.publish([]);
   }
 
   detach(socket: WebSocket): void {
     this.human.detach(socket);
     // PRD §14.1: a disconnected player's seat is auto-played until they return.
-    if (!this.closed) this.setAutoPlay(true);
+    if (!this.closed && !this.paused) this.setAutoPlay(true);
   }
 
   /** Returns an error message, or null when accepted (stale actions are silently ignored). */
@@ -319,7 +402,8 @@ export class Room {
   }
 
   private publish(events: GameEvent[]): void {
-    if (this.closed) return;
+    if (this.closed || this.paused) return;
+    this.opts.onChange?.(this);
     this.scheduleHuman();
     for (const seat of SEATS) {
       const view = viewFor(this.hand, seat);
@@ -420,6 +504,7 @@ export class Room {
     if (this.closed) return;
     this.closed = true;
     this.clearTimer();
+    if (this.graceTimer) clearTimeout(this.graceTimer);
     this.talk.dispose();
     for (const s of this.seats) s.dispose();
     this.opts.onClosed?.(this);

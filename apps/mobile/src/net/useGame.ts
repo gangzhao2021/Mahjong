@@ -22,6 +22,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { SERVER_WS } from '../config';
+import { getLocale } from '../strings';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -134,7 +135,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
 
       ws.onopen = () => {
         backoff = 1000;
-        ws.send(JSON.stringify({ type: 'hello', token, protocol: PROTOCOL_VERSION } satisfies ClientMessage));
+        ws.send(JSON.stringify({ type: 'hello', token, protocol: PROTOCOL_VERSION, locale: getLocale() } satisfies ClientMessage));
       };
       ws.onmessage = (e) => {
         let msg: ServerMessage;

@@ -1,6 +1,7 @@
 /** HTTP API client for accounts and economy. */
 import type { AccountSummary, BanterLevel, LoginMethod, ServerInfo } from '@mahjong/protocol';
 import { SERVER_HTTP } from '../config';
+import { getLocale } from '../strings';
 
 export class ApiError extends Error {
   constructor(
@@ -45,7 +46,7 @@ type AccountOnly = { account: AccountSummary };
 
 export const api = {
   config: () => request<ServerInfo>('GET', '/config'),
-  login: (method: LoginMethod, credentials: Record<string, unknown>) => request<Session>('POST', `/auth/${method}`, credentials),
+  login: (method: LoginMethod, credentials: Record<string, unknown>) => request<Session>('POST', `/auth/${method}`, { ...credentials, locale: getLocale() }),
   sendSmsCode: (phone: string) => request<{ ok: true }>('POST', '/auth/sms/send', { phone }),
   account: (token: string) => request<AccountOnly>('GET', '/account', undefined, token),
   updateProfile: (token: string, patch: { nickname?: string; avatar?: string; banterLevel?: BanterLevel }) =>

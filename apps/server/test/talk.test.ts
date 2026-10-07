@@ -43,7 +43,7 @@ describe('AI characters', () => {
     expect(ai).toHaveLength(3);
     for (const s of ai) expect(s.personality).toBeTruthy();
     expect(welcome.banterLevel).toBe('spicy');
-    expect(welcome.catalog.quickPhrases).toEqual(DEFAULT_QUICK_PHRASES);
+    expect(welcome.catalog.quickPhrases).toEqual(DEFAULT_QUICK_PHRASES.map(({ id, text }) => ({ id, text })));
     expect(welcome.catalog.stickers.length).toBeGreaterThan(5);
   });
 });

@@ -130,13 +130,17 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
   app.get('/config', async () => serverInfo(s));
 
   for (const name of ['privacy', 'terms', 'sdks'] as const) {
-    app.get(`/legal/${name}`, (_req, reply) => reply.type('text/html; charset=utf-8').send(legalPage(name, s.region)));
+    app.get(`/legal/${name}`, (req, reply) => {
+      const lang = (req.query as { lang?: string }).lang === 'en' ? 'en' : 'zh';
+      return reply.type('text/html; charset=utf-8').send(legalPage(name, s.region, lang));
+    });
   }
 
   app.post('/auth/:method', async (req) => {
     const { method } = req.params as { method: string };
     const identity = await resolveIdentity(method, body(req));
-    const { player, token } = await s.accounts.login(identity.provider, identity.subject, identity.secret);
+    const english = s.region === 'global' && (body(req) as { locale?: string }).locale === 'en';
+    const { player, token } = await s.accounts.login(identity.provider, identity.subject, identity.secret, english);
     return respond(player, token);
   });
 
