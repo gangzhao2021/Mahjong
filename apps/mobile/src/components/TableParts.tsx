@@ -90,6 +90,24 @@ export function useCountdown(timer: TimerInfo | null, receivedAt: number): numbe
 }
 
 const styles = StyleSheet.create({
+  backsRow: { flexDirection: 'row', gap: 1 },
+  backsColumn: { flexDirection: 'column', gap: 1 },
+  compass: {
+    width: 104,
+    height: 104,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.32)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wind: { position: 'absolute', color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '900' },
+  windActive: { color: '#ffd54f', textShadowColor: '#ffb300', textShadowRadius: 8 },
+  compassWall: { color: '#c8e6c9', fontSize: 11 },
+  compassTimer: { color: '#fff', fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  compassTimerLow: { color: '#ffab91' },
+  compassNote: { color: '#fff59d', fontSize: 10, textAlign: 'center', paddingHorizontal: 14 },
   melds: { flexDirection: 'row', gap: 6 },
   meld: { flexDirection: 'row' },
   pond: { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start' },
@@ -119,3 +137,40 @@ const styles = StyleSheet.create({
   plus: { color: '#ffe082' },
   minus: { color: '#ff8a80' },
 });
+
+/** An opponent's concealed tiles, seen from the back: a row across the top, a column on the sides. */
+export function ConcealedTiles({ count, width, vertical }: { count: number; width: number; vertical?: boolean }) {
+  if (count <= 0) return null;
+  return (
+    <View style={vertical ? styles.backsColumn : styles.backsRow} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {Array.from({ length: count }, (_, i) => (
+        <Tile key={i} tile={null} back width={width} rotated={vertical} />
+      ))}
+    </View>
+  );
+}
+
+/** Seat winds around the wall count and timer; the edge of the player to act lights up. */
+export function Compass({ winds, active, wallCount, timer, note }: { winds: string[]; active: number | null; wallCount: string; timer: number | null; note: string | null }) {
+  // winds[i] / active use sides: 0 = me (bottom), 1 = right, 2 = top, 3 = left.
+  const edge = (side: number) => [styles.wind, WIND_POSITION[side], active === side && styles.windActive];
+  return (
+    <View style={styles.compass}>
+      {[0, 1, 2, 3].map((side) => (
+        <Text key={side} style={edge(side)}>
+          {winds[side]}
+        </Text>
+      ))}
+      <Text style={styles.compassWall}>{wallCount}</Text>
+      {timer !== null && <Text style={[styles.compassTimer, timer <= 5 && styles.compassTimerLow]}>{timer}</Text>}
+      {note && <Text style={styles.compassNote}>{note}</Text>}
+    </View>
+  );
+}
+
+const WIND_POSITION = [
+  { bottom: 2, alignSelf: 'center' },
+  { right: 4, top: '40%' },
+  { top: 2, alignSelf: 'center' },
+  { left: 4, top: '40%' },
+] as const;

@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
+import { Felt } from '../components/Felt';
 import { GameScreen } from '../screens/GameScreen';
 import { T, tr } from '../strings';
 import { LESSONS, type Lesson } from './lessons';
@@ -51,24 +52,45 @@ export function TutorialScreen({ onExit }: { onExit(): void }) {
     );
   }
 
+  const next = LESSONS.find((l) => !done.includes(l.id));
   return (
-    <View style={styles.menu}>
+    <Felt style={styles.menu}>
       <View style={styles.menuHead}>
-        <Text style={styles.title}>{T.tutorial.title}</Text>
+        <View style={styles.menuTitles}>
+          <Text style={styles.title}>📖 {T.tutorial.title}</Text>
+          <Text style={styles.subtitle}>{T.tutorial.subtitle}</Text>
+        </View>
+        <Text style={styles.progress}>
+          {done.length}/{LESSONS.length}
+        </Text>
         <Btn label={T.tutorial.back} onPress={onExit} />
       </View>
-      <Text style={styles.subtitle}>{T.tutorial.subtitle}</Text>
       <View style={styles.cards}>
-        {LESSONS.map((l) => (
-          <Pressable key={l.id} style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => setLesson(l)} accessibilityRole="button">
-            <Text style={styles.cardTitle}>
-              {tr(l.title)} {done.includes(l.id) ? '✓' : ''}
-            </Text>
-            <Text style={styles.cardText}>{tr(l.summary)}</Text>
-          </Pressable>
-        ))}
+        {LESSONS.map((l, i) => {
+          const finished = done.includes(l.id);
+          const isNext = l === next;
+          const [, number, name] = tr(l.title).match(/^(\d+)\.\s*(.*)$/) ?? [null, String(i + 1), tr(l.title)];
+          return (
+            <Pressable
+              key={l.id}
+              style={({ pressed }) => [styles.card, isNext && styles.cardNext, pressed && styles.pressed]}
+              onPress={() => setLesson(l)}
+              accessibilityRole="button"
+              accessibilityLabel={tr(l.title)}
+            >
+              <View style={[styles.number, finished && styles.numberDone, isNext && styles.numberNext]}>
+                <Text style={[styles.numberText, (finished || isNext) && styles.numberTextOn]}>{finished ? '✓' : number}</Text>
+              </View>
+              <View style={styles.cardBody}>
+                <Text style={styles.cardTitle}>{name}</Text>
+                <Text style={styles.cardText}>{tr(l.summary)}</Text>
+                {isNext && <Text style={styles.cardNextLabel}>▶ {T.continueLesson}</Text>}
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
-    </View>
+    </Felt>
   );
 }
 
@@ -107,15 +129,40 @@ function LessonView({ lesson, onExit, onFinish }: { lesson: Lesson; onExit(): vo
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  menu: { flex: 1, backgroundColor: '#1f6b47', padding: 16, gap: 10 },
-  menuHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  menu: { padding: 16, gap: 12 },
+  menuHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  menuTitles: { flex: 1, gap: 2 },
   title: { color: '#fff8e1', fontSize: 22, fontWeight: '900' },
-  subtitle: { color: '#c8e6c9' },
-  cards: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: { width: 180, padding: 12, borderRadius: 12, backgroundColor: '#fdfaf2', gap: 4 },
+  subtitle: { color: '#c8e6c9', fontSize: 13 },
+  progress: { color: '#ffd54f', fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  cards: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignContent: 'stretch' },
+  card: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#fdfaf2',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  cardNext: { borderWidth: 3, borderColor: '#ffca28' },
   pressed: { transform: [{ scale: 0.97 }] },
-  cardTitle: { fontWeight: '800', color: '#3e2723' },
+  number: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#e8e0cc', alignItems: 'center', justifyContent: 'center' },
+  numberDone: { backgroundColor: '#43a047' },
+  numberNext: { backgroundColor: '#ffca28' },
+  numberText: { fontSize: 18, fontWeight: '900', color: '#6d4c41' },
+  numberTextOn: { color: '#fff' },
+  cardBody: { flex: 1, gap: 2 },
+  cardTitle: { fontWeight: '900', color: '#3e2723', fontSize: 15 },
   cardText: { color: '#5d4037', fontSize: 12 },
+  cardNextLabel: { color: '#b28704', fontSize: 12, fontWeight: '800' },
   coach: { position: 'absolute', top: 48, left: 0, right: 0, alignItems: 'center' },
   coachCard: {
     maxWidth: 460,

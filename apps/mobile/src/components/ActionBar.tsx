@@ -29,7 +29,7 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
     return (
       <Bar>
         <Hint text={T.swapHint} />
-        <Btn label={T.swapConfirm} disabled={!valid} onPress={() => onAct({ type: 'swap', tiles: selectedTiles })} />
+        <Btn label={T.swapConfirm} primary={valid} disabled={!valid} onPress={() => onAct({ type: 'swap', tiles: selectedTiles })} />
       </Bar>
     );
   }

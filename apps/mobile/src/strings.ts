@@ -89,7 +89,7 @@ const zh = {
   connecting: '正在连接服务器…',
   offline: '无法连接服务器，正在重试…',
   reconnecting: '正在重新连接…',
-  swapHint: '选择同一花色的三张牌交换',
+  swapHint: '已按建议选好三张，可点牌改选（须同一花色）',
   swapConfirm: '确认换牌',
   swapWaiting: '等待其他玩家换牌…',
   dingqueHint: '选择要打缺的花色',
@@ -210,6 +210,16 @@ const zh = {
   rewardDay: (d: number) => `第 ${d} 天`,
   rewardNote: '错过的天数不会清零，领完一轮重新开始。',
   tables: '选择场次',
+  brand: '四川麻将',
+  brandSub: '血战到底',
+  quickStart: '快速开始',
+  needMore: (n: number) => `还差 ${n.toLocaleString()} 金币`,
+  tutorialProgress: (done: number, total: number) => (done >= total ? '新手教程 已学完' : `新手教程 ${done}/${total}`),
+  rewardReady: '今日奖励可领取',
+  rewardTaken: '今日奖励已领取',
+  recommended: '推荐',
+  continueLesson: '继续学习',
+  winds: ['东', '南', '西', '北'],
   tableNames: { practice: '练习场', low: '初级场', mid: '中级场', high: '高级场' } as Record<string, string>,
   baseScoreN: (n: number) => `底分 ${n}`,
   minCoinsN: (n: number) => `准入 ${n.toLocaleString()}`,
@@ -297,7 +307,7 @@ const en: Strings = {
   connecting: 'Connecting to the server…',
   offline: "Can't reach the server, retrying…",
   reconnecting: 'Reconnecting…',
-  swapHint: 'Pick three tiles of one suit to swap',
+  swapHint: 'Suggested three tiles are selected — tap to change (one suit)',
   swapConfirm: 'Swap',
   swapWaiting: 'Waiting for the others to swap…',
   dingqueHint: 'Pick the suit you will give up (void suit)',
@@ -417,6 +427,16 @@ const en: Strings = {
   rewardDay: (d: number) => `Day ${d}`,
   rewardNote: "Missed days don't reset your progress; the cycle restarts after the last day.",
   tables: 'Choose a table',
+  brand: 'Sichuan Mahjong',
+  brandSub: 'Bloody Battle',
+  quickStart: 'Quick start',
+  needMore: (n: number) => `Need ${n.toLocaleString()} more coins`,
+  tutorialProgress: (done: number, total: number) => (done >= total ? 'Tutorial complete' : `Tutorial ${done}/${total}`),
+  rewardReady: "Today's reward is ready",
+  rewardTaken: "Today's reward claimed",
+  recommended: 'Recommended',
+  continueLesson: 'Continue',
+  winds: ['E', 'S', 'W', 'N'],
   tableNames: { practice: 'Practice', low: 'Beginner', mid: 'Intermediate', high: 'High Roller' },
   baseScoreN: (n: number) => `Base ${n}`,
   minCoinsN: (n: number) => `Min ${n.toLocaleString()}`,
@@ -497,6 +517,8 @@ const en: Strings = {
 export const SUIT_NAMES: Record<Suit, string> = { ...zhNames.suits };
 export const TILE_SUITS: Record<Suit, string> = { ...zhNames.tileSuits };
 export const RANK_NAMES: string[] = [...zhNames.ranks];
+/** Chinese numerals, printed on Characters tiles in every language. */
+export const RANK_NAMES_ZH: readonly string[] = [...zhNames.ranks];
 export const PATTERN_NAMES: Record<Pattern, string> = { ...zhNames.patterns };
 export const PAYMENT_NAMES: Record<string, string> = { ...zhNames.payments };
 export const T: Strings = { ...zh };

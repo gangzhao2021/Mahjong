@@ -3,7 +3,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Btn } from './src/components/ActionBar';
+import { Felt } from './src/components/Felt';
 import { Sheet } from './src/components/Sheet';
+import { TileFan } from './src/components/TileFan';
+import { TileGallery } from './src/components/TileGallery';
 import { setMusicWanted } from './src/audio/sound';
 import { api } from './src/net/api';
 import { setCrashReportToken } from './src/net/crash';
@@ -18,6 +21,9 @@ import { RealNameScreen } from './src/screens/RealNameScreen';
 import { loadTutorialProgress, TutorialScreen } from './src/tutorial/TutorialScreen';
 import { changeLocale } from './src/i18n';
 import { getLocale, T } from './src/strings';
+
+/** Development only: `?tiles` on web shows every tile face. */
+const SHOW_TILE_GALLERY = __DEV__ && typeof window !== 'undefined' && !!window.location?.search?.includes('tiles');
 
 /** Shows the latest value of `key` for a few seconds. */
 function useToast<V>(value: V | null, key: number | undefined, ms = 3000): V | null {
@@ -101,7 +107,9 @@ export default function App() {
   const noticeToast = useToast(game.notice ? T.limitEnding : null, game.notice?.at, 6000);
 
   let screen: React.ReactNode;
-  if (tutorialOpen) {
+  if (SHOW_TILE_GALLERY) {
+    screen = <TileGallery />;
+  } else if (tutorialOpen) {
     // Runs locally: works offline and before signing in.
     screen = <TutorialScreen onExit={() => setTutorialOpen(false)} />;
   } else if (consented === false) {
@@ -109,10 +117,11 @@ export default function App() {
     screen = <ConsentScreen onAgree={() => setConsented(true)} onOpenTutorial={() => setTutorialOpen(true)} />;
   } else if (!info || token === undefined || consented === undefined || (token && !game.account)) {
     screen = (
-      <View style={styles.splash}>
+      <Felt style={styles.splash}>
+        <TileFan width={48} />
         <Text style={styles.splashTitle}>{T.appTitle}</Text>
         <Text style={styles.splashText}>{T.connecting}</Text>
-      </View>
+      </Felt>
     );
   } else if (!token) {
     screen = <LoginScreen info={info} onLoggedIn={onLoggedIn} onOpenTutorial={() => setTutorialOpen(true)} />;
@@ -178,7 +187,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1f6b47' },
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  splash: { alignItems: 'center', justifyContent: 'center', gap: 12 },
   splashTitle: { fontSize: 30, fontWeight: '900', color: '#fff8e1' },
   splashText: { color: '#c8e6c9' },
   big: { fontSize: 22, fontWeight: '800', color: '#3e2723' },

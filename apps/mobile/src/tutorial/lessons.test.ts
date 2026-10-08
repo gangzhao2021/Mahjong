@@ -1,4 +1,5 @@
-import { legalActions, SUITS, suitOf, type HandState } from '@mahjong/engine';
+import { chooseSwap } from '@mahjong/ai-play';
+import { legalActions, SUITS, suitOf, viewFor, type HandState } from '@mahjong/engine';
 import { describe, expect, it } from 'vitest';
 import { LESSONS, type Intent } from './lessons';
 import { autoPlay, playerCanAct, tryPlayerMove } from './runner';
@@ -63,5 +64,14 @@ describe('tutorial text', () => {
       expect(t.en.trim()).not.toBe('');
       expect(t.en).not.toMatch(/[一-鿿]/);
     }
+  });
+});
+
+describe('swap suggestion in the tutorial', () => {
+  it('pre-selects exactly the tiles the swap lesson talks about (2, 5, 8 Dots)', () => {
+    const lesson = LESSONS.find((l) => l.id === 'swap')!;
+    const state = lesson.setup();
+    const pick = chooseSwap(viewFor(state, 0), 'expert', () => 0.5);
+    expect([...pick].sort((a, b) => a - b)).toEqual([19, 22, 25]);
   });
 });

@@ -1,14 +1,16 @@
-import { suitOf, type GameEvent, type Seat, type Tile as TileKind } from '@mahjong/engine';
+import { chooseSwap } from '@mahjong/ai-play';
+import { suitOf, type GameEvent, type HandView, type Seat, type Suit, type Tile as TileKind } from '@mahjong/engine';
 import type { TableSnapshot } from '@mahjong/protocol';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { updateSoundSettings, useSoundSettings, useTableSounds } from '../audio/sound';
 import { ActionBar, Btn } from '../components/ActionBar';
 import { BanterPicker, ChatPanel, SpeechBubbles } from '../components/Chat';
-import { PlayerHand, type HandTile } from '../components/PlayerHand';
+import { arrangeHand, PlayerHand, type HandTile } from '../components/PlayerHand';
 import { PopIn } from '../components/PopIn';
 import { ResultPanel } from '../components/ResultPanel';
-import { Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
+import { Felt } from '../components/Felt';
+import { Compass, ConcealedTiles, Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
 import { Tile } from '../components/Tile';
 import type { GameApi, TimedEvent } from '../net/useGame';
 import { T, tableName } from '../strings';
@@ -41,9 +43,16 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const sound = useSoundSettings();
   const muted = !sound.effects && !sound.music;
 
+  const stage = view.stage;
+  const activeSeat: Seat | null = stage.kind === 'turn' ? stage.seat : null;
+  const lastDiscarder: Seat | null = stage.kind === 'claim' ? stage.discarder : null;
+  const iWon = me.won !== null;
+  const drawn = stage.kind === 'turn' && stage.seat === view.seat ? stage.drawn : null;
+
   // Selections only make sense for the hand they were made on.
   const handKey = `${table.handIndex}:${view.phase}:${(me.hand ?? []).join(',')}`;
-  const selected = selection.handKey === handKey ? selection.tiles : [];
+  // Swap three starts with the expert's pick already selected; the player can confirm or change it.
+  const selected = selection.handKey === handKey ? selection.tiles : swapSuggestion(view, me.hand ?? [], drawn, me.voidSuit);
 
   const onSelect = (item: HandTile) => {
     let next: HandTile[];
@@ -52,46 +61,64 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
     else next = [item];
     setSelection({ handKey, tiles: next });
   };
-
-  const stage = view.stage;
-  const activeSeat: Seat | null = stage.kind === 'turn' ? stage.seat : null;
-  const lastDiscarder: Seat | null = stage.kind === 'claim' ? stage.discarder : null;
-  const iWon = me.won !== null;
-  const drawn = stage.kind === 'turn' && stage.seat === view.seat ? stage.drawn : null;
   const myTurnTimer = table.timer && table.timer.kind !== 'nextHand' ? countdown : null;
   // Once a hand has ended its scores are already part of the game totals.
   const scoreOf = (seat: Seat) => table.totals[seat] + (view.phase === 'ended' ? 0 : view.scores[seat]);
   // Settlement arrives after the table snapshot; prefer the newer wallet total for this game.
   const gameCoins = game.lastWallet?.gameId === table.gameId ? game.lastWallet.gameTotal : table.coinChange;
 
+  const backTile = Math.round(smallTile * 0.8);
   const opponent = (side: Side) => {
     const seat = seatAt(side);
     const p = view.players[seat];
-    return (
-      <View style={[styles.opponent, side === 2 ? styles.row : styles.column]}>
-        <SeatCard
-          info={table.seats[seat]}
-          score={scoreOf(seat)}
-          voidSuit={p.voidSuit}
-          dealer={view.dealer === seat}
-          active={activeSeat === seat}
-          won={!!p.won}
-          handCount={p.handCount}
-        />
+    const card = (
+      <SeatCard
+        info={table.seats[seat]}
+        score={scoreOf(seat)}
+        voidSuit={p.voidSuit}
+        dealer={view.dealer === seat}
+        active={activeSeat === seat}
+        won={!!p.won}
+        handCount={p.handCount}
+      />
+    );
+    // Face-down tiles sit between the player and the centre of the table.
+    const backs = p.hand ? null : <ConcealedTiles count={p.handCount} width={side === 2 ? backTile : Math.round(backTile * 0.75)} vertical={side !== 2} />;
+    const revealed = p.hand && (
+      <View style={styles.revealed}>
+        {p.hand.map((t, i) => (
+          <Tile key={i} tile={t} width={smallTile} />
+        ))}
+      </View>
+    );
+    if (side === 2) {
+      return (
+        <View style={[styles.opponent, styles.row]}>
+          {card}
+          {backs}
+          <Melds melds={p.melds} tileWidth={smallTile} />
+          {revealed}
+        </View>
+      );
+    }
+    const info = (
+      <View style={[styles.opponent, styles.column]}>
+        {card}
         <Melds melds={p.melds} tileWidth={smallTile} />
-        {p.hand && (
-          <View style={styles.revealed}>
-            {p.hand.map((t, i) => (
-              <Tile key={i} tile={t} width={smallTile} />
-            ))}
-          </View>
-        )}
+        {revealed}
+      </View>
+    );
+    return (
+      <View style={styles.sideSeat}>
+        {side === 3 ? info : backs}
+        {side === 3 ? backs : info}
       </View>
     );
   };
+  const windOf = (side: Side) => T.winds[(seatAt(side) - view.dealer + 4) % 4];
 
   return (
-    <View style={styles.felt}>
+    <Felt style={styles.felt}>
       {/* Top row: menu, opposite player, hand info */}
       <View style={styles.topRow}>
         <View style={styles.menu}>
@@ -118,17 +145,13 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           <Pond discards={view.players[seatAt(2)].discards} tileWidth={smallTile} perRow={12} lastDiscard={lastDiscarder === seatAt(2)} />
           <View style={styles.centerRow}>
             <Pond discards={view.players[seatAt(3)].discards} tileWidth={smallTile} perRow={6} lastDiscard={lastDiscarder === seatAt(3)} />
-            <View style={styles.centerBox}>
-              <Text style={styles.wall}>
-                {T.wall} {view.wallCount}
-              </Text>
-              {myTurnTimer !== null && (
-                <Text style={[styles.timer, myTurnTimer <= 5 && styles.timerLow]}>{myTurnTimer}</Text>
-              )}
-              {view.swapDirection && view.phase === 'dingque' && (
-                <Text style={styles.centerNote}>{T.swapDirection[view.swapDirection]}</Text>
-              )}
-            </View>
+            <Compass
+              winds={([0, 1, 2, 3] as Side[]).map(windOf)}
+              active={activeSeat !== null ? sideOf(activeSeat) : null}
+              wallCount={`${T.wall} ${view.wallCount}`}
+              timer={myTurnTimer}
+              note={view.swapDirection && view.phase === 'dingque' ? T.swapDirection[view.swapDirection] : null}
+            />
             <Pond discards={view.players[seatAt(1)].discards} tileWidth={smallTile} perRow={6} lastDiscard={lastDiscarder === seatAt(1)} />
           </View>
           <Pond discards={me.discards} tileWidth={smallTile} perRow={12} lastDiscard={lastDiscarder === view.seat} />
@@ -241,7 +264,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           </View>
         </View>
       )}
-    </View>
+    </Felt>
   );
 }
 
@@ -297,7 +320,8 @@ const CALLOUT_POSITION = {
 
 const styles = StyleSheet.create({
   // userSelect: keep swipes on web from selecting tile text.
-  felt: { flex: 1, backgroundColor: '#1f6b47', paddingHorizontal: 12, paddingVertical: 6, userSelect: 'none' },
+  felt: { paddingHorizontal: 12, paddingVertical: 6, userSelect: 'none' },
+  sideSeat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', minHeight: 48 },
   menu: { flexDirection: 'row', gap: 6 },
   handInfo: { color: '#c8e6c9', fontSize: 12 },
@@ -310,18 +334,6 @@ const styles = StyleSheet.create({
   revealed: { flexDirection: 'row', flexWrap: 'wrap', maxWidth: 260 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   centerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  centerBox: {
-    width: 86,
-    height: 70,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wall: { color: '#c8e6c9', fontSize: 12 },
-  timer: { color: '#fff', fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  timerLow: { color: '#ffab91' },
-  centerNote: { color: '#fff59d', fontSize: 11, textAlign: 'center' },
   bottom: { gap: 4 },
   actions: { alignItems: 'flex-end', minHeight: 48, justifyContent: 'flex-end' },
   myRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
@@ -368,3 +380,17 @@ const styles = StyleSheet.create({
   modalBody: { color: '#455a64' },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
 });
+
+/** The tiles an expert would swap away, as hand items (empty outside the swap decision). */
+function swapSuggestion(view: HandView, hand: TileKind[], drawn: TileKind | null, voidSuit: Suit | null): HandTile[] {
+  if (view.phase !== 'swap' || !view.legal.swapSuits?.length) return [];
+  const pick = chooseSwap(view, 'expert', () => 0.5);
+  const arranged = arrangeHand(hand, drawn, voidSuit);
+  const items = arranged.drawn ? [...arranged.main, arranged.drawn] : arranged.main;
+  return items.filter((item) => {
+    const i = pick.indexOf(item.tile);
+    if (i < 0) return false;
+    pick.splice(i, 1);
+    return true;
+  });
+}

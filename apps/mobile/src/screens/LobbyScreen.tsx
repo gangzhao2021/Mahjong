@@ -1,9 +1,11 @@
 /** Lobby: coins, daily reward, table selection and private rooms (PRD §10–§13, §24). */
 import type { AccountSummary, GameOptions, PrivateRules, ServerInfo } from '@mahjong/protocol';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
+import { Felt } from '../components/Felt';
 import { formStyles, Sheet } from '../components/Sheet';
+import { TileFan } from '../components/TileFan';
 import { api } from '../net/api';
 import type { ConnectionStatus } from '../net/useGame';
 import { T, tableName } from '../strings';
@@ -21,65 +23,121 @@ interface Props {
   tutorialDone: number;
 }
 
+/** Accent colour per stake level, so the tables read as a ladder at a glance. */
+const TIER: Record<string, string> = { practice: '#43a047', low: '#1e88e5', mid: '#8e24aa', high: '#e0a100' };
+const LESSON_COUNT = 6;
+
 export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, tutorialDone }: Props) {
   const [rewardOpen, setRewardOpen] = useState(false);
   const [privateOpen, setPrivateOpen] = useState(false);
+  const { width, height } = useWindowDimensions();
   const online = status === 'online';
   const limit = account.playLimit;
   const blocked = limit !== null && limit.until === null;
+  const compact = width < 700;
+
+  // Quick start: new players go to practice; others to the highest table they can comfortably afford (10× the entry).
+  const comfortable = info.tables.filter((t) => t.minCoins === 0 || account.balance >= t.minCoins * 10);
+  const quick = tutorialDone >= 0 && tutorialDone < 2 ? info.tables[0] : (comfortable[comfortable.length - 1] ?? info.tables[0]);
+  const fanTile = Math.round(Math.min(height * 0.15, 56));
 
   return (
-    <View style={styles.root}>
+    <Felt style={styles.root}>
       <View style={styles.top}>
-        <Pressable style={styles.profile} onPress={onOpenAccount} accessibilityRole="button">
+        <Pressable style={styles.profile} onPress={onOpenAccount} accessibilityRole="button" accessibilityLabel={T.account}>
           <Text style={styles.avatar}>{account.avatar}</Text>
           <View>
-            <Text style={styles.nickname}>{account.nickname}</Text>
+            <Text style={styles.nickname} numberOfLines={1}>
+              {account.nickname}
+            </Text>
             <Text style={styles.coins}>🪙 {account.balance.toLocaleString()}</Text>
           </View>
         </Pressable>
-        <View style={formStyles.row}>
+        <View style={styles.topButtons}>
           <Btn label={`📖 ${T.tutorial.entry}`} onPress={onOpenTutorial} />
-          <Btn label={account.reward.claimable ? `🎁 ${T.dailyReward}` : T.dailyReward} primary={account.reward.claimable} onPress={() => setRewardOpen(true)} />
-          <Btn label={T.account} onPress={onOpenAccount} />
+          <Btn label={`🎁 ${T.dailyReward}`} primary={account.reward.claimable} onPress={() => setRewardOpen(true)} />
+          <Btn label={`⚙️ ${T.account}`} onPress={onOpenAccount} />
         </View>
       </View>
 
-      {tutorialDone === 0 && (
-        <Pressable style={styles.tutorialBanner} onPress={onOpenTutorial} accessibilityRole="button">
-          <Text style={styles.tutorialText}>📖 {T.tutorial.firstTime} →</Text>
-        </Pressable>
+      {(limit || !online) && (
+        <Text style={styles.limit}>
+          {!online ? (status === 'connecting' ? T.connecting : T.offline) : limit!.kind === 'minor' ? T.minorLimit(limit!.until) : T.guestLimit(limit!.until)}
+        </Text>
       )}
-      {limit && <Text style={styles.limit}>{limit.kind === 'minor' ? T.minorLimit(limit.until) : T.guestLimit(limit.until)}</Text>}
-      {!online && <Text style={styles.limit}>{status === 'connecting' ? T.connecting : T.offline}</Text>}
 
-      <Text style={styles.heading}>{T.tables}</Text>
-      <View style={styles.tables}>
-        {info.tables.map((t) => {
-          const affordable = account.balance >= t.minCoins;
-          return (
-            <Pressable
-              key={t.id}
-              accessibilityRole="button"
-              disabled={!online || blocked || !affordable}
-              onPress={() => onStart({ tableId: t.id })}
-              style={({ pressed }) => [styles.table, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
-            >
-              <Text style={styles.tableName}>{tableName(t)}</Text>
-              <Text style={styles.tableInfo}>{t.multiplier === 0 ? T.noCoins : T.baseScoreN(t.baseScore)}</Text>
-              {t.minCoins > 0 && <Text style={[styles.tableInfo, !affordable && styles.short]}>{T.minCoinsN(t.minCoins)}</Text>}
+      <View style={styles.body}>
+        {/* Left: the game's face and the one-tap way in */}
+        <View style={[styles.hero, compact && styles.heroCompact]}>
+          {!compact && <TileFan width={fanTile} />}
+          <Text style={styles.brand}>{T.brand}</Text>
+          <Text style={styles.brandSub}>{T.brandSub}</Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!online || blocked}
+            onPress={() => onStart({ tableId: quick.id })}
+            style={({ pressed }) => [styles.quick, (!online || blocked) && styles.disabled, pressed && styles.pressed]}
+          >
+            <Text style={styles.quickText}>▶ {T.quickStart}</Text>
+            <Text style={styles.quickSub}>
+              {tableName(quick)} · {quick.multiplier === 0 ? T.noCoins : T.baseScoreN(quick.baseScore)}
+            </Text>
+          </Pressable>
+          <View style={styles.chips}>
+            <Pressable onPress={onOpenTutorial} style={[styles.chip, tutorialDone === 0 && styles.chipHot]} accessibilityRole="button">
+              <Text style={[styles.chipText, tutorialDone === 0 && styles.chipHotText]}>📖 {T.tutorialProgress(Math.max(0, tutorialDone), LESSON_COUNT)}</Text>
             </Pressable>
-          );
-        })}
-        <Pressable
-          accessibilityRole="button"
-          disabled={!online || blocked}
-          onPress={() => setPrivateOpen(true)}
-          style={({ pressed }) => [styles.table, styles.privateCard, blocked && styles.disabled, pressed && styles.pressed]}
-        >
-          <Text style={styles.tableName}>{T.privateRoom}</Text>
-          <Text style={styles.tableInfo}>{T.privateRoomHint}</Text>
-        </Pressable>
+            <Pressable onPress={() => setRewardOpen(true)} style={[styles.chip, account.reward.claimable && styles.chipHot]} accessibilityRole="button">
+              <Text style={[styles.chipText, account.reward.claimable && styles.chipHotText]}>
+                🎁 {account.reward.claimable ? T.rewardReady : T.rewardTaken}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Right: every table, filling the space */}
+        <View style={styles.tablesArea}>
+          <Text style={styles.heading}>{T.tables}</Text>
+          <View style={styles.grid}>
+            {info.tables.map((t) => {
+              const affordable = account.balance >= t.minCoins;
+              const tier = TIER[t.id] ?? '#607d8b';
+              return (
+                <Pressable
+                  key={t.id}
+                  accessibilityRole="button"
+                  disabled={!online || blocked || !affordable}
+                  onPress={() => onStart({ tableId: t.id })}
+                  style={({ pressed }) => [styles.card, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
+                >
+                  <View style={[styles.band, { backgroundColor: tier }]} />
+                  <View style={styles.cardBody}>
+                    <View style={styles.cardHead}>
+                      <Text style={styles.cardName}>{tableName(t)}</Text>
+                      {t.id === quick.id && <Text style={[styles.badge, { backgroundColor: tier }]}>{T.recommended}</Text>}
+                    </View>
+                    <Text style={[styles.cardBig, { color: tier }]}>{t.multiplier === 0 ? T.noCoins : T.baseScoreN(t.baseScore)}</Text>
+                    <Text style={[styles.cardInfo, !affordable && styles.short]}>
+                      {!affordable ? `🔒 ${T.needMore(t.minCoins - account.balance)}` : t.minCoins > 0 ? T.minCoinsN(t.minCoins) : ' '}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!online || blocked}
+            onPress={() => setPrivateOpen(true)}
+            style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
+          >
+            <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
+            <Text style={styles.privateInfo} numberOfLines={1}>
+              {T.privateRoomHint}
+            </Text>
+            <Text style={styles.privateArrow}>›</Text>
+          </Pressable>
+        </View>
       </View>
 
       {rewardOpen && <RewardSheet token={token} account={account} onAccount={onAccount} onClose={() => setRewardOpen(false)} />}
@@ -94,7 +152,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
           }}
         />
       )}
-    </View>
+    </Felt>
   );
 }
 
@@ -191,24 +249,100 @@ function RuleSwitch({ label, value, onChange }: { label: string; value: boolean;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#1f6b47', padding: 16, gap: 10 },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  profile: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 14, padding: 8 },
-  avatar: { fontSize: 32 },
+  root: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  topButtons: { flexDirection: 'row', gap: 6, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  profile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    maxWidth: 220,
+  },
+  avatar: { fontSize: 30 },
   nickname: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  coins: { color: '#ffe082', fontWeight: '700', fontVariant: ['tabular-nums'] },
-  limit: { color: '#ffcc80', fontSize: 13 },
-  tutorialBanner: { backgroundColor: '#ffd54f', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, alignSelf: 'flex-start' },
-  tutorialText: { color: '#5d4100', fontWeight: '800' },
-  heading: { color: '#e8f5e9', fontSize: 15, fontWeight: '700' },
-  tables: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  table: { width: 150, minHeight: 96, borderRadius: 14, padding: 12, backgroundColor: '#fdfaf2', justifyContent: 'center', gap: 4 },
-  privateCard: { backgroundColor: '#fff3e0' },
-  disabled: { opacity: 0.45 },
+  coins: { color: '#ffe082', fontWeight: '800', fontVariant: ['tabular-nums'] },
+  limit: { color: '#ffcc80', fontSize: 13, alignSelf: 'center' },
+  body: { flex: 1, flexDirection: 'row', gap: 16, minHeight: 0 },
+  hero: { flex: 0.85, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  heroCompact: { flex: 0.75 },
+  brand: {
+    color: '#fff8e1',
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 2 },
+  },
+  brandSub: { color: '#ffd54f', fontSize: 15, fontWeight: '800', letterSpacing: 6, marginTop: -4 },
+  quick: {
+    marginTop: 6,
+    backgroundColor: '#ffca28',
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 26,
+    alignItems: 'center',
+    borderBottomWidth: 4,
+    borderBottomColor: '#c79100',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  quickText: { color: '#3e2723', fontSize: 20, fontWeight: '900' },
+  quickSub: { color: '#5d4037', fontSize: 12, fontWeight: '700' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 4 },
+  chip: { backgroundColor: 'rgba(0,0,0,0.28)', borderRadius: 12, paddingVertical: 4, paddingHorizontal: 10 },
+  chipHot: { backgroundColor: '#ffd54f' },
+  chipText: { color: '#e8f5e9', fontSize: 12, fontWeight: '700' },
+  chipHotText: { color: '#5d4100' },
+  tablesArea: { flex: 1.25, gap: 8, minHeight: 0 },
+  heading: { color: '#e8f5e9', fontSize: 14, fontWeight: '800' },
+  grid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignContent: 'stretch' },
+  card: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minHeight: 64,
+    borderRadius: 14,
+    backgroundColor: '#fdfaf2',
+    overflow: 'hidden',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  band: { width: 8 },
+  cardBody: { flex: 1, paddingVertical: 8, paddingHorizontal: 12, justifyContent: 'center', gap: 2 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardName: { fontSize: 17, fontWeight: '900', color: '#3e2723' },
+  badge: { color: '#fff', fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
+  cardBig: { fontSize: 15, fontWeight: '900' },
+  cardInfo: { fontSize: 12, color: '#6d4c41' },
+  private: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,243,224,0.95)',
+    borderWidth: 2,
+    borderColor: '#ffcc80',
+    borderStyle: 'dashed',
+  },
+  privateName: { fontSize: 16, fontWeight: '900', color: '#4e342e' },
+  privateInfo: { flex: 1, fontSize: 12, color: '#6d4c41' },
+  privateArrow: { fontSize: 24, color: '#8d6e63', fontWeight: '700' },
+  disabled: { opacity: 0.5 },
   pressed: { transform: [{ scale: 0.97 }] },
-  tableName: { fontSize: 18, fontWeight: '900', color: '#3e2723' },
-  tableInfo: { fontSize: 12, color: '#5d4037' },
-  short: { color: '#c62828' },
+  short: { color: '#c62828', fontWeight: '700' },
   days: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   day: { padding: 8, borderRadius: 10, backgroundColor: '#eceff1', alignItems: 'center', minWidth: 80 },
   dayNext: { backgroundColor: '#ffe082' },

@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { appleAvailable, signInWithApple, signInWithGoogle, signInWithWechat, SignInUnavailable } from '../auth/social';
 import { Btn } from '../components/ActionBar';
+import { Felt } from '../components/Felt';
+import { TileFan } from '../components/TileFan';
 import { formStyles } from '../components/Sheet';
 import { api, ApiError } from '../net/api';
 import { getDeviceId } from '../net/deviceId';
@@ -63,7 +65,8 @@ export function LoginScreen({ info, onLoggedIn, onOpenTutorial }: Props) {
 
   const methods = info.loginMethods;
   return (
-    <View style={styles.root}>
+    <Felt style={styles.root}>
+      <TileFan width={44} />
       <Text style={styles.title}>{T.appTitle}</Text>
       <View style={styles.box}>
         {methods.includes('phone') && <PhoneLogin busy={busy} onSubmit={(phone, code) => run('phone', async () => ({ phone, code }))} onError={setError} />}
@@ -100,7 +103,7 @@ export function LoginScreen({ info, onLoggedIn, onOpenTutorial }: Props) {
           <Text style={styles.ageRating}>{T.ageRating(AGE_RATING)}</Text>
         </View>
       )}
-    </View>
+    </Felt>
   );
 }
 
@@ -140,7 +143,7 @@ export function PhoneLogin({ busy, onSubmit, onError }: { busy: boolean; onSubmi
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#1f6b47', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 16 },
+  root: { alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 },
   title: { fontSize: 30, fontWeight: '900', color: '#fff8e1' },
   box: { backgroundColor: 'rgba(253,250,242,0.96)', borderRadius: 16, padding: 16, gap: 12, alignItems: 'center', maxWidth: 560 },
   phone: { gap: 8 },

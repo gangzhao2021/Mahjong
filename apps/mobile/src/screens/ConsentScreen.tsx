@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
+import { Felt } from '../components/Felt';
 import { formStyles } from '../components/Sheet';
 import { SERVER_HTTP } from '../config';
 import { getLocale, T } from '../strings';
@@ -52,7 +53,7 @@ export function ConsentScreen({ onAgree, onOpenTutorial }: { onAgree(): void; on
     onAgree();
   };
   return (
-    <View style={styles.root}>
+    <Felt style={styles.root}>
       <View style={styles.box}>
         <Text style={styles.title}>{T.consent.title}</Text>
         <Text style={styles.body}>{declined ? T.consent.declined : T.consent.body}</Text>
@@ -71,12 +72,12 @@ export function ConsentScreen({ onAgree, onOpenTutorial }: { onAgree(): void; on
           )}
         </View>
       </View>
-    </View>
+    </Felt>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#1f6b47', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  root: { alignItems: 'center', justifyContent: 'center', padding: 16 },
   box: { backgroundColor: 'rgba(253,250,242,0.97)', borderRadius: 16, padding: 20, gap: 14, alignItems: 'center', maxWidth: 560 },
   title: { fontSize: 22, fontWeight: '800', color: '#3e2723' },
   body: { color: '#37474f', lineHeight: 22 },

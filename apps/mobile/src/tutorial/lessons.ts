@@ -124,11 +124,11 @@ export const LESSONS: Lesson[] = [
       },
       {
         text: {
-          zh: '你的筒子最少。点选 2筒、5筒、8筒，再点「确认换牌」。',
-          en: 'You have the fewest Dots. Tap 2, 5 and 8 Dots, then tap "Swap".',
+          zh: '你的筒子最少，系统已经按建议帮你选好了 2筒、5筒、8筒（抬起来的三张）。想换别的可以点牌改选；这次直接点「确认换牌」。',
+          en: 'You have the fewest Dots, so the suggested 2, 5 and 8 Dots are already selected (the raised tiles). You can tap tiles to change the pick; this time just tap "Swap".',
         },
         expect: (a) => a.type === 'swap' && a.tiles.every((t) => suitOf(t) === P),
-        hint: { zh: '要选同一花色的 3 张：点 2筒、5筒、8筒，再点「确认换牌」。', en: 'Pick 3 tiles of one suit: tap 2, 5 and 8 Dots, then "Swap".' },
+        hint: { zh: '换牌要同一花色的 3 张。选回 2筒、5筒、8筒，再点「确认换牌」。', en: 'Swap needs 3 tiles of one suit. Select 2, 5 and 8 Dots again, then tap "Swap".' },
         thenAutoPlay: true,
       },
       {

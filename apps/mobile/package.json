@@ -4,6 +4,7 @@
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
+    "@mahjong/ai-play": "workspace:*",
     "@mahjong/dialogue": "workspace:*",
     "@mahjong/engine": "workspace:*",
     "@mahjong/protocol": "workspace:*",
@@ -19,6 +20,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.3"
   },
   "devDependencies": {
