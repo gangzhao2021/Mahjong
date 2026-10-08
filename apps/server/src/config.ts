@@ -26,6 +26,8 @@ export interface ServerConfig {
   maxHandsPerGame: number;
   /** After a server restart, restored games wait this long for the player to reconnect before play resumes. */
   restoreGraceMs: number;
+  /** Budget for all unattended games together (actions per second), so they never starve live tables. */
+  unattendedActionsPerSecond: number;
 }
 
 export const DEFAULT_CONFIG: ServerConfig = {
@@ -47,4 +49,5 @@ export const DEFAULT_CONFIG: ServerConfig = {
   defaultHandsPerGame: 4,
   maxHandsPerGame: 16,
   restoreGraceMs: 60_000,
+  unattendedActionsPerSecond: 400,
 };

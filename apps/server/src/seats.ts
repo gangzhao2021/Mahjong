@@ -25,8 +25,11 @@ export interface SeatController {
   dispose(): void;
 }
 
+/** Runs `fn` after `ms` (or on the shared unattended pace); returns a cancel function. */
+export type Delay = (ms: number, fn: () => void) => () => void;
+
 export class AiSeat implements SeatController {
-  private pending: { handle: NodeJS.Timeout; key: string } | null = null;
+  private pending: { cancel: () => void; key: string } | null = null;
   private latest: HandView | null = null;
 
   constructor(
@@ -35,6 +38,7 @@ export class AiSeat implements SeatController {
     private readonly rng: Rng,
     private readonly thinkMs: (skill: SkillLevel) => number,
     private readonly submit: Submit,
+    private readonly delay: Delay,
   ) {}
 
   update({ view, mustAct }: SeatUpdate): void {
@@ -48,13 +52,13 @@ export class AiSeat implements SeatController {
     const key = JSON.stringify([view.stage, view.legal]);
     if (this.pending?.key === key) return;
     this.cancel();
-    const handle = setTimeout(() => {
+    const cancel = this.delay(this.thinkMs(this.skill), () => {
       this.pending = null;
       const latest = this.latest!;
       const action = chooseAction(latest, this.skill, this.rng);
       if (action) this.submit(action, latest.version);
-    }, this.thinkMs(this.skill));
-    this.pending = { handle, key };
+    });
+    this.pending = { cancel, key };
   }
 
   /** Re-plan immediately with a fresh delay (e.g. when fast-forward starts). */
@@ -63,7 +67,7 @@ export class AiSeat implements SeatController {
   }
 
   private cancel(): void {
-    if (this.pending) clearTimeout(this.pending.handle);
+    this.pending?.cancel();
     this.pending = null;
   }
 

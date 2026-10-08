@@ -136,11 +136,21 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
     });
   }
 
+  // Sign-in attempts per IP per 10 minutes: stops scripted account creation (each new account gets coins).
+  const authLimit = Number(process.env.AUTH_RATE_LIMIT) || 30;
+  const authAttempts = new Map<string, number[]>();
   app.post('/auth/:method', async (req) => {
     const { method } = req.params as { method: string };
+    const now = Date.now();
+    const recent = (authAttempts.get(req.ip) ?? []).filter((t) => now - t < 600_000);
+    if (recent.length >= authLimit) throw new HttpError(429, 'rateLimited');
+    recent.push(now);
+    authAttempts.set(req.ip, recent);
+    if (authAttempts.size > 50_000) authAttempts.clear(); // bound memory under a flood
     const identity = await resolveIdentity(method, body(req));
     const english = s.region === 'global' && (body(req) as { locale?: string }).locale === 'en';
     const { player, token } = await s.accounts.login(identity.provider, identity.subject, identity.secret, english);
+    await s.db.query('INSERT INTO login_events (player_id, method, ip) VALUES ($1, $2, $3)', [player.id, method, req.ip]);
     return respond(player, token);
   });
 
@@ -226,7 +236,8 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
       }
     }
     lobby.closePlayer(player.id);
-    await s.accounts.delete(player.id);
+    // China keeps login and chat logs for the legal retention period (Appendix D.6).
+    await s.accounts.delete(player.id, s.region === 'china');
     return reply.status(204).send();
   });
 

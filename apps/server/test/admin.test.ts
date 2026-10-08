@@ -282,4 +282,18 @@ describe('moderation queue (Appendix D.5)', () => {
     for (const e of events) expect((await admin.request('POST', `/moderation/${e.id}/resolve`)).status).toBe(200);
     expect((await admin.request('GET', '/moderation')).body.events).toEqual([]);
   });
+
+  it('shows chat and login logs for a player on request and audits the access', async () => {
+    const { server, admin, code } = await adminServer();
+    const client = await Client.connect(server);
+    const welcome = await client.hello('device-logs');
+    await server.services.db.query("INSERT INTO chat_log (player_id, game_id, seat, kind, speaker, text) VALUES ($1, 'g1', 0, 'player', 'me', '你好')", [welcome.playerId]);
+    await admin.login(code());
+
+    const logs = await admin.request('GET', `/players/${welcome.playerId}/logs`);
+    expect(logs.body.chat).toMatchObject([{ kind: 'player', text: '你好', gameId: 'g1' }]);
+    expect(logs.body.logins).toMatchObject([{ method: 'guest' }]);
+    const audit = await admin.request('GET', '/audit');
+    expect(audit.body.entries.some((e: { action: string; target: string }) => e.action === 'viewLogs' && e.target === welcome.playerId)).toBe(true);
+  });
 });

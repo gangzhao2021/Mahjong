@@ -4,6 +4,10 @@
 
 ## 两个版本都需要
 
+- [ ] 按 [device-testing.md](device-testing.md) 在 iOS 和 Android 真机上跑完测试清单。
+- [ ] 按 [deploy.md](deploy.md) 部署正式服务端，配好 HTTPS、每日数据库备份，确认 `/health` 正常。
+- [ ] 换掉占位应用图标和启动图（`apps/mobile/assets`）。
+
 - [ ] 把 `app.json` 里的 bundle ID / package `com.example.mahjong` 换成正式的。
 - [ ] 把 `eas.json` 里的服务器地址和 `ascAppId` 换成正式值。
 - [ ] 用录制或授权的音效和音乐替换 `apps/mobile/assets/sounds`（现在是程序合成的占位声音）。

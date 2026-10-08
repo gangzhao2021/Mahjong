@@ -142,13 +142,17 @@ export class Accounts {
    * results go; ledger rows stay for the audit trail with the player
    * reference anonymized. Existing sessions become invalid.
    */
-  async delete(playerId: string): Promise<void> {
+  async delete(playerId: string, keepLegalLogs = false): Promise<void> {
     const anonymous = `deleted:${createHash('sha256').update(playerId).digest('hex').slice(0, 16)}`;
     await this.db.tx(async (q) => {
       await q.query('UPDATE ledger SET player_id = $2, meta = NULL WHERE player_id = $1', [playerId, anonymous]);
       // Aggregated analytics stay, but no longer point at the person (PRD §19).
       await q.query('UPDATE play_sessions SET player_id = $2 WHERE player_id = $1', [playerId, anonymous]);
       await q.query('UPDATE moderation_events SET player_id = $2 WHERE player_id = $1', [playerId, anonymous]);
+      if (!keepLegalLogs) {
+        await q.query('DELETE FROM chat_log WHERE player_id = $1', [playerId]);
+        await q.query('DELETE FROM login_events WHERE player_id = $1', [playerId]);
+      }
       await q.query('DELETE FROM players WHERE id = $1', [playerId]);
     });
   }

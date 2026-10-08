@@ -1,6 +1,6 @@
 /** Player list, search, filters and the player detail drawer (PRD §29–§31, §47). */
 import { useState } from 'react';
-import { fmt, fmtTime, get, post } from '../api';
+import { errorText, fmt, fmtTime, get, post } from '../api';
 import { useLoad, useSave } from '../hooks';
 
 interface PlayerRow {
@@ -276,6 +276,8 @@ function PlayerDrawer({ id, onClose, onChanged }: { id: string; onClose(): void;
             </button>
           </div>
 
+          <PlayerLogs id={id} />
+
           <div className="card">
             <h3>金币记录</h3>
             <table>
@@ -304,6 +306,78 @@ function PlayerDrawer({ id, onClose, onChanged }: { id: string; onClose(): void;
               </tbody>
             </table>
           </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+interface Logs {
+  chat: { id: number; gameId: string; kind: string; speaker: string; text: string | null; sticker: string | null; createdAt: string }[];
+  logins: { id: number; method: string; ip: string | null; createdAt: string }[];
+}
+
+const CHAT_KINDS: Record<string, string> = { player: '玩家', quickPhrase: '快捷语', sticker: '表情', ai: 'AI' };
+
+/** Chat and login logs, loaded only on request (personal data; each view is audited). */
+function PlayerLogs({ id }: { id: string }) {
+  const [logs, setLogs] = useState<Logs | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = () => get<Logs>(`/players/${id}/logs`).then(setLogs, (e: unknown) => setError(errorText(e)));
+  return (
+    <div className="card">
+      <h3>聊天和登录记录</h3>
+      {!logs && (
+        <>
+          <p className="muted">包含玩家的聊天内容和登录 IP，查看会记入操作日志。</p>
+          <button onClick={() => void load()}>查看</button>
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+      {logs && (
+        <>
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>牌局</th>
+                <th>类型</th>
+                <th>说话人</th>
+                <th>内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.chat.map((c) => (
+                <tr key={c.id}>
+                  <td>{fmtTime(c.createdAt)}</td>
+                  <td className="muted">{c.gameId}</td>
+                  <td>{CHAT_KINDS[c.kind] ?? c.kind}</td>
+                  <td>{c.speaker}</td>
+                  <td style={{ wordBreak: 'break-all' }}>{c.text ?? (c.sticker ? `[${c.sticker}]` : '')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {logs.chat.length === 0 && <p className="muted">没有聊天记录。</p>}
+          <h3>最近登录</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>方式</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.logins.map((l) => (
+                <tr key={l.id}>
+                  <td>{fmtTime(l.createdAt)}</td>
+                  <td>{l.method}</td>
+                  <td>{l.ip ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </>
       )}
     </div>

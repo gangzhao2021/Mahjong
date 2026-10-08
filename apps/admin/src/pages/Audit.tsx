@@ -17,6 +17,7 @@ const ACTIONS: Record<string, string> = {
   updateCharacter: '修改角色',
   deleteCharacter: '删除角色',
   resolveModeration: '处理审核',
+  viewLogs: '查看聊天和登录记录',
 };
 
 export function Audit() {

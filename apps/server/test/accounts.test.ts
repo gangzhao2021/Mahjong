@@ -161,3 +161,12 @@ describe('identity token verification', () => {
     expect(tokens.verify(t)).toBeNull();
   });
 });
+
+describe('sign-in rate limit', () => {
+  it('stops one address from creating accounts in bulk', async () => {
+    const server = await startServer();
+    for (let i = 0; i < 30; i++) expect((await api(server, 'POST', '/auth/guest', { deviceId: `bulk-device-${i}` })).status).toBe(200);
+    const blocked = await api(server, 'POST', '/auth/guest', { deviceId: 'bulk-device-30' });
+    expect(blocked).toMatchObject({ status: 429, body: { error: 'rateLimited' } });
+  });
+});

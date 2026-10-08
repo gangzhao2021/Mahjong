@@ -188,4 +188,29 @@ export const MIGRATIONS: string[] = [
     updated_at timestamptz NOT NULL DEFAULT now()
   )
   `,
+  // Login and chat logs (Appendix D.6): kept for the retention period, then purged.
+  `
+  CREATE TABLE login_events (
+    id bigserial PRIMARY KEY,
+    player_id text NOT NULL,
+    method text NOT NULL,
+    ip text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX login_events_created ON login_events(created_at);
+  CREATE INDEX login_events_player ON login_events(player_id, created_at);
+  CREATE TABLE chat_log (
+    id bigserial PRIMARY KEY,
+    player_id text NOT NULL,
+    game_id text NOT NULL,
+    seat int NOT NULL,
+    kind text NOT NULL,
+    speaker text NOT NULL,
+    text text,
+    sticker text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX chat_log_created ON chat_log(created_at);
+  CREATE INDEX chat_log_player ON chat_log(player_id, created_at)
+  `,
 ];

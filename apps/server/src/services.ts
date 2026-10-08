@@ -62,7 +62,7 @@ export function createServices(o: ServiceOptions): Services {
   const now = o.now ?? (() => new Date());
   const economy = o.economy ?? loadEconomyConfig();
   const wallet = new Wallet(o.db);
-  const tokens = new SessionTokens(env.SESSION_SECRET ?? devSecret(o.dataDir, 'session-secret'), () => now().getTime());
+  const tokens = new SessionTokens(requiredSecret(env, 'SESSION_SECRET', o.dataDir, 'session-secret'), () => now().getTime());
   const list = (v?: string) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const appleKeys =
     env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY && list(env.APPLE_CLIENT_IDS)[0]
@@ -87,10 +87,21 @@ export function createServices(o: ServiceOptions): Services {
       googleClientIds: list(env.GOOGLE_CLIENT_IDS),
       wechat: env.WECHAT_APP_ID && env.WECHAT_APP_SECRET ? { appId: env.WECHAT_APP_ID, secret: env.WECHAT_APP_SECRET } : null,
       apple: appleKeys,
-      idHashSecret: env.ID_HASH_SECRET ?? devSecret(o.dataDir, 'id-hash-secret'),
+      idHashSecret: requiredSecret(env, 'ID_HASH_SECRET', o.dataDir, 'id-hash-secret'),
     },
     now,
   };
+}
+
+/** Production must configure real secrets; development falls back to one generated in the data dir. */
+function requiredSecret(env: Record<string, string | undefined>, name: string, dataDir: string | null, file: string): string {
+  const value = env[name];
+  if (value) {
+    if (env.NODE_ENV === 'production' && value.length < 32) throw new Error(`${name} must be at least 32 characters`);
+    return value;
+  }
+  if (env.NODE_ENV === 'production') throw new Error(`${name} is not set (required in production)`);
+  return devSecret(dataDir, file);
 }
 
 /** Development-only secret persisted in the data dir so sessions survive restarts. */

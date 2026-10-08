@@ -18,6 +18,7 @@ import type { ServerConfig } from './config';
 import type { DialogueConfig } from './dialogueConfig';
 import type { LlmProvider } from './llm/provider';
 import { summarizeGame } from './memory/summarizer';
+import { Pacer } from './pacer';
 import { Room, type AiSeatSpec, type RoomCheckpoint } from './room';
 import { accountSummary, checkStart, type GamePlan, type Services } from './services';
 import type { HandLogStore } from './store';
@@ -55,16 +56,21 @@ export class Lobby {
   readonly settling = new Set<Promise<void>>();
   /** Pending checkpoint writes per player. */
   private saveTimers = new Map<string, { timer: NodeJS.Timeout; write: () => Promise<void> }>();
+  /** Checkpoint writes in flight per player; a change during a write is saved right after it. */
+  private writing = new Map<string, Promise<void>>();
   /** Shutting down: rooms close but their checkpoints are kept for the next start. */
   private stopping = false;
   private rng: Rng;
   private chatGuard: ChatGuard;
+  /** Shared pace for games nobody is watching. */
+  private readonly pacer: Pacer;
   /** UI language per player, from their latest hello. */
   private languages = new Map<string, Language>();
 
   constructor(private readonly deps: LobbyDeps) {
     this.rng = createRng(this.nextSeed());
     this.chatGuard = new ChatGuard(deps.dialogue.chat);
+    this.pacer = new Pacer(deps.config.unattendedActionsPerSecond);
   }
 
   /** Chat catalog in the player's language (quick phrases are admin-configurable, so built per request). */
@@ -304,6 +310,7 @@ export class Lobby {
       seed: this.nextSeed(),
       humanSeat: restore?.checkpoint.humanSeat ?? (0 as Seat),
       restore: restore?.checkpoint,
+      pacer: this.pacer,
       coinChange: restore?.coinChange,
       human: { playerId: player.id, name: player.nickname, avatar: player.avatar },
       ai,
@@ -318,6 +325,19 @@ export class Lobby {
         banterLevel: () => this.banterOf(player),
         language,
         onMemoryUsed: (ids) => void this.s.memory.markReferenced(ids).catch((e) => console.error('Memory update failed:', e)),
+        onLine: (entry, speaker) => {
+          void this.s.db
+            .query('INSERT INTO chat_log (player_id, game_id, seat, kind, speaker, text, sticker) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
+              player.id,
+              room.id,
+              entry.seat,
+              entry.kind,
+              speaker,
+              entry.text,
+              entry.sticker,
+            ])
+            .catch((error) => console.error('Writing chat log failed:', error));
+        },
         onPlayerQuote: (text, target) => {
           const characterId = target === 'table' ? null : (room.aiSeats.find((a) => a.seat === target)?.characterId ?? null);
           void this.s.memory.recordQuote(player.id, characterId, text, room.id).catch((e) => console.error('Memory update failed:', e));
@@ -356,7 +376,16 @@ export class Lobby {
         )
         .catch((error) => console.error('Saving game checkpoint failed:', error));
     };
-    this.saveTimers.set(playerId, { timer: setTimeout(() => void write(), CHECKPOINT_DEBOUNCE_MS), write });
+    const run = () => {
+      const previous = this.writing.get(playerId) ?? Promise.resolve();
+      const next = previous.then(write);
+      this.writing.set(playerId, next);
+      void next.finally(() => {
+        if (this.writing.get(playerId) === next) this.writing.delete(playerId);
+      });
+      return next;
+    };
+    this.saveTimers.set(playerId, { timer: setTimeout(() => void run(), CHECKPOINT_DEBOUNCE_MS), write: run });
   }
 
   private dropCheckpoint(playerId: string, gameId: string): void {
@@ -528,7 +557,8 @@ export class Lobby {
     });
     for (const room of this.rooms.values()) room.close();
     for (const id of [...this.limitTimers.keys()]) this.clearLimit(id);
-    await Promise.all(writes);
+    this.pacer.dispose();
+    await Promise.all([...writes, ...this.writing.values()]);
   }
 }
 

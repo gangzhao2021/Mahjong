@@ -21,6 +21,7 @@ export const FAST: ServerConfig = {
   timers: { swapMs: 40, dingqueMs: 40, discardMs: 40, claimMs: 40, nextHandMs: 30, nextHandAutoPlayMs: 10 },
   autoPlayDelayMs: 0,
   ai: { minDelayMs: 0, maxDelayMs: 2, beginnerExtraMs: 1 },
+  unattendedActionsPerSecond: 100_000,
 };
 
 export interface TestServer {

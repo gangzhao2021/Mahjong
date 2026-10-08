@@ -8,6 +8,7 @@ import { createLlmProvider, createModerator, loadDialogueConfig } from './dialog
 import { buildHttp } from './http';
 import { Lobby } from './lobby';
 import { createServices } from './services';
+import { RetentionJob, retentionPolicy } from './retention';
 import { FileHandLogStore } from './store';
 
 const config = DEFAULT_CONFIG;
@@ -32,6 +33,9 @@ await app.ready();
 const wss = new WebSocketServer({ server: app.server, path: '/ws', maxPayload: 16 * 1024 });
 wss.on('connection', (socket) => lobby.handleConnection(socket));
 
+const retention = new RetentionJob(db, retentionPolicy(dialogue.region), config.dataDir);
+retention.start();
+
 const restored = await lobby.restoreGames();
 if (restored) console.log(`Restored ${restored} game(s) in progress.`);
 
@@ -49,6 +53,7 @@ process.on('uncaughtException', (error) => {
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {
+    retention.stop();
     await lobby.closeAll();
     wss.close();
     await app.close();

@@ -101,6 +101,24 @@ export function registerAdminRoutes(app: FastifyInstance, d: AdminDeps): void {
         return { players: rows.map(playerRow), total: Number(rows[0]?.total ?? 0), page };
       });
 
+      /** Chat and login logs (Appendix D.6). Personal data: every view is audited. */
+      admin.get('/players/:id/logs', async (req) => {
+        const { id } = req.params as { id: string };
+        const chat = await db.query<{ id: string; game_id: string; kind: string; speaker: string; text: string | null; sticker: string | null; created_at: Date }>(
+          'SELECT id, game_id, kind, speaker, text, sticker, created_at FROM chat_log WHERE player_id = $1 ORDER BY id DESC LIMIT 300',
+          [id],
+        );
+        const logins = await db.query<{ id: string; method: string; ip: string | null; created_at: Date }>(
+          'SELECT id, method, ip, created_at FROM login_events WHERE player_id = $1 ORDER BY id DESC LIMIT 50',
+          [id],
+        );
+        await audit(req, 'viewLogs', id, null);
+        return {
+          chat: chat.map((c) => ({ id: Number(c.id), gameId: c.game_id, kind: c.kind, speaker: c.speaker, text: c.text, sticker: c.sticker, createdAt: new Date(c.created_at).toISOString() })),
+          logins: logins.map((l) => ({ id: Number(l.id), method: l.method, ip: l.ip, createdAt: new Date(l.created_at).toISOString() })),
+        };
+      });
+
       admin.get('/players/:id', async (req) => {
         const { id } = req.params as { id: string };
         const rows = await db.query(

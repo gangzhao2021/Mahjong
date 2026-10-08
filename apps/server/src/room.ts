@@ -28,6 +28,7 @@ import type { ChatEntry, GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerI
 import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
 import type { LlmProvider } from './llm/provider';
+import { after, type Cancel, type Pacer } from './pacer';
 import { AiSeat, HumanSeat, type SeatController } from './seats';
 import type { HandLog, HandLogStore } from './store';
 import { TableTalk } from './talk';
@@ -52,6 +53,8 @@ export interface RoomTalkOptions {
   language?: Language;
   onMemoryUsed?(eventIds: number[]): void;
   onPlayerQuote?(text: string, target: Seat | 'table'): void;
+  /** Every line said at the table (chat log, Appendix D.6). */
+  onLine?(entry: ChatEntry, speaker: string): void;
 }
 
 export interface RoomOptions {
@@ -72,6 +75,8 @@ export interface RoomOptions {
   onHandEnd?: (room: Room, handIndex: number, result: HandResult) => void;
   /** Called once the whole game is over and nobody needs the room any more. */
   onClosed?: (room: Room) => void;
+  /** Shared pace for unattended games; without it they run on plain timers. */
+  pacer?: Pacer;
   /** Called whenever the game state changed (for checkpointing). */
   onChange?: (room: Room) => void;
   /** Rebuild from a checkpoint instead of starting a new game; call `resume` instead of `start`. */
@@ -95,7 +100,7 @@ export interface RoomCheckpoint {
 }
 
 interface Timer {
-  handle: NodeJS.Timeout;
+  cancel: Cancel;
   info: TimerInfo | null;
 }
 
@@ -145,8 +150,13 @@ export class Room {
         isHuman: false,
         personality: (en && personality.nameEn) || personality.name,
       };
-      return new AiSeat(info, spec.skill, opts.rng, (skill) => this.aiThinkMs(skill), (action, version) =>
-        this.submit({ ...action, seat }, version, 'ai'),
+      return new AiSeat(
+        info,
+        spec.skill,
+        opts.rng,
+        (skill) => this.aiThinkMs(skill),
+        (action, version) => this.submit({ ...action, seat }, version, 'ai'),
+        (ms, fn) => this.delay(ms, fn),
       );
     });
 
@@ -164,7 +174,10 @@ export class Room {
       viewFor: (seat) => viewFor(this.hand, seat),
       version: () => this.hand.actionCount,
       handIndex: () => this.handIndex,
-      emit: (entry) => this.human.send({ type: 'chat', entry }),
+      emit: (entry) => {
+        this.human.send({ type: 'chat', entry });
+        opts.talk.onLine?.(entry, this.seats[entry.seat].info.name);
+      },
       onMemoryUsed: opts.talk.onMemoryUsed,
       onPlayerQuote: opts.talk.onPlayerQuote,
     });
@@ -458,15 +471,21 @@ export class Room {
 
   private setTimer(ms: number, kind: TimerKind | null, fn: () => void): void {
     const deadline = Date.now() + ms;
-    const handle = setTimeout(() => {
+    const cancel = this.delay(ms, () => {
       this.timer = null;
       fn();
-    }, ms);
-    this.timer = { handle, info: kind ? { kind, deadline, remainingMs: ms, durationMs: ms } : null };
+    });
+    this.timer = { cancel, info: kind ? { kind, deadline, remainingMs: ms, durationMs: ms } : null };
+  }
+
+  /** Immediate steps of a game nobody is watching go through the shared pacer. */
+  private delay(ms: number, fn: () => void): Cancel {
+    if (ms === 0 && !this.human.connected && this.opts.pacer) return this.opts.pacer.schedule(fn);
+    return after(ms, fn);
   }
 
   private clearTimer(): void {
-    if (this.timer) clearTimeout(this.timer.handle);
+    this.timer?.cancel();
     this.timer = null;
   }
 

@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.expo
+**/web-build
+apps/server/data
+apps/server/data-china
+**/.env
+.git
+.github
+.claude
+*.md
+!README.md
