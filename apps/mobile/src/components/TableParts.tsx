@@ -55,7 +55,7 @@ export function SeatCard({ info, score, voidSuit, dealer, active, won, handCount
   return (
     <View style={[styles.card, active && styles.cardActive]}>
       <Text style={styles.avatar}>{info.avatar}</Text>
-      <View>
+      <View style={styles.cardText}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
             {info.name}
@@ -93,8 +93,9 @@ const styles = StyleSheet.create({
   backsRow: { flexDirection: 'row', gap: 1 },
   backsColumn: { flexDirection: 'column', gap: 1 },
   compass: {
-    width: 104,
-    height: 104,
+    width: 112,
+    height: 112,
+    flexShrink: 0,
     borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.32)',
     borderWidth: 2,
@@ -107,7 +108,7 @@ const styles = StyleSheet.create({
   compassWall: { color: '#c8e6c9', fontSize: 11 },
   compassTimer: { color: '#fff', fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'] },
   compassTimerLow: { color: '#ffab91' },
-  compassNote: { color: '#fff59d', fontSize: 10, textAlign: 'center', paddingHorizontal: 14 },
+  compassNote: { color: '#fff59d', fontSize: 10, textAlign: 'center', paddingHorizontal: 18 },
   melds: { flexDirection: 'row', gap: 6 },
   meld: { flexDirection: 'row' },
   pond: { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start' },
@@ -124,7 +125,9 @@ const styles = StyleSheet.create({
   },
   cardActive: { borderColor: '#ffd54f' },
   avatar: { fontSize: 26 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Badges wrap under the name rather than pushing the card past the screen edge.
+  cardText: { flexShrink: 1 },
+  nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
   name: { color: '#fff', fontWeight: '700', fontSize: 13, maxWidth: 90 },
   badge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 4, borderRadius: 4, overflow: 'hidden' },
   dealerBadge: { backgroundColor: '#ffd54f', color: '#5d4100' },

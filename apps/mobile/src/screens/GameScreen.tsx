@@ -28,9 +28,13 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const { table, receivedAt } = game;
   const view = table.view;
   const me = view.players[view.seat];
-  const { width, height } = useWindowDimensions();
-  const handTile = Math.max(24, Math.min(54, Math.floor((width - 80) / 17)));
-  const smallTile = Math.max(16, Math.min(30, Math.floor(height / 16)));
+  const window = useWindowDimensions();
+  // Big screens (desktop browsers, tablets) get the phone layout scaled up as a whole, so tiles,
+  // seats, buttons and text keep their proportions instead of shrinking into the corners.
+  const scale = Math.max(1, Math.min(window.width / DESIGN_WIDTH, window.height / DESIGN_HEIGHT));
+  const width = window.width / scale;
+  const height = window.height / scale;
+  const smallTile = Math.max(16, Math.min(30, Math.floor(height / 18)));
   const seatAt = (side: Side) => ((view.seat + side) % 4) as Seat;
   const sideOf = (seat: Seat) => ((seat - view.seat + 4) % 4) as Side;
 
@@ -48,6 +52,10 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const lastDiscarder: Seat | null = stage.kind === 'claim' ? stage.discarder : null;
   const iWon = me.won !== null;
   const drawn = stage.kind === 'turn' && stage.seat === view.seat ? stage.drawn : null;
+  // Size my tiles so the seat card, melds (drawn at 3/4 size) and the whole hand fit on one row.
+  const meldTiles = me.melds.reduce((n, m) => n + (m.type === 'pong' ? 3 : 4), 0);
+  const handSlots = me.handCount + (drawn !== null ? 0.4 : 0) + meldTiles * 0.75 + me.melds.length * 0.2 + 0.5;
+  const handTile = Math.max(24, Math.min(54, Math.floor((width - 24 - MY_SEAT_WIDTH) / handSlots)));
 
   // Selections only make sense for the hand they were made on.
   const handKey = `${table.handIndex}:${view.phase}:${(me.hand ?? []).join(',')}`;
@@ -92,12 +100,15 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       </View>
     );
     if (side === 2) {
+      // Melds go under the backs so the top row never pushes the hand info off screen.
       return (
         <View style={[styles.opponent, styles.row]}>
           {card}
-          {backs}
-          <Melds melds={p.melds} tileWidth={smallTile} />
-          {revealed}
+          <View style={styles.opponent}>
+            {backs}
+            <Melds melds={p.melds} tileWidth={Math.round(smallTile * 0.85)} />
+            {revealed}
+          </View>
         </View>
       );
     }
@@ -118,7 +129,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const windOf = (side: Side) => T.winds[(seatAt(side) - view.dealer + 4) % 4];
 
   return (
-    <Felt style={styles.felt}>
+    <Felt>
+      <View style={[styles.stage, { width, height, transform: [{ scale }] }]}>
       {/* Top row: menu, opposite player, hand info */}
       <View style={styles.topRow}>
         <View style={styles.menu}>
@@ -127,7 +139,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           <Btn label={`💬 ${T.chat}`} onPress={() => setChatOpen(true)} />
           <Btn label={muted ? '🔇' : '🔊'} onPress={() => updateSoundSettings({ effects: muted, music: muted })} />
         </View>
-        {opponent(2)}
+        <View style={styles.topSeat}>{opponent(2)}</View>
         <View style={styles.stake}>
           <Text style={styles.handInfo}>{T.hand(table.handIndex, table.handsPerGame)}</Text>
           <Text style={styles.handInfo}>
@@ -142,7 +154,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       <View style={styles.middle}>
         {opponent(3)}
         <View style={styles.center}>
-          <Pond discards={view.players[seatAt(2)].discards} tileWidth={smallTile} perRow={12} lastDiscard={lastDiscarder === seatAt(2)} />
+          <Pond discards={view.players[seatAt(2)].discards} tileWidth={smallTile} perRow={16} lastDiscard={lastDiscarder === seatAt(2)} />
           <View style={styles.centerRow}>
             <Pond discards={view.players[seatAt(3)].discards} tileWidth={smallTile} perRow={6} lastDiscard={lastDiscarder === seatAt(3)} />
             <Compass
@@ -154,7 +166,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             />
             <Pond discards={view.players[seatAt(1)].discards} tileWidth={smallTile} perRow={6} lastDiscard={lastDiscarder === seatAt(1)} />
           </View>
-          <Pond discards={me.discards} tileWidth={smallTile} perRow={12} lastDiscard={lastDiscarder === view.seat} />
+          <Pond discards={me.discards} tileWidth={smallTile} perRow={16} lastDiscard={lastDiscarder === view.seat} />
         </View>
         {opponent(1)}
       </View>
@@ -167,15 +179,17 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           )}
         </View>
         <View style={styles.myRow}>
-          <SeatCard
-            info={table.seats[view.seat]}
-            score={scoreOf(view.seat)}
-            voidSuit={me.voidSuit}
-            dealer={view.dealer === view.seat}
-            active={activeSeat === view.seat}
-            won={iWon}
-            handCount={me.handCount}
-          />
+          <View style={styles.mySeat}>
+            <SeatCard
+              info={table.seats[view.seat]}
+              score={scoreOf(view.seat)}
+              voidSuit={me.voidSuit}
+              dealer={view.dealer === view.seat}
+              active={activeSeat === view.seat}
+              won={iWon}
+              handCount={me.handCount}
+            />
+          </View>
           <Melds melds={me.melds} tileWidth={Math.round(handTile * 0.75)} />
           <PlayerHand
             hand={me.hand ?? []}
@@ -199,7 +213,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       ))}
 
       {table.autoPlay && (
-        <Pressable style={styles.banner} onPress={() => game.setAutoPlay(false)}>
+        // Sits where the action buttons would be (they are hidden while auto-playing), clear of the discards.
+        <Pressable style={[styles.banner, { bottom: Math.round(handTile * 1.4) + 14 }]} onPress={() => game.setAutoPlay(false)}>
           <Text style={styles.bannerText}>{T.autoPlayOn}</Text>
         </Pressable>
       )}
@@ -264,6 +279,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           </View>
         </View>
       )}
+      </View>
     </Felt>
   );
 }
@@ -303,6 +319,12 @@ function calloutText(e: GameEvent): string | null {
   }
 }
 
+/** Screen size the table is laid out at; bigger screens scale it up. Roomier than a phone so desktops don't feel cramped. */
+const DESIGN_WIDTH = 1200;
+const DESIGN_HEIGHT = 560;
+/** Room kept for my seat card left of the hand. */
+const MY_SEAT_WIDTH = 190;
+
 /** Where each seat's speech bubble appears. */
 const BUBBLE_POSITION = {
   0: { left: 150, bottom: 120 },
@@ -320,12 +342,13 @@ const CALLOUT_POSITION = {
 
 const styles = StyleSheet.create({
   // userSelect: keep swipes on web from selecting tile text.
-  felt: { paddingHorizontal: 12, paddingVertical: 6, userSelect: 'none' },
+  stage: { paddingHorizontal: 12, paddingVertical: 6, userSelect: 'none', transformOrigin: 'top left' },
   sideSeat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', minHeight: 48 },
-  menu: { flexDirection: 'row', gap: 6 },
+  menu: { flexDirection: 'row', gap: 6, flexShrink: 0 },
+  topSeat: { flex: 1, alignItems: 'center', minWidth: 0 },
   handInfo: { color: '#c8e6c9', fontSize: 12 },
-  stake: { alignItems: 'flex-end', marginTop: 4 },
+  stake: { alignItems: 'flex-end', marginTop: 4, flexShrink: 0 },
   coinLine: { color: '#ffe082', fontSize: 12, fontWeight: '700' },
   middle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   opponent: { alignItems: 'center', gap: 4 },
@@ -337,6 +360,7 @@ const styles = StyleSheet.create({
   bottom: { gap: 4 },
   actions: { alignItems: 'flex-end', minHeight: 48, justifyContent: 'flex-end' },
   myRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  mySeat: { maxWidth: MY_SEAT_WIDTH - 10, flexShrink: 0 },
   callout: {
     position: 'absolute',
     backgroundColor: 'rgba(183,28,28,0.92)',
@@ -348,7 +372,6 @@ const styles = StyleSheet.create({
   banner: {
     position: 'absolute',
     alignSelf: 'center',
-    top: '46%',
     backgroundColor: 'rgba(0,0,0,0.72)',
     paddingHorizontal: 18,
     paddingVertical: 10,
