@@ -1,7 +1,7 @@
 /** Authenticated connections, game start checks, coin settlement and room lifecycle. */
 import type { Rng } from '@mahjong/ai-play';
 import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, textLength, type Language, type Moderator, type StickerId } from '@mahjong/dialogue';
-import { createRng, isValidTile, type Action, type HandResult, type Seat } from '@mahjong/engine';
+import { createRng, smallTableRules, isValidTile, type Action, type HandResult, type Seat } from '@mahjong/engine';
 import {
   PROTOCOL_VERSION,
   type ChatCatalog,
@@ -237,7 +237,7 @@ export class Lobby {
         if (!table) return send({ type: 'friendRoomRejected', reason: 'notFound' });
         if (table.hostId !== player.id) return send({ type: 'friendRoomRejected', reason: 'notHost' });
         if (table.members.length < 2) return send({ type: 'friendRoomRejected', reason: 'needFriend' });
-        await this.startFriendGame(table, socket);
+        await this.startFriendGame(table, socket, msg.fillWithAi !== false);
         return;
       }
       case 'action': {
@@ -580,7 +580,7 @@ export class Lobby {
   }
 
   /** Starts a friend room: members take seats in join order, AI fill the rest. */
-  private async startFriendGame(table: FriendTable, hostSocket: WebSocket): Promise<void> {
+  private async startFriendGame(table: FriendTable, hostSocket: WebSocket, fillWithAi = true): Promise<void> {
     const players: { player: PlayerRow; plan: GamePlan }[] = [];
     for (const m of table.members) {
       const p = await this.s.accounts.get(m.playerId);
@@ -599,9 +599,13 @@ export class Lobby {
       const old = this.rooms.get(player.id);
       if (old && !old.multiplayer) old.close();
     }
+    // Fewer than four without AI: 三人两房 / 二人两房 (two players sit opposite each other).
+    const small = !fillWithAi && players.length < 4 ? smallTableRules(players.length as 2 | 3) : null;
+    if (small) for (const p of players) p.plan = { ...p.plan, ruleSet: { ...p.plan.ruleSet, ...small } };
+    const seats = small?.seats ?? ([0, 1, 2, 3] as Seat[]);
     const [host, ...rest] = players;
-    const guests = rest.map((g, i) => ({ seat: (i + 1) as Seat, player: g.player, plan: g.plan }));
-    const chosen = selectCharacters(this.deps.dialogue.roster, 4 - players.length, this.rng);
+    const guests = rest.map((g, i) => ({ seat: seats[i + 1], player: g.player, plan: g.plan }));
+    const chosen = selectCharacters(this.deps.dialogue.roster, seats.length - players.length, this.rng);
     const ai: AiSeatSpec[] = chosen.map((c) => ({ ...c, skill: pickWeighted(this.deps.config.skillWeights, this.rng), memory: null }));
     this.friends.close(table);
     const room = this.buildRoom(host.player, host.plan, ai, this.languageOf(host.player.id), undefined, guests);

@@ -11,7 +11,8 @@ export interface FriendActions {
   create(handsPerGame: number, xueliu: boolean): void;
   join(code: string): void;
   leave(): void;
-  start(): void;
+  /** `fillWithAi: false` plays with just the friends present (两房). */
+  start(fillWithAi: boolean): void;
 }
 
 /** Before joining: create a room, or type a friend's room number. */
@@ -92,8 +93,16 @@ export function WaitingRoomSheet({ room, myId, actions }: { room: FriendRoomInfo
       <Text style={formStyles.hint}>{T.friend.rules(room.handsPerGame, T.modeName(room.xueliu))}</Text>
       <View style={styles.buttons}>
         <Btn label={T.friend.leave} onPress={actions.leave} />
-        {isHost ? (
-          <Btn label={room.members.length < 2 ? T.friend.needFriend : T.friend.start} primary disabled={room.members.length < 2} onPress={actions.start} />
+        {isHost && room.members.length < 2 ? (
+          <Btn label={T.friend.needFriend} disabled onPress={() => undefined} />
+        ) : isHost && room.members.length < room.maxPlayers ? (
+          <>
+            {/* Not a full table: fill with AI, or play just the friends present (两房) */}
+            <Btn label={T.friend.startWithAi} onPress={() => actions.start(true)} />
+            <Btn label={T.friend.startJustUs(room.members.length)} primary onPress={() => actions.start(false)} />
+          </>
+        ) : isHost ? (
+          <Btn label={T.friend.start} primary onPress={() => actions.start(true)} />
         ) : (
           <Text style={styles.waiting}>{T.friend.waitingHost}</Text>
         )}

@@ -11,6 +11,8 @@ export type { BanterLevel, QuickPhrase, StickerId };
 export const PROTOCOL_VERSION = 3;
 
 export interface SeatInfo {
+  /** Nobody sits here (a two- or three-player friends' table). */
+  empty?: boolean;
   seat: Seat;
   name: string;
   /** Emoji avatar until the avatar art exists (Phase 6). */
@@ -342,7 +344,8 @@ export type ClientMessage =
   | { type: 'createFriendRoom'; handsPerGame: number; xueliu?: boolean }
   | { type: 'joinFriendRoom'; code: string }
   | { type: 'leaveFriendRoom' }
-  | { type: 'startFriendRoom' }
+  /** `fillWithAi: false` plays with just the friends present (三人两房 / 二人两房). */
+  | { type: 'startFriendRoom'; fillWithAi?: boolean }
   /** Quick pace: AI players move with little thinking time (a player setting). */
   | { type: 'setFastPace'; on: boolean }
   | { type: 'skipToResults' }

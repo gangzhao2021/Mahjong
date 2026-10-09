@@ -101,6 +101,34 @@ describe('friend rooms', () => {
     expect(after.members[0].isHost).toBe(true);
   });
 
+  it.each([
+    [3, [0, 1, 2]],
+    [2, [0, 2]],
+  ])('plays %i friends without AI on a two-suit table (两房)', async (n, seats) => {
+    const server = await startServer(PATIENT);
+    const clients = await Promise.all(Array.from({ length: n }, () => Client.connect(server)));
+    await Promise.all(clients.map((c, i) => c.hello(`device-small-${n}-${i}`)));
+    clients[0].send({ type: 'createFriendRoom', handsPerGame: 1 });
+    const { code } = (await clients[0].next(roomWith(1))).room!;
+    for (const [i, c] of clients.slice(1).entries()) {
+      c.send({ type: 'joinFriendRoom', code });
+      await clients[0].next(roomWith(i + 2));
+    }
+    for (const c of clients) playAsBot(c);
+    clients[0].send({ type: 'startFriendRoom', fillWithAi: false });
+    const tables = await Promise.all(clients.map((c) => c.next(isTable)));
+    expect(tables.map((t) => t.table.mySeat)).toEqual(seats);
+    const t = tables[0].table;
+    expect(t.view.ruleSet.suits).toEqual([1, 2]);
+    expect(t.view.phase).toBe('play');
+    expect(t.seats.filter((s) => s.empty).length).toBe(4 - n);
+    expect(t.seats.filter((s) => !s.empty && !s.isHuman)).toEqual([]);
+    const ends = await Promise.all(clients.map((c) => c.next(gameOver)));
+    const totals = ends[0].table.totals;
+    expect(totals.reduce((a, b) => a + b, 0)).toBe(0);
+    for (const seat of [0, 1, 2, 3]) if (!seats.includes(seat)) expect(totals[seat]).toBe(0);
+  });
+
   it('serves an invite page that opens the app and shows the number', async () => {
     const server = await startServer(PATIENT);
     const page = await fetch(`${server.http}/join/123456?lang=zh`);

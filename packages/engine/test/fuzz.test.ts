@@ -8,6 +8,7 @@ import {
   legalActions,
   recordHand,
   SEATS,
+  smallTableRules,
   startHand,
   suitOf,
   viewFor,
@@ -37,7 +38,8 @@ function randomAction(h: HandState, seat: Seat, rng: () => number): Action | nul
 }
 
 function tileTotal(h: HandState): number {
-  let n = h.wall.length;
+  // An added kong's tile is in neither hand nor meld while others may rob it.
+  let n = h.wall.length + (h.stage.kind === 'robKong' ? 1 : 0);
   for (const p of h.players) {
     n += allTilesOf(p.hand, p.melds).length + p.discards.filter((d) => !d.claimed).length;
   }
@@ -135,5 +137,43 @@ describe('randomized full games', () => {
       expect(game.totals.reduce((a, b) => a + b, 0)).toBe(0);
     }
     expect(repeatWinners).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['三人两房', 3 as const, false],
+    ['二人两房', 2 as const, false],
+    ['三人两房 · 血流成河', 3 as const, true],
+  ])('%s: only the seats in play act, 72 tiles, zero-sum', (_name, players, xueliu) => {
+    const ruleSet = withRules({ ...smallTableRules(players), xueliu });
+    const rng = createRng(777 + players);
+    for (let g = 0; g < 30; g++) {
+      let game = createGame({ ruleSet, baseScore: 10, seed: g * 7907 + players });
+      while (!isGameOver(game)) {
+        let h = startHand(game);
+        expect(ruleSet.seats).toContain(h.dealer);
+        // Straight into play: no swap, no void suit.
+        expect(h.phase).toBe('play');
+        for (const seat of SEATS) expect(h.players[seat].hand.length > 0).toBe(ruleSet.seats.includes(seat));
+        let duplicatedWinTiles = 0;
+        for (let step = 0; h.phase !== 'ended'; step++) {
+          expect(step).toBeLessThan(3000);
+          const ready = SEATS.filter((s) => Object.keys(legalActions(h, s)).length > 0);
+          expect(ready.length).toBeGreaterThan(0);
+          for (const seat of ready) expect(ruleSet.seats).toContain(seat);
+          const seat = ready[Math.floor(rng() * ready.length)];
+          const r = apply(h, randomAction(h, seat, rng)!);
+          duplicatedWinTiles += Math.max(0, r.events.filter((e) => e.type === 'win' && !e.win.selfDraw).length - 1);
+          h = r.state;
+          if (h.phase === 'play') expect(tileTotal(h)).toBe(72 + duplicatedWinTiles - (xueliu ? h.wins.length : 0));
+        }
+        const result = h.result!;
+        expect(result.deltas.reduce((a, b) => a + b, 0)).toBe(0);
+        for (const seat of SEATS) if (!ruleSet.seats.includes(seat)) expect(result.deltas[seat]).toBe(0);
+        // 血战到底 ends once all but one of the players in play have won.
+        if (!xueliu && result.reason === 'threeWon') expect(result.wins.length).toBe(players - 1);
+        game = recordHand(game, result);
+      }
+      expect(game.totals.reduce((a, b) => a + b, 0)).toBe(0);
+    }
   });
 });

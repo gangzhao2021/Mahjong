@@ -1,4 +1,7 @@
 /** Rule variants (PRD Appendix A.10). Defaults are the confirmed values. */
+import type { Suit } from './tiles';
+import type { Seat } from './types';
+
 export type SwapDirection = 'clockwise' | 'counterClockwise' | 'opposite';
 
 export interface RuleSet {
@@ -32,6 +35,16 @@ export interface RuleSet {
    * Off = 血战到底 (a winner leaves the hand; it ends when three have won).
    */
   xueliu: boolean;
+  /**
+   * Seats in play: all four, or fewer for friends' tables (two players sit opposite).
+   * Empty seats get no tiles, no turns and take no part in payments.
+   */
+  seats: Seat[];
+  /**
+   * Suits in the wall. Two suits (条 and 筒: 两房, 72 tiles) is the usual rule for
+   * three- and two-player tables: with only two suits there is no swap and no void suit.
+   */
+  suits: Suit[];
 }
 
 export const DEFAULT_RULESET: RuleSet = {
@@ -55,7 +68,23 @@ export const DEFAULT_RULESET: RuleSet = {
   dealerRule: 'firstWinner',
   handsPerGame: 4,
   xueliu: false,
+  seats: [0, 1, 2, 3],
+  suits: [0, 1, 2],
 };
+
+/** 三人两房 / 二人两房: the seats in play and the two-suit wall (no swap, no void suit). */
+export function smallTableRules(players: 2 | 3): Pick<RuleSet, 'seats' | 'suits' | 'huanSanZhang'> {
+  return {
+    seats: players === 3 ? [0, 1, 2] : [0, 2],
+    suits: [1, 2],
+    huanSanZhang: { enabled: false, direction: 'random' },
+  };
+}
+
+/** Uses two suits only (两房): no swap and no void suit. */
+export function isTwoSuit(rules: Pick<RuleSet, 'suits'>): boolean {
+  return rules.suits.length < 3;
+}
 
 export function withRules(overrides: Partial<RuleSet>): RuleSet {
   return { ...DEFAULT_RULESET, ...overrides };
