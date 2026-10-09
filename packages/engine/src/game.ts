@@ -23,7 +23,8 @@ export function createGame(config: GameConfig): GameState {
   return {
     config,
     handIndex: 0,
-    dealer: randomInt(createRng(config.seed), 4) as Seat,
+    // The first dealer is drawn among the seats in play.
+    dealer: config.ruleSet.seats[randomInt(createRng(config.seed), config.ruleSet.seats.length)],
     totals: [0, 0, 0, 0],
     results: [],
   };
@@ -55,7 +56,10 @@ export function recordHand(game: GameState, result: HandResult): GameState {
 }
 
 function nextDealer(game: GameState, result: HandResult): Seat {
-  if (game.config.ruleSet.dealerRule === 'rotate') return ((game.dealer + 1) % 4) as Seat;
+  if (game.config.ruleSet.dealerRule === 'rotate') {
+    const seats = game.config.ruleSet.seats;
+    return seats[(seats.indexOf(game.dealer) + 1) % seats.length];
+  }
   return result.wins[0]?.seat ?? game.dealer;
 }
 

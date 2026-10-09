@@ -8,7 +8,9 @@ import { removeTiles, suitOf, TILE_KINDS, toCounts, winningTiles, HIDDEN_TILE, t
 
 /** Copies of each tile kind not visible to this seat: 4 minus own hand, every meld, every pond and revealed hands. */
 export function unseenCounts(view: HandView): number[] {
-  const left = new Array<number>(TILE_KINDS).fill(4);
+  // A two-suit wall (两房) has no tiles of the missing suit at all.
+  const inWall = view.ruleSet.suits ?? [0, 1, 2];
+  const left = Array.from({ length: TILE_KINDS }, (_, t): number => (inWall.includes(suitOf(t)) ? 4 : 0));
   const see = (t: Tile, n = 1) => {
     if (t >= 0 && t !== HIDDEN_TILE) left[t] = Math.max(0, left[t] - n);
   };

@@ -90,6 +90,13 @@ export const RULES: RuleSection[] = [
     },
   },
   {
+    title: { zh: '三人两房 / 二人两房（好友房）', en: 'Three or two players (friend rooms)' },
+    body: {
+      zh: '好友房人不够时可以不要 AI，就几个人打：只用条和筒两门共 72 张，不换三张、不定缺（只有两门，本来就满足胡牌条件），其余规则不变。血战到底时，除了一家以外都胡了就结束。',
+      en: 'A friend room short of players can play without AI: only bamboo and dots (72 tiles), no swap and no void suit (two suits already meet the winning rule); everything else is the same. In bloody battle the hand ends once all but one player have won.',
+    },
+  },
+  {
     title: { zh: '过手胡', en: 'Passed win' },
     body: {
       zh: '能胡却选择了「过」，在自己下次摸牌前，不能再胡别人打出的牌（自摸可以）。',

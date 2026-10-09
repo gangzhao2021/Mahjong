@@ -31,7 +31,7 @@ import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
 import type { LlmProvider } from './llm/provider';
 import { after, type Cancel, type Pacer } from './pacer';
-import { AiSeat, HumanSeat, type SeatController } from './seats';
+import { AiSeat, EmptySeat, HumanSeat, type SeatController } from './seats';
 import type { HandLog, HandLogStore } from './store';
 import { TableTalk } from './talk';
 
@@ -69,7 +69,7 @@ export interface RoomOptions {
   human: { playerId: string; name: string; avatar: string };
   /** Friend room: the other real players and their seats (the host is `human`). */
   guests?: { seat: Seat; playerId: string; name: string; avatar: string }[];
-  /** AI opponents, filling the remaining seats in seat order. */
+  /** AI opponents, filling the remaining seats in play, in seat order. */
   ai: AiSeatSpec[];
   store: HandLogStore;
   rng: Rng;
@@ -160,6 +160,7 @@ export class Room {
       if (seat === opts.humanSeat) return this.human;
       const guest = guests.get(seat);
       if (guest) return guest;
+      if (!this.game.config.ruleSet.seats.includes(seat)) return new EmptySeat(seat);
       const spec = ai.shift()!;
       const { character, personality } = spec;
       speakers.push({ seat, character, personality, memory: spec.memory ?? null });

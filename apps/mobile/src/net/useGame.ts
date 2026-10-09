@@ -87,7 +87,7 @@ export interface GameApi extends GameState {
   createFriendRoom(handsPerGame: number, xueliu: boolean): void;
   joinFriendRoom(code: string): void;
   leaveFriendRoom(): void;
-  startFriendRoom(): void;
+  startFriendRoom(fillWithAi: boolean): void;
   skipToResults(): void;
   nextHand(): void;
   leaveGame(): void;
@@ -306,7 +306,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     createFriendRoom: useCallback((handsPerGame, xueliu) => send({ type: 'createFriendRoom', handsPerGame, xueliu }), [send]),
     joinFriendRoom: useCallback((code) => send({ type: 'joinFriendRoom', code }), [send]),
     leaveFriendRoom: useCallback(() => send({ type: 'leaveFriendRoom' }), [send]),
-    startFriendRoom: useCallback(() => send({ type: 'startFriendRoom' }), [send]),
+    startFriendRoom: useCallback((fillWithAi) => send({ type: 'startFriendRoom', fillWithAi }), [send]),
     skipToResults: useCallback(() => send({ type: 'skipToResults' }), [send]),
     nextHand: useCallback(() => send({ type: 'nextHand' }), [send]),
     leaveGame: useCallback(() => send({ type: 'leaveGame' }), [send]),

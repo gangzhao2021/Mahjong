@@ -4,7 +4,7 @@
  * A future remote human seat in real multiplayer is just another controller.
  */
 import { chooseAction, type Rng, type SkillLevel } from '@mahjong/ai-play';
-import type { Action, GameEvent, HandView } from '@mahjong/engine';
+import type { Action, GameEvent, HandView, Seat } from '@mahjong/engine';
 import type { SeatInfo, ServerMessage, TableSnapshot } from '@mahjong/protocol';
 import type { WebSocket } from 'ws';
 
@@ -74,6 +74,16 @@ export class AiSeat implements SeatController {
   dispose(): void {
     this.cancel();
   }
+}
+
+/** A seat nobody sits in (two- or three-player tables): it never has a decision to make. */
+export class EmptySeat implements SeatController {
+  readonly info: SeatInfo;
+  constructor(seat: Seat) {
+    this.info = { seat, name: '', avatar: '', isHuman: false, empty: true };
+  }
+  update(): void {}
+  dispose(): void {}
 }
 
 /** The local human. Decisions arrive over the socket; timers and 托管 live in the room. */

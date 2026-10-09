@@ -152,6 +152,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const backTile = Math.round(smallTile * 0.8);
   const opponent = (side: Side) => {
     const seat = seatAt(side);
+    // Two- and three-player tables leave seats empty: nothing to draw there.
+    if (table.seats[seat]?.empty) return <View style={styles.emptySeat} />;
     const p = view.players[seat];
     const card = (
       <SeatCard
@@ -533,6 +535,7 @@ const styles = StyleSheet.create({
   // userSelect: keep swipes on web from selecting tile text.
   stage: { paddingHorizontal: 12, paddingVertical: 6, userSelect: 'none', transformOrigin: 'top left' },
   sideSeat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  emptySeat: { minWidth: 1 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', minHeight: 48 },
   menu: { flexDirection: 'row', gap: 6, flexShrink: 0 },
   topSeat: { flex: 1, alignItems: 'center', minWidth: 0 },

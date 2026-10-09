@@ -86,7 +86,7 @@ export function TileTracker({ view, onClose }: { view: HandView; onClose(): void
     <Pressable style={styles.trackerBackdrop} onPress={onClose} accessibilityRole="button">
       <View style={styles.tracker}>
         <Text style={styles.trackerTitle}>{T.trackerTitle}</Text>
-        {[0, 1, 2].map((suit) => (
+        {(view.ruleSet.suits ?? [0, 1, 2]).map((suit) => (
           <View key={suit} style={[styles.trackerRow, suit === voidSuit && styles.gone]}>
             {Array.from({ length: 9 }, (_, r) => {
               const tile = suit * 9 + r;

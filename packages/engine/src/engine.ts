@@ -7,7 +7,7 @@
  */
 import { hasVoidTiles, isWinningHand, winningTiles } from './hands';
 import { createRng, randomInt, shuffle } from './rng';
-import type { SwapDirection } from './ruleset';
+import { isTwoSuit, type SwapDirection } from './ruleset';
 import { NO_SITUATION, scoreWin, type WinContext } from './scoring';
 import { countOf, fullTileSet, removeTiles, sortTiles, SUITS, suitOf, type Suit, type Tile } from './tiles';
 import {
@@ -66,7 +66,7 @@ export const nextSeat = (seat: Seat, step = 1): Seat => ((seat + step) % 4) as S
 export const seatsAfter = (seat: Seat): Seat[] => [nextSeat(seat, 1), nextSeat(seat, 2), nextSeat(seat, 3)];
 
 /** Still in the hand: has not won yet, or anyone at all in 血流成河 (winners play on). */
-export const isActive = (s: HandState, seat: Seat): boolean => s.ruleSet.xueliu || s.players[seat].won === null;
+export const isActive = (s: HandState, seat: Seat): boolean => s.ruleSet.seats.includes(seat) && (s.ruleSet.xueliu || s.players[seat].won === null);
 
 /** 血流成河: a player who has won plays on with a locked hand. */
 const lockedAfterWin = (s: HandState, seat: Seat): boolean => s.ruleSet.xueliu && s.players[seat].won !== null;
@@ -74,26 +74,33 @@ export const activeSeats = (s: HandState): Seat[] => SEATS.filter((seat) => isAc
 
 export function createHand(config: HandConfig): HandState {
   const rng = createRng(config.seed);
-  const wall = shuffle(fullTileSet(), rng);
+  const { seats, suits } = config.ruleSet;
+  const wall = shuffle(
+    fullTileSet().filter((t) => suits.includes(suitOf(t))),
+    rng,
+  );
   const players = [emptyPlayer(), emptyPlayer(), emptyPlayer(), emptyPlayer()] as HandState['players'];
 
+  // Deal from the dealer round the seats in play; empty seats get nothing.
   for (let i = 0; i < 4; i++) {
     const seat = nextSeat(config.dealer, i);
-    players[seat].hand = wall.splice(0, HAND_SIZE);
+    if (seats.includes(seat)) players[seat].hand = wall.splice(0, HAND_SIZE);
   }
   players[config.dealer].hand.push(wall.shift()!);
   for (const p of players) p.hand = sortTiles(p.hand);
 
+  // 两房 (two suits): no swap and no void suit; play starts at once.
+  const twoSuit = isTwoSuit(config.ruleSet);
   const swap = config.ruleSet.huanSanZhang;
   let swapDirection: SwapDirection | null = null;
-  if (swap.enabled) {
+  if (swap.enabled && !twoSuit) {
     swapDirection = swap.direction === 'random' ? SWAP_DIRECTIONS[randomInt(rng, 3)] : swap.direction;
   }
 
   return {
     ...config,
-    phase: swap.enabled ? 'swap' : 'dingque',
-    stage: { kind: 'none' },
+    phase: twoSuit ? 'play' : swapDirection ? 'swap' : 'dingque',
+    stage: twoSuit ? { kind: 'turn', seat: config.dealer, drawn: null, afterKong: false, lastTile: false, mayDeclare: true } : { kind: 'none' },
     wall,
     players,
     swapDirection,
