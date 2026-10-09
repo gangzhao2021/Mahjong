@@ -46,10 +46,18 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const settings = useSettings();
   // Big screens (desktop browsers, tablets) get the phone layout scaled up as a whole, so tiles,
   // seats, buttons and text keep their proportions instead of shrinking into the corners.
-  const scale = Math.max(1, Math.min(window.width / DESIGN_WIDTH, window.height / DESIGN_HEIGHT));
+  // Portrait phones get their own layout: side players shrink to narrow cards and the hand takes the full width.
+  const portrait = window.height > window.width;
+  const design = portrait ? PORTRAIT_DESIGN : LANDSCAPE_DESIGN;
+  const scale = Math.max(1, Math.min(window.width / design.width, window.height / design.height));
   const width = window.width / scale;
   const height = window.height / scale;
-  const smallTile = Math.max(16, Math.min(Math.round(30 * settings.tileScale), Math.floor((height / 18) * settings.tileScale)));
+  const smallTile = Math.max(
+    16,
+    Math.min(Math.round(30 * settings.tileScale), Math.floor((portrait ? width / 19 : height / 18) * settings.tileScale)),
+  );
+  const pondRow = portrait ? POND_ROW_PORTRAIT : POND_ROW;
+  const pondColumn = portrait ? POND_COLUMN_PORTRAIT : POND_COLUMN;
   const seatAt = (side: Side) => ((view.seat + side) % 4) as Seat;
   const sideOf = (seat: Seat) => ((seat - view.seat + 4) % 4) as Side;
 
@@ -76,9 +84,11 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const iWon = me.won !== null;
   const drawn = stage.kind === 'turn' && stage.seat === view.seat ? stage.drawn : null;
   // Size my tiles so the seat card, melds (drawn at 3/4 size) and the whole hand fit on one row.
+  // In portrait the seat card and melds sit above the hand, which gets the whole width.
   const meldTiles = me.melds.reduce((n, m) => n + (m.type === 'pong' ? 3 : 4), 0);
-  const handSlots = me.handCount + (drawn !== null ? 0.4 : 0) + meldTiles * 0.75 + me.melds.length * 0.2 + 0.5;
-  const handTile = Math.max(24, Math.min(Math.round(54 * settings.tileScale), Math.floor((width - 24 - MY_SEAT_WIDTH) / handSlots)));
+  const handSlots = me.handCount + (drawn !== null ? 0.4 : 0) + (portrait ? 0 : meldTiles * 0.75 + me.melds.length * 0.2) + 0.5;
+  const handRoom = width - 24 - (portrait ? 0 : MY_SEAT_WIDTH);
+  const handTile = Math.max(portrait ? 20 : 24, Math.min(Math.round(54 * settings.tileScale), Math.floor(handRoom / handSlots)));
 
   // Selections only make sense for the hand they were made on.
   const handKey = `${table.handIndex}:${view.phase}:${(me.hand ?? []).join(',')}`;
@@ -155,8 +165,9 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
     // Two- and three-player tables leave seats empty: nothing to draw there.
     if (table.seats[seat]?.empty) return <View style={styles.emptySeat} />;
     const p = view.players[seat];
-    const card = (
+    const seatCard = (compact?: boolean) => (
       <SeatCard
+        compact={compact}
         info={table.seats[seat]}
         score={scoreOf(seat)}
         voidSuit={p.voidSuit}
@@ -167,7 +178,25 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         handCount={p.handCount}
       />
     );
+    const card = seatCard();
     // Face-down tiles sit between the player and the centre of the table.
+    if (portrait && side !== 2) {
+      // Portrait sides: a narrow card (tiles left are on it), melds and any revealed hand underneath.
+      const tiny = Math.round(smallTile * 0.6);
+      return (
+        <View style={[styles.opponent, styles.sidePortrait]}>
+          {seatCard(true)}
+          <Melds melds={p.melds} tileWidth={tiny} />
+          {p.hand && (
+            <View style={styles.revealed}>
+              {p.hand.map((t, i) => (
+                <Tile key={i} tile={t} width={tiny} />
+              ))}
+            </View>
+          )}
+        </View>
+      );
+    }
     const backs = p.hand ? null : <ConcealedTiles count={p.handCount} width={side === 2 ? backTile : Math.round(backTile * 0.75)} vertical={side !== 2} />;
     const revealed = p.hand && (
       <View style={styles.revealed}>
@@ -209,8 +238,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
     <Felt>
       <View style={[styles.stage, { width, height, transform: [{ scale }] }]}>
       {/* Top row: menu, opposite player, hand info */}
-      <View style={styles.topRow}>
-        <View style={styles.menu}>
+      <View style={[styles.topRow, portrait && styles.topRowPortrait]}>
+        <View style={[styles.menu, portrait && styles.menuPortrait]}>
           <Btn label={T.leave} onPress={() => (table.gameOver ? game.leaveGame() : setConfirmLeave(true))} />
           <Btn label={T.autoPlay} primary={table.autoPlay} onPress={() => game.setAutoPlay(!table.autoPlay)} />
           <Btn label={`💬 ${T.chat}${unreadChat ? ` · ${unreadChat}` : ''}`} primary={unreadChat > 0} onPress={() => showChat(true)} />
@@ -218,8 +247,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           <Btn label={`🀄 ${T.tracker}`} primary={trackerOpen} onPress={() => setTrackerOpen(!trackerOpen)} />
           <Btn label={`⚡ ${T.autoMenu}`} primary={auto.win || auto.noClaims || auto.tsumogiri} onPress={() => setAutoOpen(!autoOpen)} />
         </View>
-        <View style={styles.topSeat}>{opponent(2)}</View>
-        <View style={styles.stake}>
+        {!portrait && <View style={styles.topSeat}>{opponent(2)}</View>}
+        <View style={[styles.stake, portrait && styles.stakePortrait]}>
           <Text style={styles.handInfo}>
             {T.modeName(view.ruleSet.xueliu)} · {T.hand(table.handIndex, table.handsPerGame)}
           </Text>
@@ -231,22 +260,24 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
       </View>
 
+      {portrait && <View style={styles.topSeatPortrait}>{opponent(2)}</View>}
+
       {/* Middle: side players and the four ponds around the centre */}
       <View style={styles.middle}>
         {opponent(3)}
         <View style={styles.center}>
-          <Pond side={2} discards={view.players[seatAt(2)].discards} tileWidth={smallTile} perLine={POND_ROW} lastDiscard={lastDiscarder === seatAt(2)} />
+          <Pond side={2} discards={view.players[seatAt(2)].discards} tileWidth={smallTile} perLine={pondRow} lastDiscard={lastDiscarder === seatAt(2)} />
           <View style={styles.centerRow}>
-            <Pond side={3} discards={view.players[seatAt(3)].discards} tileWidth={smallTile} perLine={POND_COLUMN} lastDiscard={lastDiscarder === seatAt(3)} />
+            <Pond side={3} discards={view.players[seatAt(3)].discards} tileWidth={smallTile} perLine={pondColumn} lastDiscard={lastDiscarder === seatAt(3)} />
             <Compass
               winds={([0, 1, 2, 3] as Side[]).map(windOf)}
               active={activeSeat !== null ? sideOf(activeSeat) : null}
               wallCount={`${T.wall} ${view.wallCount}`}
               timer={myTurnTimer}
             />
-            <Pond side={1} discards={view.players[seatAt(1)].discards} tileWidth={smallTile} perLine={POND_COLUMN} lastDiscard={lastDiscarder === seatAt(1)} />
+            <Pond side={1} discards={view.players[seatAt(1)].discards} tileWidth={smallTile} perLine={pondColumn} lastDiscard={lastDiscarder === seatAt(1)} />
           </View>
-          <Pond side={0} discards={me.discards} tileWidth={smallTile} perLine={POND_ROW} lastDiscard={lastDiscarder === view.seat} />
+          <Pond side={0} discards={me.discards} tileWidth={smallTile} perLine={pondRow} lastDiscard={lastDiscarder === view.seat} />
         </View>
         {opponent(1)}
       </View>
@@ -276,7 +307,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           )}
         </View>
         </View>
-        <View style={styles.myRow}>
+        <View style={[styles.myRow, portrait && styles.myRowPortrait]}>
+          <View style={[styles.mySeatRow, portrait && styles.mySeatRowPortrait]}>
           <View style={styles.mySeat}>
             <SeatCard
               info={table.seats[view.seat]}
@@ -290,6 +322,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             />
           </View>
           <Melds melds={me.melds} tileWidth={Math.round(handTile * 0.75)} />
+          </View>
           <PlayerHand
             hand={me.hand ?? []}
             drawn={drawn}
@@ -305,7 +338,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
       </View>
 
-      <SpeechBubbles chat={game.chat} catalog={game.catalog} positionOf={(seat) => BUBBLE_POSITION[sideOf(seat)]} />
+      <SpeechBubbles chat={game.chat} catalog={game.catalog} positionOf={(seat) => (portrait ? BUBBLE_POSITION_PORTRAIT : BUBBLE_POSITION)[sideOf(seat)]} />
 
       {/* The tile just discarded, shown large next to the player who let it go */}
       {spotlight && (
@@ -500,11 +533,15 @@ function calloutText(e: GameEvent): string | null {
 }
 
 /** Screen size the table is laid out at; bigger screens scale it up. Roomier than a phone so desktops don't feel cramped. */
-const DESIGN_WIDTH = 1200;
-const DESIGN_HEIGHT = 560;
+const LANDSCAPE_DESIGN = { width: 1200, height: 560 };
+/** Portrait: a tall phone; taller screens get the same layout scaled up. */
+const PORTRAIT_DESIGN = { width: 430, height: 860 };
 /** Discards per line: across for the top and bottom ponds, down for the side ponds (about the compass's height). */
 const POND_ROW = 12;
 const POND_COLUMN = 5;
+/** Portrait is narrow and tall: shorter rows, longer side columns. */
+const POND_ROW_PORTRAIT = 8;
+const POND_COLUMN_PORTRAIT = 10;
 /** Room kept for my seat card left of the hand. */
 const MY_SEAT_WIDTH = 190;
 
@@ -514,6 +551,13 @@ const BUBBLE_POSITION = {
   1: { right: 190, top: '26%' },
   2: { top: 56, left: '56%' },
   3: { left: 190, top: '26%' },
+} as const;
+
+const BUBBLE_POSITION_PORTRAIT = {
+  0: { left: 16, bottom: 170 },
+  1: { right: 76, top: '30%' },
+  2: { top: 150, left: '30%' },
+  3: { left: 76, top: '30%' },
 } as const;
 
 /** Between the discarder's pond and the compass. */
@@ -539,6 +583,11 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', minHeight: 48 },
   menu: { flexDirection: 'row', gap: 6, flexShrink: 0 },
   topSeat: { flex: 1, alignItems: 'center', minWidth: 0 },
+  topRowPortrait: { flexDirection: 'column', alignItems: 'stretch', gap: 4 },
+  menuPortrait: { flexWrap: 'wrap', flexShrink: 1 },
+  stakePortrait: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, marginTop: 0, alignSelf: 'flex-start' },
+  topSeatPortrait: { alignItems: 'center', marginTop: 4 },
+  sidePortrait: { width: 64 },
   handInfo: { color: '#c8e6c9', fontSize: 12 },
   stake: { alignItems: 'flex-end', marginTop: 4, flexShrink: 0 },
   coinLine: { color: '#ffe082', fontSize: 12, fontWeight: '700' },
@@ -574,6 +623,9 @@ const styles = StyleSheet.create({
   },
   tipText: { flexShrink: 1, color: '#4e342e', fontSize: 14, fontWeight: '700' },
   myRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  myRowPortrait: { flexDirection: 'column', alignItems: 'flex-start', gap: 4 },
+  mySeatRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, flexShrink: 0 },
+  mySeatRowPortrait: { flexWrap: 'wrap', flexShrink: 1 },
   mySeat: { maxWidth: MY_SEAT_WIDTH - 10, flexShrink: 0 },
   callout: {
     position: 'absolute',

@@ -121,7 +121,8 @@ const zh = {
   nextHand: '下一局',
   newGame: '再来一场',
   backHome: '返回大厅',
-  threeWon: '三家胡牌',
+  /** The hand ended because all but one player won (three of four, two of three, one of two). */
+  allButOneWon: (players: number): string => (players === 4 ? '三家胡牌' : players === 3 ? '两家胡牌' : '一家胡牌'),
   wallExhausted: '流局',
   huaZhu: '花猪',
   ready: '听牌',
@@ -526,7 +527,7 @@ const en: Strings = {
   nextHand: 'Next hand',
   newGame: 'Play again',
   backHome: 'Back to lobby',
-  threeWon: 'Three players won',
+  allButOneWon: (players: number) => (players === 4 ? 'Three players won' : players === 3 ? 'Two players won' : 'A player won'),
   wallExhausted: 'Wall exhausted',
   huaZhu: 'Flower Pig',
   ready: 'Ready',

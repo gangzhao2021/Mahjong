@@ -3,7 +3,7 @@
     "name": "四川麻将",
     "slug": "sichuan-mahjong",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {

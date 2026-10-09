@@ -1,7 +1,7 @@
 /** Lobby: coins, daily reward, table selection and private rooms (PRD §10–§13, §24). */
 import type { AccountSummary, FriendRoomInfo, GameOptions, PrivateRules, ServerInfo } from '@mahjong/protocol';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { formStyles, Sheet } from '../components/Sheet';
@@ -51,6 +51,8 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   const limit = account.playLimit;
   const blocked = limit !== null && limit.until === null;
   const compact = width < 700;
+  // Portrait phones stack the quick start above the tables.
+  const portrait = height > width;
 
   // Quick start: new players go to practice; others to the highest table they can comfortably afford (10× the entry).
   // Quick start goes back to the table played last, or the closest cheaper one the player can still afford.
@@ -68,8 +70,115 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   };
   const fanTile = Math.round(Math.min(height * 0.15, 72));
   // Cards size to the screen but stop growing on big monitors, so they never turn into empty slabs.
-  const cardHeight = Math.round(Math.max(64, Math.min(height * 0.17, 128)));
+  const cardHeight = Math.round(Math.max(64, Math.min((portrait ? width * 0.4 : height) * 0.17, 128)));
   const chipSize = Math.round(Math.min(cardHeight * 0.62, 60));
+
+  const body = (
+    <>
+    {/* Left: the game's face and the one-tap way in */}
+    <View style={[styles.hero, compact && styles.heroCompact, portrait && styles.heroPortrait]}>
+      {/* The decorative fan gives way on short screens when the reminder takes a row */}
+      {(!compact || portrait) && !(remindBind && height < 480) && <TileFan width={portrait ? Math.round(width * 0.12) : fanTile} />}
+      <Text style={styles.brand}>{T.brand}</Text>
+      <Text style={styles.brandSub}>{T.brandSub}</Text>
+      <Pressable
+        accessibilityRole="button"
+        disabled={!online || blocked}
+        onPress={() => play(quick.id)}
+        style={({ pressed }) => [styles.quick, (!online || blocked) && styles.disabled, pressed && styles.pressed]}
+      >
+        <Text style={styles.quickText}>▶ {T.quickStart}</Text>
+        <Text style={styles.quickSub}>
+          {tableName(quick)} · {quick.multiplier === 0 ? T.noCoins : T.baseScoreN(quick.baseScore)}
+        </Text>
+      </Pressable>
+      <View style={styles.chips}>
+        <Pressable onPress={onOpenTutorial} style={[styles.chip, tutorialDone === 0 && styles.chipHot]} accessibilityRole="button">
+          <Text style={[styles.chipText, tutorialDone === 0 && styles.chipHotText]}>📖 {T.tutorialProgress(Math.max(0, tutorialDone), LESSON_COUNT)}</Text>
+        </Pressable>
+        <Pressable onPress={onOpenRules} style={styles.chip} accessibilityRole="button">
+          <Text style={styles.chipText}>📘 {T.rulesPage.entry}</Text>
+        </Pressable>
+      </View>
+    </View>
+
+    {/* Right: every table, filling the space */}
+    <View style={[styles.tablesArea, portrait && styles.tablesPortrait]}>
+      <Text style={styles.heading}>{T.tables}</Text>
+      <View style={styles.grid}>
+        {info.tables.map((t) => {
+          const affordable = account.balance >= t.minCoins;
+          const tier = TIER[t.id] ?? TIER_FALLBACK;
+          return (
+            <Pressable
+              key={t.id}
+              accessibilityRole="button"
+              disabled={!online || blocked || !affordable}
+              onPress={() => play(t.id)}
+              style={({ pressed }) => [styles.card, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
+            >
+              {t.id === quick.id && (
+                <Text style={[styles.badge, { backgroundColor: tier.fill, color: tier.ink }]} numberOfLines={1}>
+                  {T.recommended}
+                </Text>
+              )}
+              {/* Poker chip carrying the base score; the practice table has none, so it shows the table's initial */}
+              <View
+                style={[
+                  styles.stake,
+                  { width: chipSize, height: chipSize, borderRadius: chipSize / 2, backgroundColor: tier.fill, borderColor: tier.rim },
+                ]}
+              >
+                <Text style={[styles.stakeLabel, { color: tier.ink, fontSize: Math.round(chipSize * 0.32) }]} numberOfLines={1}>
+                  {t.multiplier === 0 ? tableName(t).slice(0, 1) : t.baseScore}
+                </Text>
+              </View>
+              <View style={styles.cardBody}>
+                <Text style={styles.cardName} numberOfLines={1}>
+                  {tableName(t)}
+                </Text>
+                <Text style={[styles.cardInfo, !affordable && styles.short]} numberOfLines={1}>
+                  {!affordable
+                    ? `🔒 ${T.needMore(t.minCoins - account.balance)}`
+                    : t.multiplier === 0
+                      ? T.noCoins
+                      : `${T.baseScoreN(t.baseScore)} · ${T.minCoinsN(t.minCoins)}`}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      {/* Two ways to set up a table yourself: alone with AI, or with friends */}
+      <View style={styles.roomRow}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!online || blocked}
+          onPress={() => setPrivateOpen(true)}
+          style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
+        >
+          <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
+          <Text style={styles.privateInfo} numberOfLines={1}>
+            {T.privateRoomHint}
+          </Text>
+          <Text style={styles.privateArrow}>›</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!online || blocked}
+          onPress={() => setFriendOpen(true)}
+          style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
+        >
+          <Text style={styles.privateName}>👥 {T.friend.entry}</Text>
+          <Text style={styles.privateInfo} numberOfLines={1}>
+            {T.friend.hint}
+          </Text>
+          <Text style={styles.privateArrow}>›</Text>
+        </Pressable>
+      </View>
+    </View>
+    </>
+  );
 
   return (
     <Felt style={styles.root}>
@@ -107,110 +216,14 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </Text>
       )}
 
-      <View style={[styles.body, styles.capped]}>
-        {/* Left: the game's face and the one-tap way in */}
-        <View style={[styles.hero, compact && styles.heroCompact]}>
-          {/* The decorative fan gives way on short screens when the reminder takes a row */}
-          {!compact && !(remindBind && height < 480) && <TileFan width={fanTile} />}
-          <Text style={styles.brand}>{T.brand}</Text>
-          <Text style={styles.brandSub}>{T.brandSub}</Text>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!online || blocked}
-            onPress={() => play(quick.id)}
-            style={({ pressed }) => [styles.quick, (!online || blocked) && styles.disabled, pressed && styles.pressed]}
-          >
-            <Text style={styles.quickText}>▶ {T.quickStart}</Text>
-            <Text style={styles.quickSub}>
-              {tableName(quick)} · {quick.multiplier === 0 ? T.noCoins : T.baseScoreN(quick.baseScore)}
-            </Text>
-          </Pressable>
-          <View style={styles.chips}>
-            <Pressable onPress={onOpenTutorial} style={[styles.chip, tutorialDone === 0 && styles.chipHot]} accessibilityRole="button">
-              <Text style={[styles.chipText, tutorialDone === 0 && styles.chipHotText]}>📖 {T.tutorialProgress(Math.max(0, tutorialDone), LESSON_COUNT)}</Text>
-            </Pressable>
-            <Pressable onPress={onOpenRules} style={styles.chip} accessibilityRole="button">
-              <Text style={styles.chipText}>📘 {T.rulesPage.entry}</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Right: every table, filling the space */}
-        <View style={styles.tablesArea}>
-          <Text style={styles.heading}>{T.tables}</Text>
-          <View style={styles.grid}>
-            {info.tables.map((t) => {
-              const affordable = account.balance >= t.minCoins;
-              const tier = TIER[t.id] ?? TIER_FALLBACK;
-              return (
-                <Pressable
-                  key={t.id}
-                  accessibilityRole="button"
-                  disabled={!online || blocked || !affordable}
-                  onPress={() => play(t.id)}
-                  style={({ pressed }) => [styles.card, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
-                >
-                  {t.id === quick.id && (
-                    <Text style={[styles.badge, { backgroundColor: tier.fill, color: tier.ink }]} numberOfLines={1}>
-                      {T.recommended}
-                    </Text>
-                  )}
-                  {/* Poker chip carrying the base score; the practice table has none, so it shows the table's initial */}
-                  <View
-                    style={[
-                      styles.stake,
-                      { width: chipSize, height: chipSize, borderRadius: chipSize / 2, backgroundColor: tier.fill, borderColor: tier.rim },
-                    ]}
-                  >
-                    <Text style={[styles.stakeLabel, { color: tier.ink, fontSize: Math.round(chipSize * 0.32) }]} numberOfLines={1}>
-                      {t.multiplier === 0 ? tableName(t).slice(0, 1) : t.baseScore}
-                    </Text>
-                  </View>
-                  <View style={styles.cardBody}>
-                    <Text style={styles.cardName} numberOfLines={1}>
-                      {tableName(t)}
-                    </Text>
-                    <Text style={[styles.cardInfo, !affordable && styles.short]} numberOfLines={1}>
-                      {!affordable
-                        ? `🔒 ${T.needMore(t.minCoins - account.balance)}`
-                        : t.multiplier === 0
-                          ? T.noCoins
-                          : `${T.baseScoreN(t.baseScore)} · ${T.minCoinsN(t.minCoins)}`}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-          {/* Two ways to set up a table yourself: alone with AI, or with friends */}
-          <View style={styles.roomRow}>
-            <Pressable
-              accessibilityRole="button"
-              disabled={!online || blocked}
-              onPress={() => setPrivateOpen(true)}
-              style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
-            >
-              <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
-              <Text style={styles.privateInfo} numberOfLines={1}>
-                {T.privateRoomHint}
-              </Text>
-              <Text style={styles.privateArrow}>›</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={!online || blocked}
-              onPress={() => setFriendOpen(true)}
-              style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
-            >
-              <Text style={styles.privateName}>👥 {T.friend.entry}</Text>
-              <Text style={styles.privateInfo} numberOfLines={1}>
-                {T.friend.hint}
-              </Text>
-              <Text style={styles.privateArrow}>›</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
+      {/* Portrait phones scroll: the quick start sits above the tables */}
+      {portrait ? (
+        <ScrollView style={styles.scroll} contentContainerStyle={[styles.capped, styles.bodyPortrait]}>
+          {body}
+        </ScrollView>
+      ) : (
+        <View style={[styles.body, styles.capped]}>{body}</View>
+      )}
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {friendRoom ? (
@@ -331,6 +344,10 @@ const styles = StyleSheet.create({
   body: { flex: 1, flexDirection: 'row', gap: 24, minHeight: 0 },
   hero: { flex: 0.85, alignItems: 'center', justifyContent: 'center', gap: 6 },
   heroCompact: { flex: 0.75 },
+  scroll: { flex: 1 },
+  bodyPortrait: { flexDirection: 'column', gap: 16, paddingBottom: 16 },
+  heroPortrait: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingTop: 8 },
+  tablesPortrait: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', justifyContent: 'flex-start' },
   brand: {
     color: '#fff8e1',
     fontSize: 30,
