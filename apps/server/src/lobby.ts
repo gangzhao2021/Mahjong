@@ -45,6 +45,8 @@ interface SavedGame {
   room: RoomCheckpoint;
   plan: GamePlan;
   language?: Language;
+  /** Friend rooms: each friend's plan (play limits) by seat; the checkpoint row belongs to the host. */
+  guestPlans?: { seat: Seat; plan: GamePlan }[];
 }
 
 export class Lobby {
@@ -413,14 +415,14 @@ export class Lobby {
         },
       },
       onHandEnd: (r, handIndex, result) => this.track(this.afterHand(player, r, plan, handIndex, result)),
-      // Friend rooms are not checkpointed (MVP): a restart ends them.
-      onChange: (r) => (r.multiplayer ? undefined : this.scheduleCheckpoint(player.id, r, plan, language)),
+      // A friend room is checkpointed under the host, with each friend's seat and plan.
+      onChange: (r) => this.scheduleCheckpoint(player.id, r, plan, language, guests.map((g) => ({ seat: g.seat, plan: g.plan }))),
       onClosed: (r) => {
         for (const id of [player.id, ...guests.map((g) => g.player.id)]) {
           if (this.rooms.get(id) === r) this.rooms.delete(id);
           this.clearLimit(id);
         }
-        if (!this.stopping && !r.multiplayer) this.dropCheckpoint(player.id, r.id);
+        if (!this.stopping) this.dropCheckpoint(player.id, r.id);
       },
     });
     this.rooms.set(player.id, room);
@@ -436,14 +438,14 @@ export class Lobby {
   // Restart safety: in-progress games are checkpointed and restored on start.
   // ---------------------------------------------------------------------------
 
-  private scheduleCheckpoint(playerId: string, room: Room, plan: GamePlan, language: Language): void {
+  private scheduleCheckpoint(playerId: string, room: Room, plan: GamePlan, language: Language, guestPlans: SavedGame['guestPlans'] = []): void {
     if (this.saveTimers.has(playerId)) return;
     const write = async () => {
       this.saveTimers.delete(playerId);
       if (room.isClosed && !this.stopping) return;
       // A finished game (settled within the debounce window) has nothing to resume.
       if (room.gameOver) return void (await this.s.db.query('DELETE FROM active_games WHERE player_id = $1 AND game_id = $2', [playerId, room.id]).catch(() => undefined));
-      const saved: SavedGame = { room: room.checkpoint(), plan, language };
+      const saved: SavedGame = { room: room.checkpoint(), plan, language, guestPlans };
       await this.s.db
         .query(
           `INSERT INTO active_games (player_id, game_id, state, updated_at) VALUES ($1, $2, $3, now())
@@ -498,16 +500,26 @@ export class Lobby {
       if (!character || !personality) return false; // deleted by an admin since
       ai.push({ character, personality, skill: a.skill });
     }
-    const memories = await this.loadMemories(playerId, ai.map((a) => a.character.id));
-    for (const a of ai) a.memory = memories.get(a.character.id) ?? null;
+    // Friend rooms bring their friends back to their seats (no AI memory there).
+    const guests: { seat: Seat; player: PlayerRow; plan: GamePlan }[] = [];
+    for (const g of saved.room.guests ?? []) {
+      const guest = await this.s.accounts.get(g.playerId);
+      const plan = saved.guestPlans?.find((p) => p.seat === g.seat)?.plan ?? saved.plan;
+      if (!guest) return false; // account deleted since: the table can't be rebuilt as it was
+      guests.push({ seat: g.seat, player: guest, plan });
+    }
+    if (!guests.length) {
+      const memories = await this.loadMemories(playerId, ai.map((a) => a.character.id));
+      for (const a of ai) a.memory = memories.get(a.character.id) ?? null;
+    }
     const [{ total }] = await this.s.db.query<{ total: string }>(
       "SELECT COALESCE(sum(amount), 0) AS total FROM ledger WHERE player_id = $1 AND type = 'handSettlement' AND ref LIKE $2",
       [playerId, `${saved.room.gameId}:%`],
     );
-    const room = this.buildRoom(player, saved.plan, ai, saved.language ?? 'zh', { checkpoint: saved.room, coinChange: Number(total) });
+    const room = this.buildRoom(player, saved.plan, ai, saved.language ?? 'zh', { checkpoint: saved.room, coinChange: Number(total) }, guests);
     // The server may have stopped before the last hand was settled; settlement is idempotent.
     if (room.handEnded) {
-      const settled = this.settle(playerId, room, saved.plan, room.currentHandIndex, room.lastResult!);
+      const settled = room.multiplayer ? this.afterFriendHand(room, room.lastResult!) : this.settle(playerId, room, saved.plan, room.currentHandIndex, room.lastResult!);
       this.track(settled);
       if (room.gameOver) {
         await settled;
