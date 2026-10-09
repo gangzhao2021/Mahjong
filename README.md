@@ -15,7 +15,7 @@ packages/dialogue   对话引擎：触发事件、诈唬意图、模板台词、
 packages/protocol   客户端与服务端之间的 WebSocket 消息类型
 apps/server         权威服务端：房间、计时器、托管、断线重连、操作日志、牌桌聊天、大模型接入
 apps/server/config  AI 角色与对话、经济参数（金币、场次、每日奖励）、国内合规参数；第 5 阶段移到管理后台
-apps/mobile         Expo (React Native) 横屏客户端，也可在浏览器里运行
+apps/mobile         Expo (React Native) 客户端，横屏竖屏都支持，也可在浏览器里运行
 apps/admin          管理后台（React + Vite），构建后由服务端在 /admin 提供
 ```
 

@@ -46,6 +46,8 @@ describe('friend rooms', () => {
     expect(friendTable.table.mySeat).toBe(1);
     expect(hostTable.table.stake).toMatchObject({ kind: 'friend', multiplier: 0, inviteCode: created.code });
     expect(hostTable.table.seats.filter((s) => s.isHuman)).toHaveLength(2);
+    // Points are counted (base 1) even though no coins move.
+    expect(hostTable.table.view.baseScore).toBe(1);
     // Each sees only their own hand.
     expect(friendTable.table.view.players[0].hand).toBeNull();
     expect(friendTable.table.view.players[1].hand).not.toBeNull();
@@ -56,6 +58,7 @@ describe('friend rooms', () => {
     // Points only: nobody's coins moved.
     const ids = [...new Set(server.hands.logs.map((l) => l.playerId))];
     expect(ids).toHaveLength(2);
+    expect(server.hands.logs.every((l) => l.baseScore === 1)).toBe(true);
     for (const id of ids) {
       const ledger = await server.services.wallet.history(id);
       expect(ledger.filter((e) => e.type === 'handSettlement')).toEqual([]);

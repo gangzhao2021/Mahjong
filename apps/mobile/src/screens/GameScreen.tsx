@@ -98,6 +98,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const [hovered, setHovered] = useState<HandTile | null>(null);
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
+  // Portrait keeps 托管 and chat on the top bar; the rest drop down from ⋯.
+  const [moreOpen, setMoreOpen] = useState(false);
   const auto = useAutoSettings();
   useVoiceCallouts(game.events, settings.voice);
   // Keep the room's pace in line with the player's setting.
@@ -234,18 +236,56 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   };
   const windOf = (side: Side) => T.winds[(seatAt(side) - view.dealer + 4) % 4];
 
+  // In the portrait ⋯ drop-down every choice also closes the drop-down.
+  const closeMore = () => setMoreOpen(false);
+  const leaveButton = (then?: () => void) => (
+    <Btn
+      label={T.leave}
+      onPress={() => {
+        then?.();
+        if (table.gameOver) game.leaveGame();
+        else setConfirmLeave(true);
+      }}
+    />
+  );
+  const menuExtras = (then?: () => void) => (
+    <>
+      <Btn
+        label={`${muted ? '🔇' : '🔊'} ${T.soundLabel(!muted)}`}
+        onPress={() => {
+          then?.();
+          updateSoundSettings({ effects: muted, music: muted });
+        }}
+      />
+      <Btn
+        label={`🀄 ${T.tracker}`}
+        primary={trackerOpen}
+        onPress={() => {
+          then?.();
+          setTrackerOpen(!trackerOpen);
+        }}
+      />
+      <Btn
+        label={`⚡ ${T.autoMenu}`}
+        primary={auto.win || auto.noClaims || auto.tsumogiri}
+        onPress={() => {
+          then?.();
+          setAutoOpen(!autoOpen);
+        }}
+      />
+    </>
+  );
+
   return (
     <Felt>
       <View style={[styles.stage, { width, height, transform: [{ scale }] }]}>
       {/* Top row: menu, opposite player, hand info */}
       <View style={[styles.topRow, portrait && styles.topRowPortrait]}>
-        <View style={[styles.menu, portrait && styles.menuPortrait]}>
-          <Btn label={T.leave} onPress={() => (table.gameOver ? game.leaveGame() : setConfirmLeave(true))} />
+        <View style={styles.menu}>
+          {!portrait && leaveButton()}
           <Btn label={T.autoPlay} primary={table.autoPlay} onPress={() => game.setAutoPlay(!table.autoPlay)} />
           <Btn label={`💬 ${T.chat}${unreadChat ? ` · ${unreadChat}` : ''}`} primary={unreadChat > 0} onPress={() => showChat(true)} />
-          <Btn label={`${muted ? '🔇' : '🔊'} ${T.soundLabel(!muted)}`} onPress={() => updateSoundSettings({ effects: muted, music: muted })} />
-          <Btn label={`🀄 ${T.tracker}`} primary={trackerOpen} onPress={() => setTrackerOpen(!trackerOpen)} />
-          <Btn label={`⚡ ${T.autoMenu}`} primary={auto.win || auto.noClaims || auto.tsumogiri} onPress={() => setAutoOpen(!autoOpen)} />
+          {portrait ? <Btn label="⋯" primary={moreOpen} onPress={() => setMoreOpen(!moreOpen)} /> : menuExtras()}
         </View>
         {!portrait && <View style={styles.topSeat}>{opponent(2)}</View>}
         <View style={[styles.stake, portrait && styles.stakePortrait]}>
@@ -334,6 +374,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             onSelect={onSelect}
             onDiscard={(tile: TileKind) => game.act({ type: 'discard', tile })}
             onHover={setHovered}
+            magnify={portrait || handTile < 36}
           />
         </View>
       </View>
@@ -356,7 +397,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
 
       {table.autoPlay && (
         // Sits where the action buttons would be (they are hidden while auto-playing), clear of the discards.
-        <Pressable style={[styles.banner, { bottom: Math.round(handTile * 1.4) + 14 }]} onPress={() => game.setAutoPlay(false)}>
+        // In portrait my seat card sits above the hand, so the banner goes above that too.
+        <Pressable style={[styles.banner, { bottom: Math.round(handTile * 1.4) + (portrait ? 72 : 14) }]} onPress={() => game.setAutoPlay(false)}>
           <Text style={styles.bannerText}>{T.autoPlayOn}</Text>
         </Pressable>
       )}
@@ -406,6 +448,14 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
 
       {trackerOpen && <TileTracker view={view} onClose={() => setTrackerOpen(false)} />}
       {autoOpen && <AutoMenu auto={auto} onClose={() => setAutoOpen(false)} />}
+      {moreOpen && (
+        <Pressable style={styles.autoBackdrop} onPress={closeMore} accessibilityRole="button">
+          <View style={[styles.autoMenu, styles.moreMenu]}>
+            {menuExtras(closeMore)}
+            {leaveButton(closeMore)}
+          </View>
+        </Pressable>
+      )}
 
       {confirmLeave && (
         <View style={styles.modalBackdrop}>
@@ -584,7 +634,7 @@ const styles = StyleSheet.create({
   menu: { flexDirection: 'row', gap: 6, flexShrink: 0 },
   topSeat: { flex: 1, alignItems: 'center', minWidth: 0 },
   topRowPortrait: { flexDirection: 'column', alignItems: 'stretch', gap: 4 },
-  menuPortrait: { flexWrap: 'wrap', flexShrink: 1 },
+  moreMenu: { alignSelf: 'flex-start', alignItems: 'stretch' },
   stakePortrait: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, marginTop: 0, alignSelf: 'flex-start' },
   topSeatPortrait: { alignItems: 'center', marginTop: 4 },
   sidePortrait: { width: 64 },

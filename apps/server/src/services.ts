@@ -224,7 +224,8 @@ export async function checkStart(s: Services, player: PlayerRow, options: GameOp
       plan: {
         stake: { kind: 'private', name: '私人房', baseScore: base, multiplier: base === 0 ? 0 : 1, inviteCode: inviteCode() },
         ruleSet: { ...rules, handsPerGame: hands },
-        baseScore: base,
+        // Base 0 (and every friend room) plays for points at base 1 and settles no coins, like the practice table.
+        baseScore: base || 1,
         multiplier: base === 0 ? 0 : 1,
         limitEndsAt,
         limitKind,

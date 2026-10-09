@@ -89,7 +89,7 @@ export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount 
         </Text>
         <View style={styles.badgesCompact}>
           {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
-          {voidSuit !== null && !won && <Text style={[styles.badge, styles.voidBadge]}>{SUIT_NAMES[voidSuit]}</Text>}
+          {voidSuit !== null && !won && <Text style={[styles.badge, styles.voidBadge]}>{T.voidSuit(SUIT_NAMES[voidSuit])}</Text>}
         </View>
         <Text style={[styles.score, score > 0 ? styles.plus : score < 0 ? styles.minus : null]}>{score > 0 ? `+${score}` : score}</Text>
         {won ? (
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   cardCompact: { flexDirection: 'column', gap: 1, paddingHorizontal: 4, width: 64 },
   avatarCompact: { fontSize: 22 },
   nameCompact: { fontSize: 11, maxWidth: 56 },
-  badgesCompact: { flexDirection: 'row', gap: 2 },
+  badgesCompact: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 2 },
   // Badges wrap under the name rather than pushing the card past the screen edge.
   cardText: { flexShrink: 1 },
   nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
