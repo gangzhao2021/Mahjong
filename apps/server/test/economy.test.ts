@@ -117,7 +117,7 @@ describe('coin settlement', () => {
     expect(summary.summary.coinChange).toBe(total);
     expect(summary.summary.handsPlayed).toBe(4);
     // Task and achievement rewards are paid on top of hand settlement.
-    const rewards = ledger.filter((e) => e.type === 'taskReward' || e.type === 'achievementReward').reduce((a, e) => a + e.amount, 0);
+    const rewards = ledger.filter((e) => e.type === 'achievementReward').reduce((a, e) => a + e.amount, 0);
     expect(await server.services.wallet.balance(welcome.playerId)).toBe(20000 + total + rewards);
     // Each hand's coins = points × multiplier (no cap needed with a full balance).
     for (const e of settlements) expect((e.meta as { points: number }).points * 1).toBe(e.amount);
@@ -133,7 +133,7 @@ describe('coin settlement', () => {
     // No hand settlement; only task / achievement rewards may have been paid.
     const ledger = await server.services.wallet.history(welcome.playerId);
     expect(ledger.filter((e) => e.type === 'handSettlement')).toEqual([]);
-    const rewards = ledger.filter((e) => e.type === 'taskReward' || e.type === 'achievementReward').reduce((a, e) => a + e.amount, 0);
+    const rewards = ledger.filter((e) => e.type === 'achievementReward').reduce((a, e) => a + e.amount, 0);
     expect(await server.services.wallet.balance(welcome.playerId)).toBe(20000 + rewards);
     expect(client.messages.some((m) => m.type === 'wallet')).toBe(false);
   });
@@ -169,7 +169,7 @@ describe('coin settlement', () => {
     const pending = await b.next((m): m is Extract<ServerMessage, { type: 'pendingResult' }> => m.type === 'pendingResult');
     expect(pending.summary).toMatchObject({ handsPlayed: 4, stake: { tableId: 'low' } });
     const ledger = await server.services.wallet.history(welcome.playerId);
-    const rewards = ledger.filter((e) => e.type === 'taskReward' || e.type === 'achievementReward').reduce((a, e) => a + e.amount, 0);
+    const rewards = ledger.filter((e) => e.type === 'achievementReward').reduce((a, e) => a + e.amount, 0);
     expect(pending.summary.coinChange + rewards + 20000).toBe(await server.services.wallet.balance(welcome.playerId));
 
     // Delivered once.

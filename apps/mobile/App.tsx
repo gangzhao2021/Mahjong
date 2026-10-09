@@ -110,7 +110,7 @@ export default function App() {
   const startToast = useToast(game.startRejected ? T.startRejected[game.startRejected.reason] : null, game.startRejected?.at, 4000);
   const noticeToast = useToast(game.notice ? T.limitEnding : null, game.notice?.at, 6000);
   const rewardToast = useToast(
-    game.rewards ? T.tasks.earned(game.rewards.items.map((r) => T.tasks.names[r.id]).join(T.listSeparator), game.rewards.items.reduce((n, r) => n + r.amount, 0)) : null,
+    game.rewards ? T.achievements.earned(game.rewards.items.map((r) => T.achievements.names[r.id]).join(T.listSeparator), game.rewards.items.reduce((n, r) => n + r.amount, 0)) : null,
     game.rewards?.at,
     4500,
   );

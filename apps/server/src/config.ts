@@ -19,6 +19,8 @@ export interface ServerConfig {
   practice: { timerScale: number; autoPlayAfterTimeouts: number };
   /** Delay of an auto-played human move, so the table stays readable. */
   autoPlayDelayMs: number;
+  /** Pay the daily login reward automatically on the first connection of the game day. */
+  autoLoginReward: boolean;
   /** AI "thinking" time; beginners think a little longer. */
   ai: { minDelayMs: number; maxDelayMs: number; beginnerExtraMs: number };
   /** Arbitrary weights, normalized to probabilities (PRD §4.2). Admin-configurable in Phase 5. */
@@ -46,6 +48,7 @@ export const DEFAULT_CONFIG: ServerConfig = {
   autoPlayAfterTimeouts: 2,
   practice: { timerScale: 2, autoPlayAfterTimeouts: 3 },
   autoPlayDelayMs: 700,
+  autoLoginReward: true,
   ai: { minDelayMs: 600, maxDelayMs: 1_800, beginnerExtraMs: 500 },
   skillWeights: { beginner: 20, intermediate: 50, expert: 30 },
   defaultBaseScore: 1,

@@ -15,7 +15,7 @@ import { SessionTokens } from './accounts/tokens';
 import { ageOn, DevRealNameVerifier, guestTrialEnd, loadChinaConfig, minorWindowEnd, type ChinaConfig, type RealNameVerifier } from './china/compliance';
 import type { Db } from './db/db';
 import { HandHistory } from './history';
-import { Tasks } from './economy/tasks';
+import { Achievements } from './economy/achievements';
 import { rankInfo, Ranks } from './economy/rank';
 import { loadEconomyConfig, privateRoomMaxBase, type EconomyConfig } from './economy/config';
 import { Rewards } from './economy/rewards';
@@ -41,7 +41,7 @@ export interface Services {
   rewards: Rewards;
   memory: MemoryStore;
   history: HandHistory;
-  tasks: Tasks;
+  achievements: Achievements;
   ranks: Ranks;
   crashes: CrashReports;
   sms: SmsCodes;
@@ -84,7 +84,7 @@ export function createServices(o: ServiceOptions): Services {
     rewards: new Rewards(o.db, wallet, economy),
     memory: new MemoryStore(o.db, now),
     history: new HandHistory(o.db),
-    tasks: new Tasks(o.db, wallet, economy, now),
+    achievements: new Achievements(o.db, wallet),
     ranks: new Ranks(o.db),
     crashes: new CrashReports(o.db, () => now().getTime()),
     sms: new SmsCodes(o.db, o.sms ?? new ConsoleSmsSender(), () => now().getTime()),

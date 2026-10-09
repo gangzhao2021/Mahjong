@@ -7,7 +7,7 @@ import { Felt } from '../components/Felt';
 import { formStyles, Sheet } from '../components/Sheet';
 import { SettingsSheet } from './SettingsSheet';
 import { updateSettings, useSettings } from '../settings';
-import { TasksSheet, useClaimableTasks } from './TasksSheet';
+import { AchievementsSheet } from './AchievementsSheet';
 import { TileFan } from '../components/TileFan';
 import type { ConnectionStatus } from '../net/useGame';
 import { T, tableName } from '../strings';
@@ -40,8 +40,7 @@ const LESSON_COUNT = 6;
 export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, onOpenRules, tutorialDone }: Props) {
   const [privateOpen, setPrivateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tasksOpen, setTasksOpen] = useState(false);
-  const claimable = useClaimableTasks(token, tasksOpen);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const { width, height } = useWindowDimensions();
   const online = status === 'online';
   const limit = account.playLimit;
@@ -82,12 +81,8 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </Pressable>
         <View style={styles.topButtons}>
           <Btn label={`📊 ${T.record.entry}`} onPress={onOpenHistory} />
-          {/* Tasks, achievements and the daily reward share one entry */}
-          <Btn
-            label={`🎯 ${T.tasks.entry}${claimable + (account.reward.claimable ? 1 : 0) ? ` · ${claimable + (account.reward.claimable ? 1 : 0)}` : ''}`}
-            primary={claimable > 0 || account.reward.claimable}
-            onPress={() => setTasksOpen(true)}
-          />
+          {/* Rewards pay themselves, so this is just a place to look, with no badge nagging */}
+          <Btn label={`🏆 ${T.achievements.entry}`} onPress={() => setAchievementsOpen(true)} />
           <Btn label={`⚙️ ${T.settings.entry}`} onPress={() => setSettingsOpen(true)} />
           <Btn label={`👤 ${T.account}`} onPress={onOpenAccount} />
         </View>
@@ -131,11 +126,6 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
             </Pressable>
             <Pressable onPress={onOpenRules} style={styles.chip} accessibilityRole="button">
               <Text style={styles.chipText}>📘 {T.rulesPage.entry}</Text>
-            </Pressable>
-            <Pressable onPress={() => setTasksOpen(true)} style={[styles.chip, account.reward.claimable && styles.chipHot]} accessibilityRole="button">
-              <Text style={[styles.chipText, account.reward.claimable && styles.chipHotText]}>
-                🎁 {account.reward.claimable ? T.rewardReady : T.rewardTaken}
-              </Text>
             </Pressable>
           </View>
         </View>
@@ -203,7 +193,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
       </View>
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
-      {tasksOpen && <TasksSheet token={token} account={account} onAccount={onAccount} onClose={() => setTasksOpen(false)} />}
+      {achievementsOpen && <AchievementsSheet token={token} account={account} onAccount={onAccount} onClose={() => setAchievementsOpen(false)} />}
       {privateOpen && (
         <PrivateRoomSheet
           info={info}
