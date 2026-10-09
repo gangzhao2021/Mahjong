@@ -42,7 +42,7 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
       <View style={styles.panel}>
         <Text style={styles.title}>
           {table.gameOver ? T.gameResult : T.handResult} · {T.hand(table.handIndex, table.handsPerGame)} ·{' '}
-          {result.reason === 'threeWon' ? T.threeWon : T.wallExhausted}
+          {result.reason === 'threeWon' ? T.allButOneWon(table.view.ruleSet.seats.length) : T.wallExhausted}
         </Text>
         {/* Coins spring in once the wallet update arrives */}
         {table.stake.multiplier > 0 && handCoins !== null && (
@@ -93,13 +93,14 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
               </Text>
             ))}
           <View style={styles.scores}>
-            {table.seats.map((s) => {
+            {/* Empty seats at two- and three-player tables have nothing to show */}
+            {table.seats.filter((s) => !s.empty).map((s) => {
               const delta = result.deltas[s.seat];
               return (
                 <View key={s.seat} style={styles.scoreRow}>
                   <Text style={styles.cell}>
                     {s.avatar} {s.name}
-                    {s.isHuman ? T.me : ''} {tag(s.seat)}
+                    {s.seat === table.view.seat ? T.me : ''} {tag(s.seat)}
                   </Text>
                   <Text style={[styles.num, delta > 0 ? styles.plus : delta < 0 ? styles.minus : null]}>
                     {delta > 0 ? `+${delta}` : delta}

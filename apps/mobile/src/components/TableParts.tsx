@@ -74,10 +74,32 @@ interface SeatCardProps {
   /** Wins this hand (more than one only in 血流成河). */
   winCount?: number;
   handCount: number;
+  /** Portrait side seats: avatar, name, score and tiles left stacked in a narrow card. */
+  compact?: boolean;
 }
 
-export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount = win ? 1 : 0, handCount }: SeatCardProps) {
+export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount = win ? 1 : 0, handCount, compact }: SeatCardProps) {
   const won = win !== null;
+  if (compact) {
+    return (
+      <View style={[styles.card, styles.cardCompact, active && styles.cardActive, won && styles.cardWon]}>
+        <Text style={styles.avatarCompact}>{info.avatar}</Text>
+        <Text style={[styles.name, styles.nameCompact]} numberOfLines={1}>
+          {info.name}
+        </Text>
+        <View style={styles.badgesCompact}>
+          {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
+          {voidSuit !== null && !won && <Text style={[styles.badge, styles.voidBadge]}>{SUIT_NAMES[voidSuit]}</Text>}
+        </View>
+        <Text style={[styles.score, score > 0 ? styles.plus : score < 0 ? styles.minus : null]}>{score > 0 ? `+${score}` : score}</Text>
+        {won ? (
+          <Text style={styles.winText}>{winCount > 1 ? T.winTimes(winCount) : win.selfDraw ? T.zimo : T.hu}</Text>
+        ) : (
+          <Text style={styles.score}>{T.tilesInHand(handCount)}</Text>
+        )}
+      </View>
+    );
+  }
   return (
     <View style={[styles.card, active && styles.cardActive, won && styles.cardWon]}>
       <Text style={styles.avatar}>{info.avatar}</Text>
@@ -141,7 +163,7 @@ const styles = StyleSheet.create({
   compassWall: { color: '#c8e6c9', fontSize: 11 },
   compassTimer: { color: '#fff', fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'] },
   compassTimerLow: { color: '#ffab91' },
-  melds: { flexDirection: 'row', gap: 6 },
+  melds: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   meld: { flexDirection: 'row' },
   pond: { alignContent: 'flex-start' },
   card: {
@@ -160,6 +182,10 @@ const styles = StyleSheet.create({
   winRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   winText: { color: '#ffcdd2', fontSize: 12, fontWeight: '900' },
   avatar: { fontSize: 26 },
+  cardCompact: { flexDirection: 'column', gap: 1, paddingHorizontal: 4, width: 64 },
+  avatarCompact: { fontSize: 22 },
+  nameCompact: { fontSize: 11, maxWidth: 56 },
+  badgesCompact: { flexDirection: 'row', gap: 2 },
   // Badges wrap under the name rather than pushing the card past the screen edge.
   cardText: { flexShrink: 1 },
   nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
