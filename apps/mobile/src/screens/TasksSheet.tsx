@@ -28,7 +28,7 @@ function claimableCount(t: TasksStatus): number {
   return t.daily.filter((d) => !d.claimed && d.progress >= d.target).length + t.achievements.filter((a) => a.unlockedAt !== null && !a.claimed).length;
 }
 
-export function TasksSheet({ token, onAccount, onClose }: { token: string; onAccount(a: AccountSummary): void; onClose(): void }) {
+export function TasksSheet({ token, account, onAccount, onClose }: { token: string; account: AccountSummary; onAccount(a: AccountSummary): void; onClose(): void }) {
   const [tasks, setTasks] = useState<TasksStatus | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -55,6 +55,7 @@ export function TasksSheet({ token, onAccount, onClose }: { token: string; onAcc
         <ActivityIndicator />
       ) : (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
+          <DailyReward token={token} account={account} onAccount={onAccount} />
           <Text style={styles.section}>{T.tasks.daily}</Text>
           {tasks.daily.map((d) => {
             const done = d.progress >= d.target;
@@ -78,6 +79,40 @@ export function TasksSheet({ token, onAccount, onClose }: { token: string; onAcc
         </ScrollView>
       )}
     </Sheet>
+  );
+}
+
+/** The login reward: one claim per day; a missed day never resets the cycle. */
+function DailyReward({ token, account, onAccount }: { token: string; account: AccountSummary; onAccount(a: AccountSummary): void }) {
+  const [busy, setBusy] = useState(false);
+  const r = account.reward;
+  const claim = async () => {
+    setBusy(true);
+    try {
+      onAccount((await api.claimReward(token)).account);
+    } catch {
+      // Already claimed elsewhere: refresh to show the real state.
+      onAccount((await api.account(token)).account);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View style={styles.reward}>
+      <Text style={styles.section}>{T.dailyReward}</Text>
+      <View style={styles.days}>
+        {r.cycle.map((amount, i) => (
+          <View key={i} style={[styles.day, i === r.dayIndex && styles.dayNext, i < r.dayIndex && styles.dayDone]}>
+            <Text style={styles.dayLabel}>{T.rewardDay(i + 1)}</Text>
+            <Text style={styles.dayAmount}>🪙 {amount.toLocaleString()}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={styles.rewardRow}>
+        <Text style={styles.detail}>{T.rewardNote}</Text>
+        <Btn label={r.claimable ? T.claim(r.nextAmount) : T.claimed} primary disabled={!r.claimable || busy} onPress={claim} />
+      </View>
+    </View>
   );
 }
 
@@ -105,4 +140,12 @@ const styles = StyleSheet.create({
   name: { fontWeight: '800', color: '#3e2723' },
   detail: { fontSize: 12, color: '#6d4c41' },
   claimed: { color: '#2e7d32', fontWeight: '800' },
+  reward: { gap: 6 },
+  rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'space-between' },
+  days: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  day: { padding: 6, borderRadius: 10, backgroundColor: '#eceff1', alignItems: 'center', minWidth: 64 },
+  dayNext: { backgroundColor: '#ffe082' },
+  dayDone: { opacity: 0.5 },
+  dayLabel: { fontSize: 11, color: '#455a64' },
+  dayAmount: { fontWeight: '800', color: '#3e2723', fontSize: 12 },
 });

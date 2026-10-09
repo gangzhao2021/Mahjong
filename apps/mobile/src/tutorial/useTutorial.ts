@@ -145,6 +145,8 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
     // The tutorial ends the lesson instead of fast-forwarding.
     fastForward: true,
     fastPace: false,
+    // Scripted lessons are not dealt from a seed.
+    deal: { commitment: '', seed: null, salt: null },
     gameOver: false,
     chat,
     stake: { kind: 'private', name: '新手教程', baseScore: 1, multiplier: 0 },
@@ -166,6 +168,8 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
     account: null,
     lastWallet: null,
     lastRank: null,
+    commitments: {},
+    rewards: null,
     startRejected: null,
     pendingResult: null,
     gameSummary: null,

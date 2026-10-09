@@ -456,7 +456,11 @@ export class Lobby {
     await this.settle(player.id, room, plan, handIndex, result);
     await this.remember(player, room, plan, result).catch((error) => console.error('Recording AI memory failed:', error));
     // After the memory write, so lifetime counts in the profile include this hand.
-    await this.s.tasks.recordHand(player.id, room.humanSeat, result).catch((error) => console.error('Recording task progress failed:', error));
+    const rewards = await this.s.tasks.recordHand(player.id, room.humanSeat, result).catch((error) => {
+      console.error('Recording task progress failed:', error);
+      return [];
+    });
+    if (rewards.length) room.human.send({ type: 'rewards', items: rewards, balance: await this.s.wallet.balance(player.id) });
     if (room.gameOver) {
       const rank = await this.s.ranks.recordGame(player.id, room.id, plan.stake, room.totals, room.humanSeat).catch((error) => {
         console.error('Recording rank failed:', error);

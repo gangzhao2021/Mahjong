@@ -329,6 +329,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           countdown={table.timer?.kind === 'nextHand' ? countdown : null}
           gameCoins={gameCoins}
           rank={table.gameOver && game.lastRank?.gameId === table.gameId ? game.lastRank : null}
+          committedAt={game.commitments[`${table.gameId}:${table.handIndex}`] ?? null}
           handCoins={
             game.lastWallet && game.lastWallet.gameId === table.gameId && game.lastWallet.handIndex === table.handIndex ? game.lastWallet.amount : null
           }

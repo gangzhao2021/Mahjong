@@ -1,10 +1,11 @@
 /**
  * Daily tasks and one-time achievements. Progress is recorded after every
- * finished hand; coins are paid when the player claims, once per task per
- * game day (and once per achievement), guarded by the ledger's unique ref.
+ * finished hand and rewards are paid right away (no claim chores); each is
+ * paid once per task per game day (and once per achievement), guarded by the
+ * ledger's unique ref. `claim` remains for anything earned but not yet paid.
  */
 import type { HandResult, Pattern, Seat } from '@mahjong/engine';
-import type { AchievementId, AchievementStatus, DailyTaskId, DailyTaskStatus, TasksStatus } from '@mahjong/protocol';
+import type { AchievementId, AchievementStatus, DailyTaskId, DailyTaskStatus, EarnedReward, TasksStatus } from '@mahjong/protocol';
 import type { Db } from '../db/db';
 import { gameDay, type EconomyConfig } from './config';
 import type { Wallet } from './wallet';
@@ -54,8 +55,8 @@ export class Tasks {
     private readonly now: () => Date,
   ) {}
 
-  /** Counts a finished hand towards today's tasks and unlocks any achievements it earned. */
-  async recordHand(playerId: string, seat: Seat, result: HandResult): Promise<void> {
+  /** Counts a finished hand towards today's tasks, unlocks achievements, and pays whatever it completed. */
+  async recordHand(playerId: string, seat: Seat, result: HandResult): Promise<EarnedReward[]> {
     const day = gameDay(this.now(), this.config);
     const win = result.wins.find((w) => w.seat === seat);
     const add: Record<DailyTaskId, number> = { playHands: 1, win: win ? 1 : 0, selfDraw: win?.selfDraw ? 1 : 0 };
@@ -87,6 +88,25 @@ export class Tasks {
     for (const id of earned) {
       await this.db.query('INSERT INTO player_achievements (player_id, achievement_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [playerId, id]);
     }
+    return this.payDue(playerId);
+  }
+
+  /** Pays every finished task and earned achievement not yet paid. */
+  private async payDue(playerId: string): Promise<EarnedReward[]> {
+    const status = await this.status(playerId);
+    const due = [
+      ...status.daily.filter((d) => !d.claimed && d.progress >= d.target).map((d) => ({ kind: 'daily' as const, id: d.id })),
+      ...status.achievements.filter((a) => a.unlockedAt !== null && !a.claimed).map((a) => ({ kind: 'achievement' as const, id: a.id })),
+    ];
+    const paid: EarnedReward[] = [];
+    for (const item of due) {
+      try {
+        paid.push({ ...item, amount: await this.claim(playerId, item.kind, item.id) });
+      } catch (error) {
+        if (!(error instanceof NothingToClaimError)) throw error;
+      }
+    }
+    return paid;
   }
 
   async status(playerId: string): Promise<TasksStatus> {

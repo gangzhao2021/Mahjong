@@ -6,9 +6,9 @@ import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { formStyles, Sheet } from '../components/Sheet';
 import { SettingsSheet } from './SettingsSheet';
+import { updateSettings, useSettings } from '../settings';
 import { TasksSheet, useClaimableTasks } from './TasksSheet';
 import { TileFan } from '../components/TileFan';
-import { api } from '../net/api';
 import type { ConnectionStatus } from '../net/useGame';
 import { T, tableName } from '../strings';
 
@@ -38,7 +38,6 @@ const TIER_FALLBACK = { fill: '#607d8b', rim: '#cfd8dc', ink: '#fff' };
 const LESSON_COUNT = 6;
 
 export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, onOpenRules, tutorialDone }: Props) {
-  const [rewardOpen, setRewardOpen] = useState(false);
   const [privateOpen, setPrivateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -50,8 +49,19 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   const compact = width < 700;
 
   // Quick start: new players go to practice; others to the highest table they can comfortably afford (10× the entry).
-  const comfortable = info.tables.filter((t) => t.minCoins === 0 || account.balance >= t.minCoins * 10);
-  const quick = tutorialDone >= 0 && tutorialDone < 2 ? info.tables[0] : (comfortable[comfortable.length - 1] ?? info.tables[0]);
+  // Quick start goes back to the table played last, or the closest cheaper one the player can still afford.
+  // It never moves anyone up to higher stakes on its own; new players start at practice.
+  const { lastTableId, bindReminderSnoozedUntil } = useSettings();
+  // Guests who keep playing get a quiet reminder to link an account; "not now" hides it for a week.
+  const [now] = useState(() => Date.now());
+  const remindBind = account.isGuest && account.gamesPlayed >= 2 && bindReminderSnoozedUntil < now;
+  const lastIndex = Math.max(0, info.tables.findIndex((t) => t.id === lastTableId));
+  const affordable = info.tables.slice(0, lastIndex + 1).filter((t) => account.balance >= t.minCoins);
+  const quick = tutorialDone >= 0 && tutorialDone < 2 && !lastTableId ? info.tables[0] : (affordable[affordable.length - 1] ?? info.tables[0]);
+  const play = (tableId: string) => {
+    updateSettings({ lastTableId: tableId });
+    onStart({ tableId });
+  };
   const fanTile = Math.round(Math.min(height * 0.15, 72));
   // Cards size to the screen but stop growing on big monitors, so they never turn into empty slabs.
   const cardHeight = Math.round(Math.max(64, Math.min(height * 0.17, 128)));
@@ -72,12 +82,24 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </Pressable>
         <View style={styles.topButtons}>
           <Btn label={`📊 ${T.record.entry}`} onPress={onOpenHistory} />
-          <Btn label={`🎯 ${T.tasks.entry}${claimable ? ` · ${claimable}` : ''}`} primary={claimable > 0} onPress={() => setTasksOpen(true)} />
-          <Btn label={`🎁 ${T.dailyReward}`} primary={account.reward.claimable} onPress={() => setRewardOpen(true)} />
+          {/* Tasks, achievements and the daily reward share one entry */}
+          <Btn
+            label={`🎯 ${T.tasks.entry}${claimable + (account.reward.claimable ? 1 : 0) ? ` · ${claimable + (account.reward.claimable ? 1 : 0)}` : ''}`}
+            primary={claimable > 0 || account.reward.claimable}
+            onPress={() => setTasksOpen(true)}
+          />
           <Btn label={`⚙️ ${T.settings.entry}`} onPress={() => setSettingsOpen(true)} />
           <Btn label={`👤 ${T.account}`} onPress={onOpenAccount} />
         </View>
       </View>
+
+      {remindBind && (
+        <View style={[styles.bind, styles.capped]}>
+          <Text style={styles.bindText}>🔐 {T.bindReminder.text}</Text>
+          <Btn label={T.bindReminder.bind} primary onPress={onOpenAccount} />
+          <Btn label={T.bindReminder.later} onPress={() => updateSettings({ bindReminderSnoozedUntil: Date.now() + 7 * 24 * 3600_000 })} />
+        </View>
+      )}
 
       {(limit || !online) && (
         <Text style={styles.limit}>
@@ -88,13 +110,14 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
       <View style={[styles.body, styles.capped]}>
         {/* Left: the game's face and the one-tap way in */}
         <View style={[styles.hero, compact && styles.heroCompact]}>
-          {!compact && <TileFan width={fanTile} />}
+          {/* The decorative fan gives way on short screens when the reminder takes a row */}
+          {!compact && !(remindBind && height < 480) && <TileFan width={fanTile} />}
           <Text style={styles.brand}>{T.brand}</Text>
           <Text style={styles.brandSub}>{T.brandSub}</Text>
           <Pressable
             accessibilityRole="button"
             disabled={!online || blocked}
-            onPress={() => onStart({ tableId: quick.id })}
+            onPress={() => play(quick.id)}
             style={({ pressed }) => [styles.quick, (!online || blocked) && styles.disabled, pressed && styles.pressed]}
           >
             <Text style={styles.quickText}>▶ {T.quickStart}</Text>
@@ -109,7 +132,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
             <Pressable onPress={onOpenRules} style={styles.chip} accessibilityRole="button">
               <Text style={styles.chipText}>📘 {T.rulesPage.entry}</Text>
             </Pressable>
-            <Pressable onPress={() => setRewardOpen(true)} style={[styles.chip, account.reward.claimable && styles.chipHot]} accessibilityRole="button">
+            <Pressable onPress={() => setTasksOpen(true)} style={[styles.chip, account.reward.claimable && styles.chipHot]} accessibilityRole="button">
               <Text style={[styles.chipText, account.reward.claimable && styles.chipHotText]}>
                 🎁 {account.reward.claimable ? T.rewardReady : T.rewardTaken}
               </Text>
@@ -129,7 +152,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
                   key={t.id}
                   accessibilityRole="button"
                   disabled={!online || blocked || !affordable}
-                  onPress={() => onStart({ tableId: t.id })}
+                  onPress={() => play(t.id)}
                   style={({ pressed }) => [styles.card, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
                 >
                   {t.id === quick.id && (
@@ -180,8 +203,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
       </View>
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
-      {tasksOpen && <TasksSheet token={token} onAccount={onAccount} onClose={() => setTasksOpen(false)} />}
-      {rewardOpen && <RewardSheet token={token} account={account} onAccount={onAccount} onClose={() => setRewardOpen(false)} />}
+      {tasksOpen && <TasksSheet token={token} account={account} onAccount={onAccount} onClose={() => setTasksOpen(false)} />}
       {privateOpen && (
         <PrivateRoomSheet
           info={info}
@@ -194,36 +216,6 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         />
       )}
     </Felt>
-  );
-}
-
-function RewardSheet({ token, account, onAccount, onClose }: { token: string; account: AccountSummary; onAccount(a: AccountSummary): void; onClose(): void }) {
-  const [busy, setBusy] = useState(false);
-  const r = account.reward;
-  const claim = async () => {
-    setBusy(true);
-    try {
-      onAccount((await api.claimReward(token)).account);
-    } catch {
-      // Already claimed elsewhere: refresh to show the real state.
-      onAccount((await api.account(token)).account);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Sheet title={T.dailyReward} onClose={onClose}>
-      <View style={styles.days}>
-        {r.cycle.map((amount, i) => (
-          <View key={i} style={[styles.day, i === r.dayIndex && styles.dayNext, i < r.dayIndex && styles.dayDone]}>
-            <Text style={styles.dayLabel}>{T.rewardDay(i + 1)}</Text>
-            <Text style={styles.dayAmount}>🪙 {amount.toLocaleString()}</Text>
-          </View>
-        ))}
-      </View>
-      <Text style={formStyles.hint}>{T.rewardNote}</Text>
-      <Btn label={r.claimable ? T.claim(r.nextAmount) : T.claimed} primary disabled={!r.claimable || busy} onPress={claim} />
-    </Sheet>
   );
 }
 
@@ -308,6 +300,16 @@ const styles = StyleSheet.create({
   coins: { color: '#ffe082', fontWeight: '800', fontVariant: ['tabular-nums'] },
   rank: { color: '#b2dfdb', fontSize: 12, fontWeight: '800' },
   limit: { color: '#ffcc80', fontSize: 13, alignSelf: 'center' },
+  bind: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  bindText: { flex: 1, color: '#e8f5e9', fontSize: 13 },
   capped: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
   body: { flex: 1, flexDirection: 'row', gap: 24, minHeight: 0 },
   hero: { flex: 0.85, alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -384,11 +386,5 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   pressed: { transform: [{ scale: 0.97 }] },
   short: { color: '#ffab91' },
-  days: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  day: { padding: 8, borderRadius: 10, backgroundColor: '#eceff1', alignItems: 'center', minWidth: 80 },
-  dayNext: { backgroundColor: '#ffe082' },
-  dayDone: { opacity: 0.5 },
-  dayLabel: { fontSize: 12, color: '#455a64' },
-  dayAmount: { fontWeight: '800', color: '#3e2723' },
   stepper: { fontSize: 18, fontWeight: '800', minWidth: 30, textAlign: 'center' },
 });

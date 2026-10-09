@@ -4,9 +4,11 @@
  * (托管), fast-forward and hand-log persistence (PRD §14, §14.1, §40, §41).
  */
 import { chooseAction, timeoutAction, type Rng, type SkillLevel } from '@mahjong/ai-play';
+import { randomBytes } from 'node:crypto';
 import {
   apply,
   createGame,
+  dealCommitment,
   isGameOver,
   legalActions,
   recordHand,
@@ -24,7 +26,7 @@ import {
   type Seat,
 } from '@mahjong/engine';
 import type { BanterLevel, Character, CharacterMemory, DialogueSettings, Language, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
-import type { ChatEntry, GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
+import type { ChatEntry, DealProof, GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
 import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
 import type { LlmProvider } from './llm/provider';
@@ -375,6 +377,7 @@ export class Room {
       handIndex: this.handIndex,
       playerId: this.human.playerId,
       seed: this.hand.seed,
+      salt: randomBytes(16).toString('hex'),
       dealer: this.hand.dealer,
       baseScore: this.hand.baseScore,
       ruleSet: this.hand.ruleSet,
@@ -526,11 +529,19 @@ export class Room {
       autoPlay: this.autoPlay,
       fastForward: this.fastForward,
       fastPace: this.fastPace,
+      deal: this.dealProof(),
       gameOver: this.gameOver,
       chat: this.talk.chatLog,
       stake: this.opts.stake,
       coinChange: this.coinChange,
     };
+  }
+
+  /** The commitment for this hand's deal; seed and salt only once the hand is over. */
+  private dealProof(): DealProof {
+    const salt = this.log.salt ?? '';
+    const over = this.hand.phase === 'ended';
+    return { commitment: dealCommitment(this.log.seed, salt), seed: over ? this.log.seed : null, salt: over ? salt : null };
   }
 
   close(): void {

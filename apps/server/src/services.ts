@@ -174,6 +174,7 @@ export async function accountSummary(s: Services, player: PlayerRow): Promise<Ac
     realName: { required: s.region === 'china' && !isGuest, verified: player.real_name_verified },
     playLimit: await playLimit(s, player, providers),
     rank: rankInfo(player.rank_points ?? 0),
+    gamesPlayed: (await s.db.query<{ games_played: number }>('SELECT games_played FROM player_profiles WHERE player_id = $1', [player.id]))[0]?.games_played ?? 0,
   };
 }
 

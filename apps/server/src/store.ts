@@ -12,6 +12,8 @@ export interface HandLog {
   handIndex: number;
   playerId: string;
   seed: number;
+  /** Random salt for the deal commitment sha256("seed:salt"), revealed with the seed after the hand. */
+  salt?: string;
   dealer: Seat;
   baseScore: number;
   ruleSet: RuleSet;
