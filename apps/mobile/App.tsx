@@ -109,6 +109,12 @@ export default function App() {
   const chatToast = useToast(game.chatRejected ? T.chatRejected[game.chatRejected.reason] : null, game.chatRejected?.at, 2500);
   const startToast = useToast(game.startRejected ? T.startRejected[game.startRejected.reason] : null, game.startRejected?.at, 4000);
   const noticeToast = useToast(game.notice ? T.limitEnding : null, game.notice?.at, 6000);
+  const friendRejection = game.friendRoomRejected ? T.friend.rejected[game.friendRoomRejected.reason] : null;
+  const friendToast = useToast(
+    typeof friendRejection === 'function' ? friendRejection(game.friendRoomRejected?.detail ?? '') : friendRejection,
+    game.friendRoomRejected?.at,
+    3500,
+  );
   const rewardToast = useToast(
     game.rewards ? T.achievements.earned(game.rewards.items.map((r) => T.achievements.names[r.id]).join(T.listSeparator), game.rewards.items.reduce((n, r) => n + r.amount, 0)) : null,
     game.rewards?.at,
@@ -156,12 +162,14 @@ export default function App() {
         onOpenTutorial={() => setTutorialOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenRules={() => setRulesOpen(true)}
+        friendRoom={game.friendRoom}
+        friend={{ create: game.createFriendRoom, join: game.joinFriendRoom, leave: game.leaveFriendRoom, start: game.startFriendRoom }}
         tutorialDone={tutorialDone}
       />
     );
   }
 
-  const toast = errorToast ?? chatToast ?? startToast ?? noticeToast ?? rewardToast ?? (game.leftReason ? T.startRejected[game.leftReason] : null);
+  const toast = errorToast ?? chatToast ?? startToast ?? friendToast ?? noticeToast ?? rewardToast ?? (game.leftReason ? T.startRejected[game.leftReason] : null);
   return (
     <View style={styles.root}>
       <StatusBar hidden />

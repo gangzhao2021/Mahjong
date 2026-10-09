@@ -25,6 +25,8 @@ interface Props {
 }
 
 export function ResultPanel({ table, result, countdown, handCoins, gameCoins, rank, committedAt, onNextHand, onNewGame, onHome }: Props) {
+  // In a friend room the next hand waits for everyone; show that this player is ready.
+  const [ready, setReady] = useState(false);
   const name = (seat: Seat) => table.seats[seat].name;
   const draw = result.drawSettlement;
   const tag = (seat: Seat) => {
@@ -116,7 +118,14 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
               <Btn label={T.newGame} primary onPress={onNewGame} />
             </>
           ) : (
-            <Btn label={countdown !== null ? `${T.nextHand} (${countdown})` : T.nextHand} primary onPress={onNextHand} />
+            <Btn
+              label={ready && table.stake.kind === 'friend' ? T.friend.readyWaiting : countdown !== null ? `${T.nextHand} (${countdown})` : T.nextHand}
+              primary={!ready}
+              onPress={() => {
+                setReady(true);
+                onNextHand();
+              }}
+            />
           )}
         </View>
       </View>

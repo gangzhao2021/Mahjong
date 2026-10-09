@@ -1,5 +1,5 @@
 /** Lobby: coins, daily reward, table selection and private rooms (PRD §10–§13, §24). */
-import type { AccountSummary, GameOptions, PrivateRules, ServerInfo } from '@mahjong/protocol';
+import type { AccountSummary, FriendRoomInfo, GameOptions, PrivateRules, ServerInfo } from '@mahjong/protocol';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
@@ -8,6 +8,7 @@ import { formStyles, Sheet } from '../components/Sheet';
 import { SettingsSheet } from './SettingsSheet';
 import { updateSettings, useSettings } from '../settings';
 import { AchievementsSheet } from './AchievementsSheet';
+import { FriendRoomEntrySheet, WaitingRoomSheet, type FriendActions } from './FriendRoomSheet';
 import { TileFan } from '../components/TileFan';
 import type { ConnectionStatus } from '../net/useGame';
 import { T, tableName } from '../strings';
@@ -23,6 +24,9 @@ interface Props {
   onOpenTutorial(): void;
   onOpenHistory(): void;
   onOpenRules(): void;
+  /** Friend-room waiting room (null when not in one) and its actions. */
+  friendRoom: FriendRoomInfo | null;
+  friend: FriendActions;
   /** Lessons the player has finished (from local storage). */
   tutorialDone: number;
 }
@@ -37,10 +41,11 @@ const TIER: Record<string, { fill: string; rim: string; ink: string }> = {
 const TIER_FALLBACK = { fill: '#607d8b', rim: '#cfd8dc', ink: '#fff' };
 const LESSON_COUNT = 6;
 
-export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, onOpenRules, tutorialDone }: Props) {
+export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, onOpenRules, friendRoom, friend, tutorialDone }: Props) {
   const [privateOpen, setPrivateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [friendOpen, setFriendOpen] = useState(false);
   const { width, height } = useWindowDimensions();
   const online = status === 'online';
   const limit = account.playLimit;
@@ -177,22 +182,42 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
               );
             })}
           </View>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!online || blocked}
-            onPress={() => setPrivateOpen(true)}
-            style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
-          >
-            <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
-            <Text style={styles.privateInfo} numberOfLines={1}>
-              {T.privateRoomHint}
-            </Text>
-            <Text style={styles.privateArrow}>›</Text>
-          </Pressable>
+          {/* Two ways to set up a table yourself: alone with AI, or with friends */}
+          <View style={styles.roomRow}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!online || blocked}
+              onPress={() => setPrivateOpen(true)}
+              style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
+            >
+              <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
+              <Text style={styles.privateInfo} numberOfLines={1}>
+                {T.privateRoomHint}
+              </Text>
+              <Text style={styles.privateArrow}>›</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!online || blocked}
+              onPress={() => setFriendOpen(true)}
+              style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
+            >
+              <Text style={styles.privateName}>👥 {T.friend.entry}</Text>
+              <Text style={styles.privateInfo} numberOfLines={1}>
+                {T.friend.hint}
+              </Text>
+              <Text style={styles.privateArrow}>›</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
+      {friendRoom ? (
+        <WaitingRoomSheet room={friendRoom} myId={account.playerId} actions={friend} />
+      ) : (
+        friendOpen && <FriendRoomEntrySheet maxHands={info.privateRoom.maxHands} actions={friend} onClose={() => setFriendOpen(false)} />
+      )}
       {achievementsOpen && <AchievementsSheet token={token} account={account} onAccount={onAccount} onClose={() => setAchievementsOpen(false)} />}
       {privateOpen && (
         <PrivateRoomSheet
@@ -358,7 +383,9 @@ const styles = StyleSheet.create({
   cardName: { fontSize: 17, fontWeight: '900', color: '#fff8e1' },
   badge: { position: 'absolute', top: -8, right: 10, fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
   cardInfo: { fontSize: 12, color: '#a5d6a7', fontWeight: '700' },
+  roomRow: { flexDirection: 'row', gap: 10 },
   private: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,

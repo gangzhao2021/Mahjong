@@ -90,6 +90,11 @@ export class HumanSeat implements SeatController {
     this.socket = socket;
   }
 
+  /** This is the socket the seat is attached to. */
+  holds(socket: WebSocket): boolean {
+    return this.socket === socket;
+  }
+
   detach(socket?: WebSocket): void {
     if (!socket || socket === this.socket) this.socket = null;
   }

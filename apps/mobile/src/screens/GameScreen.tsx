@@ -92,9 +92,11 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   useVoiceCallouts(game.events, settings.voice);
   // Keep the room's pace in line with the player's setting.
   const setFastPace = game.setFastPace;
+  // Friend rooms keep everyone's pace, so the setting is not sent there.
+  const friendTable = table.stake.kind === 'friend';
   useEffect(() => {
-    if (table.fastPace !== settings.fastPace) setFastPace(settings.fastPace);
-  }, [table.fastPace, settings.fastPace, setFastPace]);
+    if (!friendTable && table.fastPace !== settings.fastPace) setFastPace(settings.fastPace);
+  }, [friendTable, table.fastPace, settings.fastPace, setFastPace]);
   // Shortcut moves, at most one per view version, after a short beat so the player sees what happened.
   const autoActed = useRef(-1);
   // Memoised on the view: a fresh object every countdown tick would restart the timer below forever.
@@ -319,7 +321,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </Pressable>
       )}
 
-      {iWon && view.phase === 'play' && !table.fastForward && (
+      {iWon && view.phase === 'play' && !table.fastForward && !friendTable && (
         <View style={styles.skip}>
           <Btn label={T.skipToResults} primary onPress={game.skipToResults} />
         </View>
