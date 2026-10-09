@@ -1,5 +1,5 @@
 /** Small presentational pieces of the table: melds, ponds, seat cards, countdown. */
-import type { DiscardRecord, Meld, Suit } from '@mahjong/engine';
+import type { DiscardRecord, Meld, Suit, WinRecord } from '@mahjong/engine';
 import type { SeatInfo, TimerInfo } from '@mahjong/protocol';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -27,19 +27,41 @@ export function Melds({ melds, tileWidth }: { melds: Meld[]; tileWidth: number }
   );
 }
 
-export function Pond({ discards, tileWidth, perRow, lastDiscard }: { discards: DiscardRecord[]; tileWidth: number; perRow: number; lastDiscard: boolean }) {
+/**
+ * A player's discards, laid out the way they land on a real table: in front of
+ * that player, starting next to the compass and growing back toward them.
+ * Side players' tiles lie sideways with their tops toward the centre.
+ * side: 0 = me (bottom), 1 = right, 2 = top, 3 = left.
+ */
+export function Pond({ discards, tileWidth, perLine, side, lastDiscard }: { discards: DiscardRecord[]; tileWidth: number; perLine: number; side: 0 | 1 | 2 | 3; lastDiscard: boolean }) {
   const visible = discards.filter((d) => !d.claimed);
+  const vertical = side === 1 || side === 3;
+  const span = perLine * (tileWidth + 2);
   return (
-    <View style={[styles.pond, { width: perRow * (tileWidth + 2) }]}>
+    <View style={[styles.pond, POND_FLOW[side], vertical ? { height: span } : { width: span }]}>
       {visible.map((d, i) => (
         // Each discard pops in once, when it first lands in the pond.
         <PopIn key={i} from={1.4}>
-          <Tile tile={d.tile} width={tileWidth} highlighted={lastDiscard && i === visible.length - 1} style={{ margin: 1 }} />
+          <Tile
+            tile={d.tile}
+            width={tileWidth}
+            rotated={side === 3 ? true : side === 1 ? 'ccw' : undefined}
+            highlighted={lastDiscard && i === visible.length - 1}
+            style={{ margin: 1 }}
+          />
         </PopIn>
       ))}
     </View>
   );
 }
+
+/** Reading order of each pond from its owner's seat; new lines are added on the owner's side. */
+const POND_FLOW = {
+  0: { flexDirection: 'row', flexWrap: 'wrap' },
+  1: { flexDirection: 'column-reverse', flexWrap: 'wrap' },
+  2: { flexDirection: 'row-reverse', flexWrap: 'wrap-reverse' },
+  3: { flexDirection: 'column', flexWrap: 'wrap-reverse' },
+} as const;
 
 interface SeatCardProps {
   info: SeatInfo;
@@ -47,15 +69,17 @@ interface SeatCardProps {
   voidSuit: Suit | null;
   dealer: boolean;
   active: boolean;
-  won: boolean;
+  /** Set once this seat has won (血战: they sit out while the others play on). */
+  win: WinRecord | null;
   handCount: number;
 }
 
-export function SeatCard({ info, score, voidSuit, dealer, active, won, handCount }: SeatCardProps) {
+export function SeatCard({ info, score, voidSuit, dealer, active, win, handCount }: SeatCardProps) {
+  const won = win !== null;
   return (
-    <View style={[styles.card, active && styles.cardActive]}>
+    <View style={[styles.card, active && styles.cardActive, won && styles.cardWon]}>
       <Text style={styles.avatar}>{info.avatar}</Text>
-      <View>
+      <View style={styles.cardText}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
             {info.name}
@@ -70,6 +94,13 @@ export function SeatCard({ info, score, voidSuit, dealer, active, won, handCount
           {!info.isHuman && !won ? `  · ${T.tilesInHand(handCount)}` : ''}
           {info.personality ? <Text style={styles.personality}>{`  ${info.personality}`}</Text> : null}
         </Text>
+        {win && (
+          <View style={styles.winRow}>
+            <Text style={styles.winText}>{win.selfDraw ? T.zimo : T.hu}</Text>
+            <Tile tile={win.tile} width={16} highlighted />
+            <Text style={styles.winText}>{T.fan(win.fan)}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -93,8 +124,9 @@ const styles = StyleSheet.create({
   backsRow: { flexDirection: 'row', gap: 1 },
   backsColumn: { flexDirection: 'column', gap: 1 },
   compass: {
-    width: 104,
-    height: 104,
+    width: 112,
+    height: 112,
+    flexShrink: 0,
     borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.32)',
     borderWidth: 2,
@@ -107,10 +139,9 @@ const styles = StyleSheet.create({
   compassWall: { color: '#c8e6c9', fontSize: 11 },
   compassTimer: { color: '#fff', fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'] },
   compassTimerLow: { color: '#ffab91' },
-  compassNote: { color: '#fff59d', fontSize: 10, textAlign: 'center', paddingHorizontal: 14 },
   melds: { flexDirection: 'row', gap: 6 },
   meld: { flexDirection: 'row' },
-  pond: { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start' },
+  pond: { alignContent: 'flex-start' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -123,8 +154,13 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   cardActive: { borderColor: '#ffd54f' },
+  cardWon: { borderColor: '#ef5350', backgroundColor: 'rgba(120,20,20,0.55)' },
+  winRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  winText: { color: '#ffcdd2', fontSize: 12, fontWeight: '900' },
   avatar: { fontSize: 26 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Badges wrap under the name rather than pushing the card past the screen edge.
+  cardText: { flexShrink: 1 },
+  nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
   name: { color: '#fff', fontWeight: '700', fontSize: 13, maxWidth: 90 },
   badge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 4, borderRadius: 4, overflow: 'hidden' },
   dealerBadge: { backgroundColor: '#ffd54f', color: '#5d4100' },
@@ -151,7 +187,7 @@ export function ConcealedTiles({ count, width, vertical }: { count: number; widt
 }
 
 /** Seat winds around the wall count and timer; the edge of the player to act lights up. */
-export function Compass({ winds, active, wallCount, timer, note }: { winds: string[]; active: number | null; wallCount: string; timer: number | null; note: string | null }) {
+export function Compass({ winds, active, wallCount, timer }: { winds: string[]; active: number | null; wallCount: string; timer: number | null }) {
   // winds[i] / active use sides: 0 = me (bottom), 1 = right, 2 = top, 3 = left.
   const edge = (side: number) => [styles.wind, WIND_POSITION[side], active === side && styles.windActive];
   return (
@@ -163,7 +199,6 @@ export function Compass({ winds, active, wallCount, timer, note }: { winds: stri
       ))}
       <Text style={styles.compassWall}>{wallCount}</Text>
       {timer !== null && <Text style={[styles.compassTimer, timer <= 5 && styles.compassTimerLow]}>{timer}</Text>}
-      {note && <Text style={styles.compassNote}>{note}</Text>}
     </View>
   );
 }

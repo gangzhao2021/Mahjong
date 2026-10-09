@@ -11,8 +11,8 @@ export interface TileProps {
   back?: boolean;
   dimmed?: boolean;
   highlighted?: boolean;
-  /** Lying sideways in a side player's area. */
-  rotated?: boolean;
+  /** Lying sideways in a side player's area: true turns the top to the right, 'ccw' to the left. */
+  rotated?: boolean | 'ccw';
   style?: ViewStyle;
 }
 
@@ -34,7 +34,7 @@ function TileView({ tile, width, back, dimmed, highlighted, rotated, style }: Ti
       style={[styles.tile, styles.face, box, highlighted && styles.highlighted, dimmed && styles.dimmed, style]}
       accessibilityLabel={`${RANK_NAMES[rankOf(tile) - 1]} ${SUIT_NAMES[suit]}`}
     >
-      <View style={rotated ? { transform: [{ rotate: '90deg' }] } : null}>
+      <View style={rotated ? { transform: [{ rotate: rotated === 'ccw' ? '-90deg' : '90deg' }] } : null}>
         <TileFace tile={tile} width={faceW} height={faceH} />
       </View>
     </View>

@@ -196,6 +196,9 @@ export class Lobby {
       case 'setAutoPlay':
         room?.setAutoPlay(!!msg.on);
         return;
+      case 'setFastPace':
+        room?.setFastPace(!!msg.on);
+        return;
       case 'skipToResults':
         room?.skipToResults();
         return;
@@ -444,9 +447,23 @@ export class Lobby {
   }
 
   /** Coins first (what the player sees), then memory (best effort). */
+  /** The character roster (live: admins can edit it). */
+  get characters(): DialogueConfig['roster']['characters'] {
+    return this.deps.dialogue.roster.characters;
+  }
+
   private async afterHand(player: PlayerRow, room: Room, plan: GamePlan, handIndex: number, result: HandResult): Promise<void> {
     await this.settle(player.id, room, plan, handIndex, result);
     await this.remember(player, room, plan, result).catch((error) => console.error('Recording AI memory failed:', error));
+    // After the memory write, so lifetime counts in the profile include this hand.
+    await this.s.tasks.recordHand(player.id, room.humanSeat, result).catch((error) => console.error('Recording task progress failed:', error));
+    if (room.gameOver) {
+      const rank = await this.s.ranks.recordGame(player.id, room.id, plan.stake, room.totals, room.humanSeat).catch((error) => {
+        console.error('Recording rank failed:', error);
+        return null;
+      });
+      if (rank) room.human.send({ type: 'rank', result: rank });
+    }
   }
 
   /** Long-term memory write path (PRD Appendix B.2). */

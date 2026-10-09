@@ -10,6 +10,7 @@ import { Lobby } from './lobby';
 import { createServices } from './services';
 import { RetentionJob, retentionPolicy } from './retention';
 import { FileHandLogStore } from './store';
+import { TeeHandLogStore } from './history';
 
 const config = DEFAULT_CONFIG;
 const dialogue = loadDialogueConfig();
@@ -17,7 +18,7 @@ const llm = createLlmProvider(dialogue);
 const moderator = createModerator(dialogue);
 const db = await openDb({ databaseUrl: process.env.DATABASE_URL, dataDir: path.join(config.dataDir, 'pglite') });
 const services = createServices({ region: dialogue.region, db, dataDir: config.dataDir });
-const lobby = new Lobby({ config, dialogue, llm, moderator, hands: new FileHandLogStore(config.dataDir), services });
+const lobby = new Lobby({ config, dialogue, llm, moderator, hands: new TeeHandLogStore([new FileHandLogStore(config.dataDir), services.history]), services });
 
 // Admin-edited settings override the JSON defaults (PRD §34–§38).
 const liveConfig = new LiveConfig(db, { region: dialogue.region, economy: services.economy, dialogue, server: config, llm });

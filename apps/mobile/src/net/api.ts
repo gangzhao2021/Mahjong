@@ -1,5 +1,5 @@
 /** HTTP API client for accounts and economy. */
-import type { AccountSummary, BanterLevel, LoginMethod, ServerInfo } from '@mahjong/protocol';
+import type { AccountSummary, BanterLevel, CharacterRelation, HandHistoryEntry, HandReplay, LoginMethod, PlayerStats, ServerInfo, TasksStatus } from '@mahjong/protocol';
 import { SERVER_HTTP } from '../config';
 import { getLocale } from '../strings';
 
@@ -35,7 +35,7 @@ async function request<T>(method: string, path: string, body?: unknown, token?: 
 
 export interface LedgerEntry {
   id: number;
-  type: 'startingCoins' | 'handSettlement' | 'loginReward' | 'adminAdjustment';
+  type: 'startingCoins' | 'handSettlement' | 'loginReward' | 'taskReward' | 'achievementReward' | 'adminAdjustment';
   amount: number;
   balanceAfter: number;
   createdAt: string;
@@ -56,5 +56,12 @@ export const api = {
   realName: (token: string, name: string, idNumber: string) => request<AccountOnly>('POST', '/account/real-name', { name, idNumber }, token),
   claimReward: (token: string) => request<{ amount: number; account: AccountSummary }>('POST', '/rewards/claim', {}, token),
   ledger: (token: string) => request<{ entries: LedgerEntry[] }>('GET', '/ledger?limit=50', undefined, token),
+  history: (token: string) => request<{ hands: HandHistoryEntry[] }>('GET', '/history', undefined, token),
+  replay: (token: string, gameId: string, handIndex: number) => request<HandReplay>('GET', `/history/${encodeURIComponent(gameId)}/${handIndex}`, undefined, token),
+  relationships: (token: string) => request<{ relations: CharacterRelation[] }>('GET', '/relationships', undefined, token),
+  tasks: (token: string) => request<TasksStatus>('GET', '/tasks', undefined, token),
+  claimTask: (token: string, kind: 'daily' | 'achievement', id: string) =>
+    request<{ amount: number; tasks: TasksStatus; account: AccountSummary }>('POST', '/tasks/claim', { kind, id }, token),
+  stats: (token: string) => request<PlayerStats>('GET', '/stats', undefined, token),
   deleteAccount: (token: string) => request<Record<string, never>>('DELETE', '/account', undefined, token),
 };

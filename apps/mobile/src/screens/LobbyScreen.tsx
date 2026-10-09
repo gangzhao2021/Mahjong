@@ -5,6 +5,8 @@ import { Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, Vi
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { formStyles, Sheet } from '../components/Sheet';
+import { SettingsSheet } from './SettingsSheet';
+import { TasksSheet, useClaimableTasks } from './TasksSheet';
 import { TileFan } from '../components/TileFan';
 import { api } from '../net/api';
 import type { ConnectionStatus } from '../net/useGame';
@@ -19,17 +21,28 @@ interface Props {
   onStart(options: GameOptions): void;
   onOpenAccount(): void;
   onOpenTutorial(): void;
+  onOpenHistory(): void;
+  onOpenRules(): void;
   /** Lessons the player has finished (from local storage). */
   tutorialDone: number;
 }
 
-/** Accent colour per stake level, so the tables read as a ladder at a glance. */
-const TIER: Record<string, string> = { practice: '#43a047', low: '#1e88e5', mid: '#8e24aa', high: '#e0a100' };
+/** Chip colours per stake level (fill, dashed rim, label), so the tables read as a ladder at a glance. */
+const TIER: Record<string, { fill: string; rim: string; ink: string }> = {
+  practice: { fill: '#43a047', rim: '#c8e6c9', ink: '#fff' },
+  low: { fill: '#1e88e5', rim: '#bbdefb', ink: '#fff' },
+  mid: { fill: '#8e24aa', rim: '#e1bee7', ink: '#fff' },
+  high: { fill: '#e0a100', rim: '#ffecb3', ink: '#3e2a00' },
+};
+const TIER_FALLBACK = { fill: '#607d8b', rim: '#cfd8dc', ink: '#fff' };
 const LESSON_COUNT = 6;
 
-export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, tutorialDone }: Props) {
+export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, onOpenRules, tutorialDone }: Props) {
   const [rewardOpen, setRewardOpen] = useState(false);
   const [privateOpen, setPrivateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const claimable = useClaimableTasks(token, tasksOpen);
   const { width, height } = useWindowDimensions();
   const online = status === 'online';
   const limit = account.playLimit;
@@ -39,11 +52,14 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   // Quick start: new players go to practice; others to the highest table they can comfortably afford (10× the entry).
   const comfortable = info.tables.filter((t) => t.minCoins === 0 || account.balance >= t.minCoins * 10);
   const quick = tutorialDone >= 0 && tutorialDone < 2 ? info.tables[0] : (comfortable[comfortable.length - 1] ?? info.tables[0]);
-  const fanTile = Math.round(Math.min(height * 0.15, 56));
+  const fanTile = Math.round(Math.min(height * 0.15, 72));
+  // Cards size to the screen but stop growing on big monitors, so they never turn into empty slabs.
+  const cardHeight = Math.round(Math.max(64, Math.min(height * 0.17, 128)));
+  const chipSize = Math.round(Math.min(cardHeight * 0.62, 60));
 
   return (
     <Felt style={styles.root}>
-      <View style={styles.top}>
+      <View style={[styles.top, styles.capped]}>
         <Pressable style={styles.profile} onPress={onOpenAccount} accessibilityRole="button" accessibilityLabel={T.account}>
           <Text style={styles.avatar}>{account.avatar}</Text>
           <View>
@@ -51,12 +67,15 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
               {account.nickname}
             </Text>
             <Text style={styles.coins}>🪙 {account.balance.toLocaleString()}</Text>
+            <Text style={styles.rank}>🏅 {T.rank.label(T.rank.tiers[account.rank.tier], account.rank.points)}</Text>
           </View>
         </Pressable>
         <View style={styles.topButtons}>
-          <Btn label={`📖 ${T.tutorial.entry}`} onPress={onOpenTutorial} />
+          <Btn label={`📊 ${T.record.entry}`} onPress={onOpenHistory} />
+          <Btn label={`🎯 ${T.tasks.entry}${claimable ? ` · ${claimable}` : ''}`} primary={claimable > 0} onPress={() => setTasksOpen(true)} />
           <Btn label={`🎁 ${T.dailyReward}`} primary={account.reward.claimable} onPress={() => setRewardOpen(true)} />
-          <Btn label={`⚙️ ${T.account}`} onPress={onOpenAccount} />
+          <Btn label={`⚙️ ${T.settings.entry}`} onPress={() => setSettingsOpen(true)} />
+          <Btn label={`👤 ${T.account}`} onPress={onOpenAccount} />
         </View>
       </View>
 
@@ -66,7 +85,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </Text>
       )}
 
-      <View style={styles.body}>
+      <View style={[styles.body, styles.capped]}>
         {/* Left: the game's face and the one-tap way in */}
         <View style={[styles.hero, compact && styles.heroCompact]}>
           {!compact && <TileFan width={fanTile} />}
@@ -87,6 +106,9 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
             <Pressable onPress={onOpenTutorial} style={[styles.chip, tutorialDone === 0 && styles.chipHot]} accessibilityRole="button">
               <Text style={[styles.chipText, tutorialDone === 0 && styles.chipHotText]}>📖 {T.tutorialProgress(Math.max(0, tutorialDone), LESSON_COUNT)}</Text>
             </Pressable>
+            <Pressable onPress={onOpenRules} style={styles.chip} accessibilityRole="button">
+              <Text style={styles.chipText}>📘 {T.rulesPage.entry}</Text>
+            </Pressable>
             <Pressable onPress={() => setRewardOpen(true)} style={[styles.chip, account.reward.claimable && styles.chipHot]} accessibilityRole="button">
               <Text style={[styles.chipText, account.reward.claimable && styles.chipHotText]}>
                 🎁 {account.reward.claimable ? T.rewardReady : T.rewardTaken}
@@ -101,24 +123,41 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
           <View style={styles.grid}>
             {info.tables.map((t) => {
               const affordable = account.balance >= t.minCoins;
-              const tier = TIER[t.id] ?? '#607d8b';
+              const tier = TIER[t.id] ?? TIER_FALLBACK;
               return (
                 <Pressable
                   key={t.id}
                   accessibilityRole="button"
                   disabled={!online || blocked || !affordable}
                   onPress={() => onStart({ tableId: t.id })}
-                  style={({ pressed }) => [styles.card, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.card, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
                 >
-                  <View style={[styles.band, { backgroundColor: tier }]} />
+                  {t.id === quick.id && (
+                    <Text style={[styles.badge, { backgroundColor: tier.fill, color: tier.ink }]} numberOfLines={1}>
+                      {T.recommended}
+                    </Text>
+                  )}
+                  {/* Poker chip carrying the base score; the practice table has none, so it shows the table's initial */}
+                  <View
+                    style={[
+                      styles.stake,
+                      { width: chipSize, height: chipSize, borderRadius: chipSize / 2, backgroundColor: tier.fill, borderColor: tier.rim },
+                    ]}
+                  >
+                    <Text style={[styles.stakeLabel, { color: tier.ink, fontSize: Math.round(chipSize * 0.32) }]} numberOfLines={1}>
+                      {t.multiplier === 0 ? tableName(t).slice(0, 1) : t.baseScore}
+                    </Text>
+                  </View>
                   <View style={styles.cardBody}>
-                    <View style={styles.cardHead}>
-                      <Text style={styles.cardName}>{tableName(t)}</Text>
-                      {t.id === quick.id && <Text style={[styles.badge, { backgroundColor: tier }]}>{T.recommended}</Text>}
-                    </View>
-                    <Text style={[styles.cardBig, { color: tier }]}>{t.multiplier === 0 ? T.noCoins : T.baseScoreN(t.baseScore)}</Text>
-                    <Text style={[styles.cardInfo, !affordable && styles.short]}>
-                      {!affordable ? `🔒 ${T.needMore(t.minCoins - account.balance)}` : t.minCoins > 0 ? T.minCoinsN(t.minCoins) : ' '}
+                    <Text style={styles.cardName} numberOfLines={1}>
+                      {tableName(t)}
+                    </Text>
+                    <Text style={[styles.cardInfo, !affordable && styles.short]} numberOfLines={1}>
+                      {!affordable
+                        ? `🔒 ${T.needMore(t.minCoins - account.balance)}`
+                        : t.multiplier === 0
+                          ? T.noCoins
+                          : `${T.baseScoreN(t.baseScore)} · ${T.minCoinsN(t.minCoins)}`}
                     </Text>
                   </View>
                 </Pressable>
@@ -140,6 +179,8 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </View>
       </View>
 
+      {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
+      {tasksOpen && <TasksSheet token={token} onAccount={onAccount} onClose={() => setTasksOpen(false)} />}
       {rewardOpen && <RewardSheet token={token} account={account} onAccount={onAccount} onClose={() => setRewardOpen(false)} />}
       {privateOpen && (
         <PrivateRoomSheet
@@ -265,8 +306,10 @@ const styles = StyleSheet.create({
   avatar: { fontSize: 30 },
   nickname: { color: '#fff', fontWeight: '800', fontSize: 15 },
   coins: { color: '#ffe082', fontWeight: '800', fontVariant: ['tabular-nums'] },
+  rank: { color: '#b2dfdb', fontSize: 12, fontWeight: '800' },
   limit: { color: '#ffcc80', fontSize: 13, alignSelf: 'center' },
-  body: { flex: 1, flexDirection: 'row', gap: 16, minHeight: 0 },
+  capped: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
+  body: { flex: 1, flexDirection: 'row', gap: 24, minHeight: 0 },
   hero: { flex: 0.85, alignItems: 'center', justifyContent: 'center', gap: 6 },
   heroCompact: { flex: 0.75 },
   brand: {
@@ -301,30 +344,28 @@ const styles = StyleSheet.create({
   chipHot: { backgroundColor: '#ffd54f' },
   chipText: { color: '#e8f5e9', fontSize: 12, fontWeight: '700' },
   chipHotText: { color: '#5d4100' },
-  tablesArea: { flex: 1.25, gap: 8, minHeight: 0 },
+  tablesArea: { flex: 1.25, gap: 8, minHeight: 0, justifyContent: 'center' },
   heading: { color: '#e8f5e9', fontSize: 14, fontWeight: '800' },
-  grid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignContent: 'stretch' },
+  grid: { flexShrink: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     flexGrow: 1,
     flexBasis: '45%',
-    minHeight: 64,
     borderRadius: 14,
-    backgroundColor: '#fdfaf2',
-    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.16)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(129,199,132,0.55)',
+    borderStyle: 'dashed',
     flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
   },
-  band: { width: 8 },
-  cardBody: { flex: 1, paddingVertical: 8, paddingHorizontal: 12, justifyContent: 'center', gap: 2 },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cardName: { fontSize: 17, fontWeight: '900', color: '#3e2723' },
-  badge: { color: '#fff', fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
-  cardBig: { fontSize: 15, fontWeight: '900' },
-  cardInfo: { fontSize: 12, color: '#6d4c41' },
+  stake: { borderWidth: 4, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  stakeLabel: { fontWeight: '900', fontVariant: ['tabular-nums'] },
+  cardBody: { flex: 1, paddingVertical: 8, justifyContent: 'center', gap: 3 },
+  cardName: { fontSize: 17, fontWeight: '900', color: '#fff8e1' },
+  badge: { position: 'absolute', top: -8, right: 10, fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
+  cardInfo: { fontSize: 12, color: '#a5d6a7', fontWeight: '700' },
   private: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,17 +373,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(255,243,224,0.95)',
-    borderWidth: 2,
-    borderColor: '#ffcc80',
+    backgroundColor: 'rgba(0,0,0,0.16)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,213,79,0.55)',
     borderStyle: 'dashed',
   },
-  privateName: { fontSize: 16, fontWeight: '900', color: '#4e342e' },
-  privateInfo: { flex: 1, fontSize: 12, color: '#6d4c41' },
-  privateArrow: { fontSize: 24, color: '#8d6e63', fontWeight: '700' },
+  privateName: { fontSize: 16, fontWeight: '900', color: '#ffe082' },
+  privateInfo: { flex: 1, fontSize: 12, color: 'rgba(232,245,233,0.7)' },
+  privateArrow: { fontSize: 24, color: '#ffe082', fontWeight: '700' },
   disabled: { opacity: 0.5 },
   pressed: { transform: [{ scale: 0.97 }] },
-  short: { color: '#c62828', fontWeight: '700' },
+  short: { color: '#ffab91' },
   days: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   day: { padding: 8, borderRadius: 10, backgroundColor: '#eceff1', alignItems: 'center', minWidth: 80 },
   dayNext: { backgroundColor: '#ffe082' },

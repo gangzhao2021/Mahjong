@@ -4,7 +4,7 @@
  */
 import type { Db, Queryable } from '../db/db';
 
-export type LedgerType = 'startingCoins' | 'handSettlement' | 'loginReward' | 'adminAdjustment';
+export type LedgerType = 'startingCoins' | 'handSettlement' | 'loginReward' | 'taskReward' | 'achievementReward' | 'adminAdjustment';
 
 export interface LedgerEntry {
   id: number;

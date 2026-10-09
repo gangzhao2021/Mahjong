@@ -144,6 +144,7 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
     autoPlay: false,
     // The tutorial ends the lesson instead of fast-forwarding.
     fastForward: true,
+    fastPace: false,
     gameOver: false,
     chat,
     stake: { kind: 'private', name: '新手教程', baseScore: 1, multiplier: 0 },
@@ -164,6 +165,7 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
     chatRejected: null,
     account: null,
     lastWallet: null,
+    lastRank: null,
     startRejected: null,
     pendingResult: null,
     gameSummary: null,
@@ -173,6 +175,7 @@ export function useTutorial(lesson: Lesson, onExit: () => void): TutorialState {
     startGame: noop,
     act,
     setAutoPlay: noop,
+    setFastPace: noop,
     skipToResults: noop,
     nextHand: noop,
     leaveGame: onExit,

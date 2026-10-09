@@ -114,6 +114,8 @@ export class Room {
   private handIndex = 0;
   private log!: HandLog;
   private autoPlay = false;
+  /** Quick pace (player setting): AI think time and auto-play delay cut to a fraction. */
+  private fastPace = false;
   private consecutiveTimeouts = 0;
   private fastForward = false;
   private timer: Timer | null = null;
@@ -281,6 +283,12 @@ export class Room {
     if (this.autoPlay === on) return;
     this.autoPlay = on;
     this.consecutiveTimeouts = 0;
+    this.publish([]);
+  }
+
+  setFastPace(on: boolean): void {
+    if (this.fastPace === on) return;
+    this.fastPace = on;
     this.publish([]);
   }
 
@@ -452,7 +460,7 @@ export class Room {
 
     if (unattended) {
       // 托管 plays like an intermediate player and does declare wins.
-      const delay = this.fastForward || !this.human.connected ? 0 : this.opts.config.autoPlayDelayMs;
+      const delay = this.fastForward || !this.human.connected ? 0 : this.opts.config.autoPlayDelayMs * (this.fastPace ? FAST_PACE : 1);
       this.setTimer(delay, null, () => {
         const action = chooseAction(viewFor(this.hand, seat), 'intermediate', this.opts.rng);
         if (action) this.submit(action, version, 'autoPlay');
@@ -461,9 +469,13 @@ export class Room {
     }
 
     const kind = timerKind(legal);
-    this.setTimer(timerDuration(kind, this.opts.config), kind, () => {
+    const { config } = this.opts;
+    const practice = this.opts.stake.multiplier === 0;
+    const ms = timerDuration(kind, config) * (practice ? config.practice.timerScale : 1);
+    const autoPlayAfter = practice ? config.practice.autoPlayAfterTimeouts : config.autoPlayAfterTimeouts;
+    this.setTimer(ms, kind, () => {
       this.consecutiveTimeouts++;
-      if (this.consecutiveTimeouts >= this.opts.config.autoPlayAfterTimeouts) this.autoPlay = true;
+      if (this.consecutiveTimeouts >= autoPlayAfter) this.autoPlay = true;
       const action = timeoutAction(viewFor(this.hand, seat), this.opts.rng);
       if (action) this.submit(action, version, 'timeout');
     });
@@ -495,7 +507,8 @@ export class Room {
     if ((this.fastForward && humanWon) || !this.human.connected) return 0;
     const { minDelayMs, maxDelayMs, beginnerExtraMs } = this.opts.config.ai;
     const extra = skill === 'beginner' ? beginnerExtraMs : 0;
-    return minDelayMs + Math.floor(this.opts.rng() * (maxDelayMs - minDelayMs)) + extra;
+    const ms = minDelayMs + Math.floor(this.opts.rng() * (maxDelayMs - minDelayMs)) + extra;
+    return this.fastPace ? Math.round(ms * FAST_PACE) : ms;
   }
 
   private snapshotFor(seat: Seat): TableSnapshot {
@@ -512,6 +525,7 @@ export class Room {
       timer,
       autoPlay: this.autoPlay,
       fastForward: this.fastForward,
+      fastPace: this.fastPace,
       gameOver: this.gameOver,
       chat: this.talk.chatLog,
       stake: this.opts.stake,
@@ -529,6 +543,9 @@ export class Room {
     this.opts.onClosed?.(this);
   }
 }
+
+/** Share of the normal AI think time and auto-play delay used at quick pace. */
+const FAST_PACE = 0.3;
 
 function hasDecision(legal: LegalActions): boolean {
   return Object.keys(legal).length > 0;

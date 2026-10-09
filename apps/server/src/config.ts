@@ -15,6 +15,8 @@ export interface ServerConfig {
   };
   /** Consecutive timeouts before auto-play (托管) turns on. */
   autoPlayAfterTimeouts: number;
+  /** Practice tables (no coins) are for learning: longer timers and slower to fall into auto-play. */
+  practice: { timerScale: number; autoPlayAfterTimeouts: number };
   /** Delay of an auto-played human move, so the table stays readable. */
   autoPlayDelayMs: number;
   /** AI "thinking" time; beginners think a little longer. */
@@ -34,14 +36,15 @@ export const DEFAULT_CONFIG: ServerConfig = {
   port: Number(process.env.PORT ?? 8787),
   dataDir: process.env.DATA_DIR ?? 'data',
   timers: {
-    swapMs: 15_000,
-    dingqueMs: 10_000,
-    discardMs: 15_000,
+    swapMs: 20_000,
+    dingqueMs: 15_000,
+    discardMs: 25_000,
     claimMs: 15_000,
     nextHandMs: 20_000,
     nextHandAutoPlayMs: 4_000,
   },
   autoPlayAfterTimeouts: 2,
+  practice: { timerScale: 2, autoPlayAfterTimeouts: 3 },
   autoPlayDelayMs: 700,
   ai: { minDelayMs: 600, maxDelayMs: 1_800, beginnerExtraMs: 500 },
   skillWeights: { beginner: 20, intermediate: 50, expert: 30 },

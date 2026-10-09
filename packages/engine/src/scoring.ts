@@ -67,6 +67,13 @@ const BASE_FAN: Record<string, number> = {
   qingLongQiDui: 5,
 };
 
+/** Fan a pattern contributes on its own; null for 自摸 (depends on the rules) and 天胡/地胡 (the cap). */
+export function patternFan(pattern: Pattern): number | null {
+  if (pattern in BASE_FAN) return BASE_FAN[pattern];
+  if (pattern === 'ziMo' || pattern === 'tianHu' || pattern === 'diHu') return null;
+  return 1; // 根, 杠上花, 杠上炮, 抢杠胡, 海底捞月
+}
+
 function basePattern(hand: readonly Tile[], melds: readonly Meld[], rules: RuleSet): Pattern {
   const counts = toCounts(hand);
   const all = allTilesOf(hand, melds);

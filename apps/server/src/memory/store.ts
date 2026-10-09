@@ -26,7 +26,7 @@ const MAX_QUOTES_PER_PLAYER = 10;
 const RECALL_OWN = 2;
 const RECALL_SHARED = 1;
 
-interface RelationshipRow {
+export interface RelationshipRow {
   character_id: string;
   games_together: number;
   hands_together: number;
@@ -235,6 +235,11 @@ export class MemoryStore {
       });
     }
     return result;
+  }
+
+  /** Every character this player has shared a table with, most-played first. */
+  async relationships(playerId: string, limit = 20): Promise<RelationshipRow[]> {
+    return this.db.query<RelationshipRow>('SELECT * FROM relationships WHERE player_id = $1 ORDER BY hands_together DESC, last_seen_at DESC LIMIT $2', [playerId, limit]);
   }
 
   async profile(playerId: string): Promise<{ playStyle: string; habits: string[] } | null> {

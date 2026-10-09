@@ -117,14 +117,15 @@ function valueBonus(counts: number[], voidSuit: Suit | null, meldTiles: Tile[]):
   return bonus;
 }
 
-interface DiscardScore {
+export interface DiscardScore {
   tile: Tile;
   shanten: number;
   acceptance: number;
   score: number;
 }
 
-function rankDiscards(view: HandView, candidates: Tile[], skill: SkillLevel): DiscardScore[] {
+/** Every candidate discard with the shanten and acceptance (进张) it leaves, best first for `skill`. */
+export function rankDiscards(view: HandView, candidates: Tile[], skill: SkillLevel): DiscardScore[] {
   const me = self(view);
   const seen = visibleCounts(view);
   const counts = usefulCounts(me.hand, me.voidSuit);

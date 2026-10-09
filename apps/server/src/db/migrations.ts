@@ -213,4 +213,45 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX chat_log_created ON chat_log(created_at);
   CREATE INDEX chat_log_player ON chat_log(player_id, created_at)
   `,
+  // Each player's finished hands, for the in-app replay and history list; purged with the hand logs.
+  `
+  CREATE TABLE hand_history (
+    player_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    game_id text NOT NULL,
+    hand_index int NOT NULL,
+    log jsonb NOT NULL,
+    ended_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (player_id, game_id, hand_index)
+  );
+  CREATE INDEX hand_history_recent ON hand_history(player_id, ended_at DESC)
+  `,
+  // Daily tasks (progress per game day) and one-time achievements; rewards are paid on claim.
+  `
+  CREATE TABLE player_tasks (
+    player_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    day date NOT NULL,
+    task_id text NOT NULL,
+    progress int NOT NULL DEFAULT 0,
+    claimed boolean NOT NULL DEFAULT false,
+    PRIMARY KEY (player_id, day, task_id)
+  );
+  CREATE TABLE player_achievements (
+    player_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    achievement_id text NOT NULL,
+    unlocked_at timestamptz NOT NULL DEFAULT now(),
+    claimed boolean NOT NULL DEFAULT false,
+    PRIMARY KEY (player_id, achievement_id)
+  )
+  `,
+  // Ranks: points on the player, and the ranked games already applied (each counts once).
+  `
+  ALTER TABLE players ADD COLUMN rank_points int NOT NULL DEFAULT 0;
+  CREATE TABLE rank_games (
+    player_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    game_id text NOT NULL,
+    place int NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (player_id, game_id)
+  )
+  `,
 ];

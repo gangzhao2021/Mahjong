@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_RULESET, NO_SITUATION, parseTiles, scoreWin, withRules, type Meld, type WinContext } from '../src';
+import { DEFAULT_RULESET, NO_SITUATION, parseTiles, patternFan, scoreWin, withRules, type Meld, type WinContext } from '../src';
 import { t } from './helpers';
 
 function score(hand: string, opts: { melds?: Meld[]; ctx?: Partial<WinContext>; rules?: typeof DEFAULT_RULESET; base?: number } = {}) {
@@ -106,5 +106,22 @@ describe('roots and bonuses', () => {
     const r = score('1111m23m456m789m55m', { ctx: { selfDraw: true }, base: 100 });
     expect(r.patterns).toEqual(['qingYiSe', 'gen', 'ziMo']);
     expect(r.score).toBe(900);
+  });
+});
+
+describe('patternFan', () => {
+  it.each([
+    ['1111m23m456m789m55m', { gangShangHua: true }],
+    ['111m444m333s777s55s', { haiDi: true }],
+    ['1111m22m33m44s55s66s', {}],
+    ['11m22m33m44m55s66s77s', { qiangGang: true }],
+  ])('adds up to the raw fan for %s', (hand, ctx) => {
+    const r = score(hand, { ctx, rules: withRules({ maxFan: 13 }) });
+    expect(r.patterns.reduce((sum, p) => sum + (patternFan(p) ?? 0), 0)).toBe(r.rawFan);
+  });
+
+  it('leaves self-draw and heavenly / earthly hands to the rules', () => {
+    expect(patternFan('ziMo')).toBeNull();
+    expect(patternFan('tianHu')).toBeNull();
   });
 });

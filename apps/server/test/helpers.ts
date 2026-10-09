@@ -15,11 +15,13 @@ import { NoLlm, type LlmProvider } from '../src/llm/provider';
 import { Lobby } from '../src/lobby';
 import { createServices, type Services } from '../src/services';
 import { MemoryHandLogStore } from '../src/store';
+import { TeeHandLogStore } from '../src/history';
 
 export const FAST: ServerConfig = {
   ...DEFAULT_CONFIG,
   timers: { swapMs: 40, dingqueMs: 40, discardMs: 40, claimMs: 40, nextHandMs: 30, nextHandAutoPlayMs: 10 },
   autoPlayDelayMs: 0,
+  practice: { timerScale: 1, autoPlayAfterTimeouts: 2 },
   ai: { minDelayMs: 0, maxDelayMs: 2, beginnerExtraMs: 1 },
   unattendedActionsPerSecond: 100_000,
 };
@@ -81,7 +83,7 @@ export async function startServer(config = FAST, options: TestServerOptions = {}
     dialogue,
     llm: options.llm ?? new NoLlm(),
     moderator,
-    hands,
+    hands: new TeeHandLogStore([hands, services.history]),
     services,
     seed: () => seed++ * 7919,
   });

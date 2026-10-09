@@ -45,6 +45,30 @@ describe('game server', () => {
     });
   });
 
+  it('gives practice tables longer timers and one more timeout before auto-play', async () => {
+    const server = await startServer({ ...FAST, practice: { timerScale: 2, autoPlayAfterTimeouts: 3 } });
+    const client = await Client.connect(server);
+    await client.hello();
+    client.send({ type: 'startGame', options: { private: { baseScore: 0, handsPerGame: 1 } } });
+    const first = await client.next(isTable);
+    expect(first.table.timer).toMatchObject({ kind: 'swap', durationMs: FAST.timers.swapMs * 2 });
+    await client.next(gameOver);
+
+    const sources = server.hands.logs[0].sources;
+    expect(sources.filter((s) => s === 'timeout')).toHaveLength(3);
+    expect(sources).toContain('autoPlay');
+  });
+
+  it('switches the table to quick pace on request', async () => {
+    const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 60_000 } });
+    const client = await Client.connect(server);
+    await client.hello();
+    client.send({ type: 'startGame' });
+    expect((await client.next(isTable)).table.fastPace).toBe(false);
+    client.send({ type: 'setFastPace', on: true });
+    await client.next((m): m is TableMsg => isTable(m) && m.table.fastPace);
+  });
+
   it('shows a countdown timer for the human decision', async () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 15_000 } });
     const client = await Client.connect(server);

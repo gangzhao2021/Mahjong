@@ -1,9 +1,10 @@
 /**
- * The human player's concealed hand. Double-tap or swipe a tile upward to
- * discard (PRD §15); single tap selects (used for the swap and the 出牌 button).
+ * The human player's concealed hand. Tap a tile to select it and tap it again
+ * (or double-tap, or swipe it upward) to discard (PRD §15). With a mouse,
+ * tiles that can be discarded lift slightly on hover.
  */
 import { suitOf, type Suit, type Tile as TileKind } from '@mahjong/engine';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import { Tile } from './Tile';
 
@@ -23,6 +24,8 @@ interface Props {
   selected: string[];
   onSelect(item: HandTile): void;
   onDiscard(tile: TileKind): void;
+  /** Pointer moved onto a tile (or off all tiles: null); mouse only. */
+  onHover?(item: HandTile | null): void;
 }
 
 const DOUBLE_TAP_MS = 320;
@@ -44,7 +47,7 @@ export function arrangeHand(hand: TileKind[], drawn: TileKind | null, voidSuit: 
   return { main: tiles.map((tile, i) => ({ key: `h${i}-${tile}`, tile })), drawn: drawnItem };
 }
 
-export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, selected, onSelect, onDiscard }: Props) {
+export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, selected, onSelect, onDiscard, onHover }: Props) {
   const arranged = useMemo(() => arrangeHand(hand, drawn, voidSuit), [hand, drawn, voidSuit]);
   const items = arranged.drawn ? [...arranged.main, arranged.drawn] : arranged.main;
 
@@ -61,6 +64,7 @@ export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, sele
           dimmed={discardable !== null && !discardable.includes(item.tile)}
           onSelect={onSelect}
           onDiscard={onDiscard}
+          onHover={onHover}
         />
       ))}
     </View>
@@ -76,10 +80,12 @@ interface TileViewProps {
   dimmed: boolean;
   onSelect(item: HandTile): void;
   onDiscard(tile: TileKind): void;
+  onHover?(item: HandTile | null): void;
 }
 
-function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect, onDiscard }: TileViewProps) {
+function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect, onDiscard, onHover }: TileViewProps) {
   const lastTap = useRef(0);
+  const [hovered, setHovered] = useState(false);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
 
   // One responder handles both gestures, identically for touch and mouse:
@@ -96,7 +102,8 @@ function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect
     }
     if (Math.abs(dx) > 12 || Math.abs(dy) > 12) return;
     const now = Date.now();
-    if (canDiscard && now - lastTap.current < DOUBLE_TAP_MS) {
+    // A second tap discards: right away (double tap), or later on a tile already selected.
+    if (canDiscard && (selected || now - lastTap.current < DOUBLE_TAP_MS)) {
       lastTap.current = 0;
       onDiscard(item.tile);
       return;
@@ -117,7 +124,19 @@ function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect
       onResponderTerminate={() => {
         pressStart.current = null;
       }}
-      style={{ marginLeft: gap, transform: [{ translateY: selected ? -width * 0.35 : 0 }] }}
+      onPointerEnter={() => {
+        setHovered(true);
+        onHover?.(item);
+      }}
+      onPointerLeave={() => {
+        setHovered(false);
+        onHover?.(null);
+      }}
+      style={{
+        marginLeft: gap,
+        cursor: canDiscard ? 'pointer' : undefined,
+        transform: [{ translateY: selected ? -width * 0.35 : hovered && canDiscard ? -width * 0.12 : 0 }],
+      }}
     >
       <Tile tile={item.tile} width={width} dimmed={dimmed} highlighted={selected} />
     </View>
