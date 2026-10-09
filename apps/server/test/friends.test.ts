@@ -100,4 +100,14 @@ describe('friend rooms', () => {
     const after = (await clients[1].next(roomWith(3))).room!;
     expect(after.members[0].isHost).toBe(true);
   });
+
+  it('serves an invite page that opens the app and shows the number', async () => {
+    const server = await startServer(PATIENT);
+    const page = await fetch(`${server.http}/join/123456?lang=zh`);
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain('sichuanmahjong://join/123456');
+    expect(html).toContain('123456');
+    expect((await fetch(`${server.http}/join/12ab56`)).status).toBe(404);
+  });
 });

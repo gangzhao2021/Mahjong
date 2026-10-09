@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { formStyles, Sheet } from '../components/Sheet';
+import { shareInvite } from '../net/invite';
 import { T } from '../strings';
 
 export interface FriendActions {
@@ -49,6 +50,11 @@ export function FriendRoomEntrySheet({ maxHands, actions, onClose }: { maxHands:
 /** The waiting room: the number to share, who is in, and (for the host) the start button. */
 export function WaitingRoomSheet({ room, myId, actions }: { room: FriendRoomInfo; myId: string; actions: FriendActions }) {
   const isHost = room.members.find((m) => m.playerId === myId)?.isHost ?? false;
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const share = async () => {
+    const outcome = await shareInvite(room.code);
+    setShareNote(outcome === 'copied' ? T.friend.copied : outcome === 'failed' ? T.friend.shareFailed : null);
+  };
   const seats = Array.from({ length: room.maxPlayers }, (_, i) => room.members[i] ?? null);
   return (
     <Sheet title={T.friend.waitingTitle} width={480}>
@@ -57,7 +63,9 @@ export function WaitingRoomSheet({ room, myId, actions }: { room: FriendRoomInfo
         <Text style={styles.codeBig} selectable>
           {room.code}
         </Text>
-        <Text style={formStyles.hint}>{T.friend.share}</Text>
+        <Text style={formStyles.hint}>{T.friend.shareHint}</Text>
+        <Btn label={T.friend.share} primary onPress={share} />
+        {shareNote && <Text style={styles.note}>{shareNote}</Text>}
       </View>
       <View style={styles.members}>
         {seats.map((m, i) => (
@@ -97,6 +105,7 @@ const styles = StyleSheet.create({
   codeLabel: { color: '#6d4c41', fontSize: 12, fontWeight: '700' },
   codeBig: { fontSize: 34, fontWeight: '900', letterSpacing: 8, color: '#bf360c', fontVariant: ['tabular-nums'] },
   members: { flexDirection: 'row', gap: 8 },
+  note: { color: '#2e7d32', fontSize: 12, fontWeight: '700' },
   member: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: '#eceff1', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 4 },
   empty: { opacity: 0.5 },
   avatar: { fontSize: 26 },
