@@ -65,7 +65,11 @@ export const nextSeat = (seat: Seat, step = 1): Seat => ((seat + step) % 4) as S
 /** The three other seats in turn order starting after `seat`. */
 export const seatsAfter = (seat: Seat): Seat[] => [nextSeat(seat, 1), nextSeat(seat, 2), nextSeat(seat, 3)];
 
-export const isActive = (s: HandState, seat: Seat): boolean => s.players[seat].won === null;
+/** Still in the hand: has not won yet, or anyone at all in 血流成河 (winners play on). */
+export const isActive = (s: HandState, seat: Seat): boolean => s.ruleSet.xueliu || s.players[seat].won === null;
+
+/** 血流成河: a player who has won plays on with a locked hand. */
+const lockedAfterWin = (s: HandState, seat: Seat): boolean => s.ruleSet.xueliu && s.players[seat].won !== null;
 export const activeSeats = (s: HandState): Seat[] => SEATS.filter((seat) => isActive(s, seat));
 
 export function createHand(config: HandConfig): HandState {
@@ -141,6 +145,12 @@ export function legalActions(s: HandState, seat: Seat): LegalActions {
   const stage = s.stage;
   if (stage.kind === 'turn') {
     if (stage.seat !== seat) return {};
+    if (lockedAfterWin(s, seat)) {
+      // Locked hand: throw what was drawn, unless it wins again.
+      const legal: LegalActions = { discard: stage.drawn !== null ? [stage.drawn] : [...new Set(p.hand)].sort((a, b) => a - b) };
+      if (stage.mayDeclare && isWinningHand(p.hand, p.melds, p.voidSuit)) legal.zimo = true;
+      return legal;
+    }
     let discard = [...new Set(p.hand)];
     if (s.ruleSet.mustDiscardVoidFirst && hasVoidTiles(p.hand, p.voidSuit)) {
       discard = discard.filter((t) => suitOf(t) === p.voidSuit);
@@ -282,7 +292,7 @@ function applyDiscard(ctx: Ctx, seat: Seat, tile: Tile): void {
     const q = s.players[other];
     const opts: ClaimOption[] = [];
     if (canClaimWin(s, other, tile)) opts.push('hu');
-    if (suitOf(tile) !== q.voidSuit) {
+    if (suitOf(tile) !== q.voidSuit && !lockedAfterWin(s, other)) {
       const n = countOf(q.hand, tile);
       if (n >= 2) opts.push('pong');
       if (n >= 3 && s.wall.length > 0) opts.push('kong');
@@ -502,7 +512,10 @@ function declareWin(ctx: Ctx, seat: Seat, tile: Tile, finalHand: Tile[], winCtx:
     hand,
     melds: p.melds,
   };
-  p.hand = hand;
+  // 血战: the winner's hand is final. 血流: the winning tile is set aside and the 13-tile hand plays on, locked.
+  if (!s.ruleSet.xueliu) p.hand = hand;
+  else if (finalHand.length > p.hand.length) p.hand = sortTiles(p.hand);
+  else p.hand = removeTiles(hand, [tile]);
   p.won = record;
   s.wins.push(record);
   events.push({ type: 'win', win: record, payments });
@@ -555,7 +568,8 @@ export function maxPotentialScore(s: HandState, seat: Seat): number {
 function settleExhaustedWall(ctx: Ctx): void {
   const { s } = ctx;
   const rules = s.ruleSet.drawSettlement;
-  const active = activeSeats(s);
+  // 血流成河: winners are done with 查叫; only those who never won are checked.
+  const active = activeSeats(s).filter((seat) => !s.ruleSet.xueliu || s.players[seat].won === null);
   const huaZhu = rules.checkHuaZhu
     ? active.filter((seat) => hasVoidTiles(s.players[seat].hand, s.players[seat].voidSuit))
     : [];

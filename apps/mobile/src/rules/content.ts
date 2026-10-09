@@ -83,6 +83,13 @@ export const RULES: RuleSection[] = [
     },
   },
   {
+    title: { zh: '血流成河（可选玩法）', en: 'Endless river (optional mode)' },
+    body: {
+      zh: '私人房和好友房可以选「血流成河」：胡了不退出，接着摸牌，可以一次又一次地胡，直到牌摸完。胡牌后手牌锁定，摸到的牌自动打出，只有再次能胡时才问你。流局查叫只查从没胡过的人。',
+      en: 'Private and friend rooms can pick "endless river": winners stay in and keep drawing, winning again and again until the wall runs out. After a win the hand is locked: drawn tiles are discarded for you unless they win again. At a draw only players who never won are checked.',
+    },
+  },
+  {
     title: { zh: '过手胡', en: 'Passed win' },
     body: {
       zh: '能胡却选择了「过」，在自己下次摸牌前，不能再胡别人打出的牌（自摸可以）。',

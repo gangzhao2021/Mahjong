@@ -84,7 +84,7 @@ export interface GameApi extends GameState {
   act(action: DistributiveOmit<Action, 'seat'>): void;
   setAutoPlay(on: boolean): void;
   setFastPace(on: boolean): void;
-  createFriendRoom(handsPerGame: number): void;
+  createFriendRoom(handsPerGame: number, xueliu: boolean): void;
   joinFriendRoom(code: string): void;
   leaveFriendRoom(): void;
   startFriendRoom(): void;
@@ -303,7 +303,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     ),
     setAutoPlay: useCallback((on) => send({ type: 'setAutoPlay', on }), [send]),
     setFastPace: useCallback((on) => send({ type: 'setFastPace', on }), [send]),
-    createFriendRoom: useCallback((handsPerGame) => send({ type: 'createFriendRoom', handsPerGame }), [send]),
+    createFriendRoom: useCallback((handsPerGame, xueliu) => send({ type: 'createFriendRoom', handsPerGame, xueliu }), [send]),
     joinFriendRoom: useCallback((code) => send({ type: 'joinFriendRoom', code }), [send]),
     leaveFriendRoom: useCallback(() => send({ type: 'leaveFriendRoom' }), [send]),
     startFriendRoom: useCallback(() => send({ type: 'startFriendRoom' }), [send]),

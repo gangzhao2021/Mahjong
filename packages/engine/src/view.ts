@@ -34,7 +34,10 @@ export interface PlayerView {
   voidSuit: Suit | null;
   swapDone: boolean;
   dingqueDone: boolean;
+  /** The latest win (血流成河 players can win several times). */
   won: WinRecord | null;
+  /** Wins this hand: 0 or 1 in 血战到底, any number in 血流成河. */
+  winCount: number;
 }
 
 export type StageView =
@@ -81,6 +84,7 @@ export function viewFor(s: HandState, seat: Seat): HandView {
       swapDone: p.swapSelection !== null,
       dingqueDone: p.voidSuit !== null,
       won: p.won,
+      winCount: s.wins.filter((w) => w.seat === seat).length,
     };
   });
 

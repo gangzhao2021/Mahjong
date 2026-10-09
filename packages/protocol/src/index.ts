@@ -127,6 +127,8 @@ export interface PrivateRules {
   haiDi: boolean;
   gangShangPao: boolean;
   qiangGang: boolean;
+  /** 血流成河 instead of 血战到底. */
+  xueliu: boolean;
 }
 
 export interface StakeInfo {
@@ -146,6 +148,8 @@ export interface FriendRoomInfo {
   members: { playerId: string; name: string; avatar: string; isHost: boolean; online: boolean }[];
   handsPerGame: number;
   maxPlayers: number;
+  /** 血流成河 instead of 血战到底. */
+  xueliu: boolean;
 }
 
 export type FriendRoomRejection =
@@ -335,7 +339,7 @@ export type ClientMessage =
   | { type: 'action'; action: DistributiveOmit<Action, 'seat'>; version: number }
   | { type: 'setAutoPlay'; on: boolean }
   /** Friend rooms: open a waiting room, join one by number, leave it, or (host) start the game. */
-  | { type: 'createFriendRoom'; handsPerGame: number }
+  | { type: 'createFriendRoom'; handsPerGame: number; xueliu?: boolean }
   | { type: 'joinFriendRoom'; code: string }
   | { type: 'leaveFriendRoom' }
   | { type: 'startFriendRoom' }

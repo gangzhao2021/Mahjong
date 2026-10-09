@@ -1,13 +1,13 @@
 /** 好友房: open a room or join one by its 6-digit number, then wait for friends until the host starts. */
 import type { FriendRoomInfo } from '@mahjong/protocol';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { formStyles, Sheet } from '../components/Sheet';
 import { T } from '../strings';
 
 export interface FriendActions {
-  create(handsPerGame: number): void;
+  create(handsPerGame: number, xueliu: boolean): void;
   join(code: string): void;
   leave(): void;
   start(): void;
@@ -16,6 +16,7 @@ export interface FriendActions {
 /** Before joining: create a room, or type a friend's room number. */
 export function FriendRoomEntrySheet({ maxHands, actions, onClose }: { maxHands: number; actions: FriendActions; onClose(): void }) {
   const [hands, setHands] = useState(4);
+  const [xueliu, setXueliu] = useState(false);
   const [code, setCode] = useState('');
   const valid = /^\d{6}$/.test(code);
   return (
@@ -27,7 +28,11 @@ export function FriendRoomEntrySheet({ maxHands, actions, onClose }: { maxHands:
         <Btn label="−" onPress={() => setHands((h) => Math.max(1, h - 1))} />
         <Text style={styles.stepper}>{hands}</Text>
         <Btn label="+" onPress={() => setHands((h) => Math.min(maxHands, h + 1))} />
-        <Btn label={T.friend.create} primary onPress={() => actions.create(hands)} />
+        <Btn label={T.friend.create} primary onPress={() => actions.create(hands, xueliu)} />
+      </View>
+      <View style={formStyles.row}>
+        <Switch value={xueliu} onValueChange={setXueliu} />
+        <Text style={formStyles.label}>{T.rules.xueliu}</Text>
       </View>
       <Text style={styles.section}>{T.friend.joinTitle}</Text>
       <View style={formStyles.row}>
@@ -76,7 +81,7 @@ export function WaitingRoomSheet({ room, myId, actions }: { room: FriendRoomInfo
           </View>
         ))}
       </View>
-      <Text style={formStyles.hint}>{T.friend.rules(room.handsPerGame)}</Text>
+      <Text style={formStyles.hint}>{T.friend.rules(room.handsPerGame, T.modeName(room.xueliu))}</Text>
       <View style={styles.buttons}>
         <Btn label={T.friend.leave} onPress={actions.leave} />
         {isHost ? (

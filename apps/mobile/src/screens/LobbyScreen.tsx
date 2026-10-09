@@ -245,6 +245,7 @@ const DEFAULT_RULES: PrivateRules = {
   haiDi: true,
   gangShangPao: true,
   qiangGang: true,
+  xueliu: false,
 };
 
 function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerInfo; balance: number; onClose(): void; onCreate(o: GameOptions): void }) {
@@ -254,7 +255,7 @@ function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerIn
   const [rules, setRules] = useState<PrivateRules>(DEFAULT_RULES);
   const baseNum = Number(base);
   const valid = Number.isInteger(baseNum) && baseNum >= 0 && baseNum <= maxBase;
-  const toggle = (key: 'huanSanZhang' | 'callTransfer') => setRules((r) => ({ ...r, [key]: !r[key] }));
+  const toggle = (key: 'huanSanZhang' | 'callTransfer' | 'xueliu') => setRules((r) => ({ ...r, [key]: !r[key] }));
 
   return (
     <Sheet title={T.privateRoom} onClose={onClose}>
@@ -276,6 +277,7 @@ function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerIn
         ))}
       </View>
       <RuleSwitch label={T.rules.huanSanZhang} value={rules.huanSanZhang} onChange={() => toggle('huanSanZhang')} />
+      <RuleSwitch label={T.rules.xueliu} value={rules.xueliu} onChange={() => toggle('xueliu')} />
       <RuleSwitch label={T.rules.callTransfer} value={rules.callTransfer} onChange={() => toggle('callTransfer')} />
       <RuleSwitch
         label={T.rules.selfDrawFan}

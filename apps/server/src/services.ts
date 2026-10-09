@@ -266,6 +266,7 @@ export function privateRuleSet(rules: Partial<PrivateRules> | undefined): RuleSe
     haiDi: bool(r.haiDi, d.enabledPatterns.haiDi),
     gangShangPao: bool(r.gangShangPao, d.enabledPatterns.gangShangPao),
     qiangGang: bool(r.qiangGang, d.enabledPatterns.qiangGang),
+    xueliu: bool(r.xueliu, d.xueliu),
   };
   if (Object.values(flags).some((v) => v === null)) return null;
   return {
@@ -274,6 +275,7 @@ export function privateRuleSet(rules: Partial<PrivateRules> | undefined): RuleSe
     maxFan,
     selfDrawBonus: r.selfDrawBonus ?? d.selfDrawBonus,
     callTransfer: flags.callTransfer!,
+    xueliu: flags.xueliu!,
     enabledPatterns: {
       jinGouDiao: flags.jinGouDiao!,
       jiangDui: flags.jiangDui!,

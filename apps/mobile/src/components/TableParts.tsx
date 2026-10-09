@@ -71,10 +71,12 @@ interface SeatCardProps {
   active: boolean;
   /** Set once this seat has won (血战: they sit out while the others play on). */
   win: WinRecord | null;
+  /** Wins this hand (more than one only in 血流成河). */
+  winCount?: number;
   handCount: number;
 }
 
-export function SeatCard({ info, score, voidSuit, dealer, active, win, handCount }: SeatCardProps) {
+export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount = win ? 1 : 0, handCount }: SeatCardProps) {
   const won = win !== null;
   return (
     <View style={[styles.card, active && styles.cardActive, won && styles.cardWon]}>
@@ -96,7 +98,7 @@ export function SeatCard({ info, score, voidSuit, dealer, active, win, handCount
         </Text>
         {win && (
           <View style={styles.winRow}>
-            <Text style={styles.winText}>{win.selfDraw ? T.zimo : T.hu}</Text>
+            <Text style={styles.winText}>{winCount > 1 ? T.winTimes(winCount) : win.selfDraw ? T.zimo : T.hu}</Text>
             <Tile tile={win.tile} width={16} highlighted />
             <Text style={styles.winText}>{T.fan(win.fan)}</Text>
           </View>

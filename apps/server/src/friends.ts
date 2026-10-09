@@ -20,6 +20,7 @@ export interface FriendTable {
   /** In join order; the host is first. */
   members: FriendMember[];
   handsPerGame: number;
+  xueliu: boolean;
 }
 
 export class FriendTables {
@@ -38,9 +39,9 @@ export class FriendTables {
     return code ? (this.tables.get(code) ?? null) : null;
   }
 
-  create(host: FriendMember, handsPerGame: number): FriendTable {
+  create(host: FriendMember, handsPerGame: number, xueliu = false): FriendTable {
     this.leave(host.playerId);
-    const table: FriendTable = { code: this.freshCode(), hostId: host.playerId, members: [host], handsPerGame };
+    const table: FriendTable = { code: this.freshCode(), hostId: host.playerId, members: [host], handsPerGame, xueliu };
     this.tables.set(table.code, table);
     this.memberOf.set(host.playerId, table.code);
     this.broadcast(table);
@@ -89,6 +90,7 @@ export class FriendTables {
       members: table.members.map((m) => ({ ...m, isHost: m.playerId === table.hostId, online: this.isOnline(m.playerId) })),
       handsPerGame: table.handsPerGame,
       maxPlayers: FRIEND_ROOM_SEATS,
+      xueliu: table.xueliu,
     };
   }
 

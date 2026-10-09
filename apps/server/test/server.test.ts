@@ -79,6 +79,23 @@ describe('game server', () => {
     expect([...dealt.players[v.seat].hand].sort((a, b) => a - b)).toEqual([...v.players[v.seat].hand!].sort((a, b) => a - b));
   });
 
+  it('plays 血流成河 in a private room: winners play on and every hand runs to the end of the wall', async () => {
+    const server = await startServer({ ...FAST, timers: { ...FAST.timers, discardMs: 5_000, claimMs: 5_000, swapMs: 5_000, dingqueMs: 5_000 } });
+    const client = await Client.connect(server);
+    await client.hello();
+    playAsBot(client);
+    client.send({ type: 'startGame', options: { private: { handsPerGame: 3, baseScore: 1, rules: { xueliu: true } } } });
+    const first = await client.next(isTable);
+    expect(first.table.view.ruleSet.xueliu).toBe(true);
+    await client.next(gameOver);
+    expect(server.hands.logs).toHaveLength(3);
+    for (const log of server.hands.logs) {
+      expect(log.result!.reason).toBe('wallExhausted');
+      const replayed = replayHand({ ruleSet: log.ruleSet, baseScore: log.baseScore, seed: log.seed, dealer: log.dealer }, log.actions);
+      expect(replayed.result).toEqual(log.result);
+    }
+  });
+
   it('switches the table to quick pace on request', async () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 60_000 } });
     const client = await Client.connect(server);
