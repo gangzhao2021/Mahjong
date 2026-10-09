@@ -1,7 +1,7 @@
 import { chooseAction, chooseDiscard, chooseSwap } from '@mahjong/ai-play';
 import { suitOf, type Action, type GameEvent, type HandView, type Seat, type Suit, type Tile as TileKind } from '@mahjong/engine';
 import type { DistributiveOmit, TableSnapshot } from '@mahjong/protocol';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { updateSoundSettings, useSoundSettings, useTableSounds } from '../audio/sound';
 import { ActionBar, Btn, claimFanSize } from '../components/ActionBar';
@@ -97,7 +97,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   }, [table.fastPace, settings.fastPace, setFastPace]);
   // Shortcut moves, at most one per view version, after a short beat so the player sees what happened.
   const autoActed = useRef(-1);
-  const shortcut = table.autoPlay || me.won ? null : autoMove(view, auto);
+  // Memoised on the view: a fresh object every countdown tick would restart the timer below forever.
+  const shortcut = useMemo(() => (table.autoPlay || me.won ? null : autoMove(view, auto)), [table.autoPlay, me.won, view, auto]);
   useEffect(() => {
     if (!shortcut || autoActed.current === view.version) return;
     const timer = setTimeout(() => {
@@ -137,7 +138,9 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   };
   const myTurnTimer = table.timer && table.timer.kind !== 'nextHand' ? countdown : null;
   const timeRunningOut = myTurnTimer !== null && myTurnTimer <= 5 && !table.autoPlay;
-  const tip = useTipPending(table.autoPlay ? null : tipFor(view));
+  // Lessons explain each step themselves, so the one-time tips stay out of the tutorial.
+  const inTutorial = table.gameId.startsWith('tutorial-');
+  const tip = useTipPending(table.autoPlay || inTutorial ? null : tipFor(view));
   const tipId = tip ? tipFor(view) : null;
   // Once a hand has ended its scores are already part of the game totals.
   const scoreOf = (seat: Seat) => table.totals[seat] + (view.phase === 'ended' ? 0 : view.scores[seat]);
@@ -329,6 +332,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           countdown={table.timer?.kind === 'nextHand' ? countdown : null}
           gameCoins={gameCoins}
           rank={table.gameOver && game.lastRank?.gameId === table.gameId ? game.lastRank : null}
+          committedAt={game.commitments[`${table.gameId}:${table.handIndex}`] ?? null}
           handCoins={
             game.lastWallet && game.lastWallet.gameId === table.gameId && game.lastWallet.handIndex === table.handIndex ? game.lastWallet.amount : null
           }

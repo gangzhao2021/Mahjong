@@ -1,5 +1,5 @@
 /** Stats, recent hands, and a move-by-move replay of any of them with every hand face up. */
-import { apply, createHand, rankOf, suitOf, type Action, type HandState, type Seat, type Tile as TileKind } from '@mahjong/engine';
+import { apply, createHand, rankOf, suitOf, verifyDeal, type Action, type HandState, type Seat, type Tile as TileKind } from '@mahjong/engine';
 import type { CharacterRelation, HandHistoryEntry, HandReplay, PlayerStats } from '@mahjong/protocol';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -199,6 +199,7 @@ function ReplayView({ replay, onClose }: { replay: HandReplay; onClose(): void }
         </View>
       </View>
       <Text style={styles.moveText}>{action ? describe(action, name) : T.replay.start}</Text>
+      {replay.commitment && replay.salt && verifyDeal(replay.commitment, replay.seed, replay.salt) && <Text style={styles.fair}>{T.fairness.replay(replay.seed)}</Text>}
       <ReviewBar notes={notes} index={index} onJump={(step) => {
         setPlaying(false);
         setIndex(step);
@@ -302,6 +303,7 @@ const styles = StyleSheet.create({
   arrow: { color: '#a5d6a7', fontSize: 20 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   stepText: { color: '#c8e6c9', fontVariant: ['tabular-nums'], minWidth: 60 },
+  fair: { color: '#a5d6a7', fontSize: 12, alignSelf: 'center' },
   moveText: { color: '#ffe082', fontSize: 16, fontWeight: '800', alignSelf: 'center' },
   seats: { gap: 8, paddingBottom: 20 },
   review: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 8, gap: 6 },

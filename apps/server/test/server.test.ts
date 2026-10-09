@@ -1,4 +1,4 @@
-import { replayHand, type Action } from '@mahjong/engine';
+import { createHand, replayHand, verifyDeal, type Action } from '@mahjong/engine';
 import type { ServerMessage } from '@mahjong/protocol';
 import { describe, expect, it } from 'vitest';
 import { Client, FAST, gameOver, isTable, playAsBot, startServer, type TableMsg } from './helpers';
@@ -57,6 +57,26 @@ describe('game server', () => {
     const sources = server.hands.logs[0].sources;
     expect(sources.filter((s) => s === 'timeout')).toHaveLength(3);
     expect(sources).toContain('autoPlay');
+  });
+
+  it('commits to the deal before play and reveals a seed that re-deals my opening hand', async () => {
+    const server = await startServer({ ...FAST, timers: { ...FAST.timers, discardMs: 5_000, claimMs: 5_000, swapMs: 5_000, dingqueMs: 5_000 } });
+    const client = await Client.connect(server);
+    await client.hello();
+    playAsBot(client);
+    client.send({ type: 'startGame', options: { private: { handsPerGame: 1, baseScore: 0 } } });
+    const first = await client.next(isTable);
+    expect(first.table.deal.commitment).toMatch(/^[0-9a-f]{64}$/);
+    expect(first.table.deal.seed).toBeNull();
+    expect(first.table.deal.salt).toBeNull();
+
+    const end = await client.next((m): m is TableMsg => isTable(m) && m.table.view.phase === 'ended');
+    const { commitment, seed, salt } = end.table.deal;
+    expect(commitment).toBe(first.table.deal.commitment);
+    expect(verifyDeal(commitment, seed!, salt!)).toBe(true);
+    const v = first.table.view;
+    const dealt = createHand({ ruleSet: v.ruleSet, baseScore: v.baseScore, seed: seed!, dealer: v.dealer });
+    expect([...dealt.players[v.seat].hand].sort((a, b) => a - b)).toEqual([...v.players[v.seat].hand!].sort((a, b) => a - b));
   });
 
   it('switches the table to quick pace on request', async () => {

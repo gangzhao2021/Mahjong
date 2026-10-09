@@ -15,6 +15,8 @@ describe('daily tasks and achievements', () => {
 
     const before = await api<TasksStatus>(server, 'GET', '/tasks', undefined, token);
     expect(before.body.daily.find((d) => d.id === 'playHands')).toMatchObject({ progress: 2, target: 4, claimed: false });
+    // Anything earned during the game (e.g. a first win) was paid automatically.
+    for (const a of before.body.achievements) if (a.unlockedAt !== null) expect(a.claimed).toBe(true);
     // Not finished yet.
     expect((await api(server, 'POST', '/tasks/claim', { kind: 'daily', id: 'playHands' }, token)).status).toBe(409);
 

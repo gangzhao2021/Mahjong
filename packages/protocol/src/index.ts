@@ -101,6 +101,8 @@ export interface AccountSummary {
   realName: { required: boolean; verified: boolean };
   playLimit: PlayLimit | null;
   rank: RankInfo;
+  /** Finished games, for gentle prompts such as linking a guest account. */
+  gamesPlayed: number;
 }
 
 /** Public, unauthenticated server info for the login and lobby screens. */
@@ -174,9 +176,19 @@ export interface HandReplay {
   baseScore: number;
   ruleSet: RuleSet;
   actions: Action[];
+  /** The deal's commitment and salt (older hands have none). */
+  commitment: string | null;
+  salt: string | null;
 }
 
 /** How the player and one AI character have fared against each other. */
+/** sha256("seed:salt") published before the deal; `seed` and `salt` stay null until the hand is over. */
+export interface DealProof {
+  commitment: string;
+  seed: number | null;
+  salt: string | null;
+}
+
 export interface CharacterRelation {
   characterId: string;
   name: string;
@@ -221,6 +233,13 @@ export interface AchievementStatus {
   /** Null until earned. */
   unlockedAt: number | null;
   claimed: boolean;
+}
+
+/** A task or achievement reward that was just paid. */
+export interface EarnedReward {
+  kind: 'daily' | 'achievement';
+  id: DailyTaskId | AchievementId;
+  amount: number;
 }
 
 export interface TasksStatus {
@@ -278,6 +297,8 @@ export interface TableSnapshot {
   fastForward: boolean;
   /** Quick pace is on: AI players barely pause. */
   fastPace: boolean;
+  /** Verifiable deal: the commitment is published before play; seed and salt are revealed once the hand ends. */
+  deal: DealProof;
   gameOver: boolean;
   /** Recent table chat, oldest first. */
   chat: ChatEntry[];
@@ -318,6 +339,8 @@ export type ServerMessage =
   | { type: 'left'; reason?: 'user' | 'minorTimeLimit' | 'guestTrialOver' }
   /** `gameTotal`: the player's net coins over the current game so far. */
   | { type: 'rank'; result: RankResult }
+  /** Task / achievement rewards paid automatically after a hand. */
+  | { type: 'rewards'; items: EarnedReward[]; balance: number }
   | { type: 'wallet'; balance: number; change: { amount: number; requested: number; handIndex: number; gameTotal: number } | null }
   | { type: 'startRejected'; reason: StartRejection; detail?: string }
   | { type: 'pendingResult'; summary: GameSummary }

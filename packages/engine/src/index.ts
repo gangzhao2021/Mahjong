@@ -8,3 +8,4 @@ export * from './engine';
 export * from './view';
 export * from './game';
 export * from './custom';
+export * from './fairness';

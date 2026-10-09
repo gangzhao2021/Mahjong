@@ -109,6 +109,11 @@ export default function App() {
   const chatToast = useToast(game.chatRejected ? T.chatRejected[game.chatRejected.reason] : null, game.chatRejected?.at, 2500);
   const startToast = useToast(game.startRejected ? T.startRejected[game.startRejected.reason] : null, game.startRejected?.at, 4000);
   const noticeToast = useToast(game.notice ? T.limitEnding : null, game.notice?.at, 6000);
+  const rewardToast = useToast(
+    game.rewards ? T.tasks.earned(game.rewards.items.map((r) => T.tasks.names[r.id]).join(T.listSeparator), game.rewards.items.reduce((n, r) => n + r.amount, 0)) : null,
+    game.rewards?.at,
+    4500,
+  );
 
   let screen: React.ReactNode;
   if (SHOW_TILE_GALLERY) {
@@ -156,7 +161,7 @@ export default function App() {
     );
   }
 
-  const toast = errorToast ?? chatToast ?? startToast ?? noticeToast ?? (game.leftReason ? T.startRejected[game.leftReason] : null);
+  const toast = errorToast ?? chatToast ?? startToast ?? noticeToast ?? rewardToast ?? (game.leftReason ? T.startRejected[game.leftReason] : null);
   return (
     <View style={styles.root}>
       <StatusBar hidden />

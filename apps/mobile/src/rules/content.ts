@@ -48,6 +48,13 @@ export interface RuleSection {
 
 export const RULES: RuleSection[] = [
   {
+    title: { zh: '公平说明', en: 'Fair play' },
+    body: {
+      zh: '发牌：开局前公布一个加密摘要，结束后公开发牌种子，结算页会自动校验，任何人都能用种子重新发出整副牌。AI：只能看到自己的手牌和桌面上公开的牌，看不到你的牌，也不会根据输赢或金币调整发牌。对手是 AI 时，座位上始终标着「AI」。游戏里没有充值、广告和付费道具。',
+      en: 'Deals: a digest is published before each deal and the seed is revealed afterwards; the result screen checks it, and anyone can re-deal the whole wall from the seed. AI players see only their own tiles and what is on the table — never yours — and deals never depend on wins or coins. AI seats are always labelled "AI". There are no purchases, ads or paid items.',
+    },
+  },
+  {
     title: { zh: '牌和座位', en: 'Tiles and seats' },
     body: {
       zh: '只用万、条、筒三门，共 108 张。四人各 13 张，庄家 14 张先打。不能吃，只能碰、杠、胡。',

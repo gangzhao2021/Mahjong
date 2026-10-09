@@ -1,7 +1,8 @@
 /** Hand / game settlement overlay. */
-import { patternFan, type HandResult, type Pattern, type Seat, type WinRecord } from '@mahjong/engine';
+import { patternFan, verifyDeal, type HandResult, type Pattern, type Seat, type WinRecord } from '@mahjong/engine';
 import type { RankResult, TableSnapshot } from '@mahjong/protocol';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PATTERN_NAMES, PAYMENT_NAMES, T } from '../strings';
 import { Btn } from './ActionBar';
 import { PopIn } from './PopIn';
@@ -16,12 +17,14 @@ interface Props {
   gameCoins: number;
   /** Rank change for this game, once it is over (ranked tables only). */
   rank: RankResult | null;
+  /** The deal commitment this client saw at the start of the hand (null if it joined later). */
+  committedAt: string | null;
   onNextHand(): void;
   onNewGame(): void;
   onHome(): void;
 }
 
-export function ResultPanel({ table, result, countdown, handCoins, gameCoins, rank, onNextHand, onNewGame, onHome }: Props) {
+export function ResultPanel({ table, result, countdown, handCoins, gameCoins, rank, committedAt, onNextHand, onNewGame, onHome }: Props) {
   const name = (seat: Seat) => table.seats[seat].name;
   const draw = result.drawSettlement;
   const tag = (seat: Seat) => {
@@ -105,6 +108,7 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
             })}
           </View>
         </ScrollView>
+        <DealCheck deal={table.deal} committedAt={committedAt} />
         <View style={styles.buttons}>
           {table.gameOver ? (
             <>
@@ -116,6 +120,29 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
           )}
         </View>
       </View>
+    </View>
+  );
+}
+
+/** The commit–reveal check for this hand, with the numbers one tap away. */
+function DealCheck({ deal, committedAt }: { deal: TableSnapshot['deal']; committedAt: string | null }) {
+  const [open, setOpen] = useState(false);
+  if (!deal.commitment || deal.seed === null || deal.salt === null) return null;
+  // The commitment must be the one shown before the deal, and must match the revealed seed.
+  const ok = (committedAt === null || committedAt === deal.commitment) && verifyDeal(deal.commitment, deal.seed, deal.salt);
+  return (
+    <View style={styles.deal}>
+      <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" style={styles.dealRow}>
+        <Text style={[styles.dealText, !ok && styles.dealBad]}>{ok ? T.fairness.verified : T.fairness.failed}</Text>
+        <Text style={styles.dealLink}>{open ? T.fairness.hide : T.fairness.details}</Text>
+      </Pressable>
+      {open && (
+        <View style={styles.dealDetails}>
+          <Text style={styles.dealMono}>{T.fairness.commitment(deal.commitment)}</Text>
+          <Text style={styles.dealMono}>{T.fairness.revealed(deal.seed, deal.salt)}</Text>
+          <Text style={styles.dealHow}>{T.fairness.how}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -157,6 +184,14 @@ const styles = StyleSheet.create({
   coins: { fontSize: 17, fontWeight: '900', color: '#5d4100' },
   coinBadge: { alignSelf: 'flex-start', backgroundColor: '#ffe082', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
   coinLoss: { backgroundColor: '#ffccbc' },
+  deal: { gap: 4 },
+  dealRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  dealText: { color: '#2e7d32', fontSize: 12, fontWeight: '800' },
+  dealBad: { color: '#c62828' },
+  dealLink: { color: '#6d4c41', fontSize: 12, textDecorationLine: 'underline' },
+  dealDetails: { gap: 2, backgroundColor: '#f5f0e1', borderRadius: 8, padding: 8 },
+  dealMono: { fontSize: 11, color: '#4e342e', fontFamily: 'monospace' },
+  dealHow: { fontSize: 11, color: '#6d4c41', marginTop: 2 },
   rankBadge: { alignSelf: 'flex-start', backgroundColor: '#e0f2f1', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
   rankUp: { backgroundColor: '#ffd54f' },
   rankText: { fontSize: 15, fontWeight: '900', color: '#004d40' },

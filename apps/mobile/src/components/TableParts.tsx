@@ -86,13 +86,13 @@ export function SeatCard({ info, score, voidSuit, dealer, active, win, handCount
           </Text>
           {!info.isHuman && <Text style={[styles.badge, styles.aiBadge]}>{T.aiBadge}</Text>}
           {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
-          {voidSuit !== null && <Text style={[styles.badge, styles.voidBadge]}>{T.voidSuit(SUIT_NAMES[voidSuit])}</Text>}
-          {won && <Text style={[styles.badge, styles.wonBadge]}>{T.hu}</Text>}
+          {/* After a win the win line below says it all; the void suit no longer matters */}
+          {voidSuit !== null && !won && <Text style={[styles.badge, styles.voidBadge]}>{T.voidSuit(SUIT_NAMES[voidSuit])}</Text>}
         </View>
         <Text style={[styles.score, score > 0 ? styles.plus : score < 0 ? styles.minus : null]}>
           {score > 0 ? `+${score}` : score}
           {!info.isHuman && !won ? `  · ${T.tilesInHand(handCount)}` : ''}
-          {info.personality ? <Text style={styles.personality}>{`  ${info.personality}`}</Text> : null}
+          {info.personality && !won ? <Text style={styles.personality}>{`  ${info.personality}`}</Text> : null}
         </Text>
         {win && (
           <View style={styles.winRow}>
@@ -168,7 +168,6 @@ const styles = StyleSheet.create({
   aiBadge: { backgroundColor: '#80deea', color: '#004d55' },
   personality: { color: '#b2dfdb', fontSize: 11 },
   voidBadge: { backgroundColor: '#eceff1', color: '#37474f' },
-  wonBadge: { backgroundColor: '#e53935', color: '#fff' },
   score: { color: '#e0f2e9', fontSize: 12, fontVariant: ['tabular-nums'] },
   plus: { color: '#ffe082' },
   minus: { color: '#ff8a80' },

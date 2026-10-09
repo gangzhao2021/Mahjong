@@ -15,6 +15,7 @@ import {
   type GameOptions,
   type GameSummary,
   type RankResult,
+  type EarnedReward,
   type ServerMessage,
   type StartRejection,
   type StickerId,
@@ -57,12 +58,16 @@ export interface GameState {
   lastWallet: { amount: number; requested: number; handIndex: number; gameTotal: number; gameId: string | null } | null;
   /** Rank change after the last ranked game. */
   lastRank: RankResult | null;
+  /** Deal commitment as first received for each hand ("gameId:handIndex"), before any reveal. */
+  commitments: Record<string, string>;
   startRejected: { reason: StartRejection; detail?: string; at: number } | null;
   /** Result of a game that finished while the player was away (PRD §14.1). */
   pendingResult: GameSummary | null;
   /** Result of the game just finished. */
   gameSummary: GameSummary | null;
   notice: { kind: 'minorTimeLimit' | 'guestTrialOver'; endsAt: number; at: number } | null;
+  /** Task / achievement rewards just paid automatically. */
+  rewards: { items: EarnedReward[]; at: number } | null;
   /** Ids of AI lines this player reported. */
   reported: number[];
   /** Why the server last took the player out of a game, if not by choice. */
@@ -115,10 +120,12 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     account: null,
     lastWallet: null,
     lastRank: null,
+    commitments: {},
     startRejected: null,
     pendingResult: null,
     gameSummary: null,
     notice: null,
+    rewards: null,
     leftReason: null,
     reported: [],
   });
@@ -171,6 +178,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
               receivedAt: at,
               events: [...s.events, ...msg.events.map((event) => ({ id: ++eventId.current, at, event }))].slice(-MAX_EVENTS),
               chat: mergeChat(s.chat, msg.table.chat, msg.table.gameId !== s.table?.gameId, 0),
+              commitments: firstCommitment(s.commitments, msg.table),
             }));
             break;
           case 'left':
@@ -181,6 +189,13 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
               events: [],
               chat: [],
               leftReason: msg.reason === 'minorTimeLimit' || msg.reason === 'guestTrialOver' ? msg.reason : null,
+            }));
+            break;
+          case 'rewards':
+            setState((s) => ({
+              ...s,
+              rewards: { items: msg.items, at: Date.now() },
+              account: s.account ? { ...s.account, balance: msg.balance } : s.account,
             }));
             break;
           case 'rank':
@@ -293,4 +308,11 @@ function mergeChat(current: LocalChatEntry[], incoming: ChatEntry[], reset: bool
   const byId = new Map((reset ? [] : current).map((e) => [e.id, e]));
   for (const e of incoming) if (!byId.has(e.id)) byId.set(e.id, { ...e, localAt });
   return [...byId.values()].sort((a, b) => a.id - b.id).slice(-MAX_CHAT);
+}
+
+/** Remembers the deal commitment the first time a hand is seen still unrevealed; a later change would then fail the check. */
+function firstCommitment(seen: Record<string, string>, table: TableSnapshot): Record<string, string> {
+  const key = `${table.gameId}:${table.handIndex}`;
+  if (seen[key] || !table.deal.commitment || table.deal.seed !== null) return seen;
+  return { ...seen, [key]: table.deal.commitment };
 }

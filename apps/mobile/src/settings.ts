@@ -11,12 +11,16 @@ export interface Settings {
   animations: boolean;
   /** Tile size multiplier at the table. */
   tileScale: number;
+  /** Public table played last; quick start returns there instead of climbing on its own. */
+  lastTableId: string | null;
+  /** The guest "link your account" reminder stays hidden until this time (ms). */
+  bindReminderSnoozedUntil: number;
 }
 
 export const TILE_SCALES = [0.85, 1, 1.15] as const;
 
 const KEY = 'mahjong.settings';
-let settings: Settings = { fastPace: false, voice: false, animations: true, tileScale: 1 };
+let settings: Settings = { fastPace: false, voice: false, animations: true, tileScale: 1, lastTableId: null, bindReminderSnoozedUntil: 0 };
 const listeners = new Set<(s: Settings) => void>();
 let loading: Promise<void> | null = null;
 

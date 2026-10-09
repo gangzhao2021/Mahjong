@@ -3,7 +3,7 @@
  * plus the lifetime numbers on the stats page. Rows go with the account
  * (ON DELETE CASCADE) and are purged with the other hand logs.
  */
-import type { Seat } from '@mahjong/engine';
+import { dealCommitment, type Seat } from '@mahjong/engine';
 import type { HandHistoryEntry, HandReplay, PlayerStats } from '@mahjong/protocol';
 import type { Queryable } from './db/db';
 import type { HandLog, HandLogStore } from './store';
@@ -48,6 +48,8 @@ export class HandHistory implements HandLogStore {
       baseScore: log.baseScore,
       ruleSet: log.ruleSet,
       actions: log.actions,
+      commitment: log.salt ? dealCommitment(log.seed, log.salt) : null,
+      salt: log.salt ?? null,
     };
   }
 
