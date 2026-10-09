@@ -101,6 +101,8 @@ export interface RoomCheckpoint {
   log: HandLog;
   autoPlay: boolean;
   chat: ChatEntry[];
+  /** Friend rooms: the other real players' seats and 托管 state. */
+  guests?: { seat: Seat; playerId: string; autoPlay: boolean }[];
 }
 
 interface Timer {
@@ -213,6 +215,7 @@ export class Room {
       this.handIndex = r.hand.phase === 'ended' ? r.game.handIndex - 1 : r.game.handIndex;
       this.log = r.log;
       this.stateOf(this.humanSeat).autoPlay = r.autoPlay;
+      for (const g of r.guests ?? []) if (this.humans.some((h) => h.seat === g.seat)) this.stateOf(g.seat).autoPlay = g.autoPlay;
       this.coinChange = opts.coinChange ?? 0;
       this.talk.restoreLog(r.chat);
     }
@@ -228,6 +231,7 @@ export class Room {
       log: this.log,
       autoPlay: this.stateOf(this.humanSeat).autoPlay,
       chat: this.talk.chatLog,
+      guests: this.humans.filter((h) => h.seat !== this.humanSeat).map((h) => ({ seat: h.seat, playerId: h.ctrl.playerId, autoPlay: h.autoPlay })),
     };
   }
 
@@ -312,9 +316,13 @@ export class Room {
   // -------------------------------------------------------------------------
 
   attach(socket: WebSocket, seat: Seat = this.humanSeat): void {
-    this.stateOf(seat).ctrl.attach(socket);
-    if (this.paused) this.unpause();
-    else this.publish([]);
+    const h = this.stateOf(seat);
+    h.ctrl.attach(socket);
+    if (!this.paused) return this.publish([]);
+    // After a restart a friend room waits for everyone (or the grace period) before play goes on;
+    // whoever is back already sees the table.
+    if (this.humans.every((x) => x.ctrl.connected)) this.unpause();
+    else h.ctrl.send({ type: 'table', table: this.snapshotFor(seat), events: [] });
   }
 
   detach(socket: WebSocket): void {
