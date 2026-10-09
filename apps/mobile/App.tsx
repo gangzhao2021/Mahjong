@@ -142,7 +142,7 @@ export default function App() {
     screen = <TutorialScreen onExit={() => setTutorialOpen(false)} />;
   } else if (consented === false) {
     // Nothing is collected until the player agrees (PRD Appendix D.7).
-    screen = <ConsentScreen onAgree={() => setConsented(true)} onOpenTutorial={() => setTutorialOpen(true)} />;
+    screen = <ConsentScreen onAgree={() => setConsented(true)} onOpenTutorial={() => setTutorialOpen(true)} showLanguage={info?.region !== 'china'} />;
   } else if (!info || token === undefined || consented === undefined || (token && !game.account)) {
     screen = (
       <Felt style={styles.splash}>

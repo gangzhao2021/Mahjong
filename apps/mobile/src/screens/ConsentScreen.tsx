@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { formStyles } from '../components/Sheet';
 import { SERVER_HTTP } from '../config';
 import { getLocale, T } from '../strings';
@@ -42,7 +43,8 @@ export function LegalLinks() {
   );
 }
 
-export function ConsentScreen({ onAgree, onOpenTutorial }: { onAgree(): void; onOpenTutorial(): void }) {
+/** `showLanguage`: the global build offers 中文 / English before anything else (the China build is always Chinese). */
+export function ConsentScreen({ onAgree, onOpenTutorial, showLanguage }: { onAgree(): void; onOpenTutorial(): void; showLanguage: boolean }) {
   const [declined, setDeclined] = useState(false);
   const agree = async () => {
     try {
@@ -58,6 +60,7 @@ export function ConsentScreen({ onAgree, onOpenTutorial }: { onAgree(): void; on
         <Text style={styles.title}>{T.consent.title}</Text>
         <Text style={styles.body}>{declined ? T.consent.declined : T.consent.body}</Text>
         <LegalLinks />
+        {showLanguage && <LanguagePicker label={false} />}
         <View style={formStyles.row}>
           {declined ? (
             <>
