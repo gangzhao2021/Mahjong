@@ -82,11 +82,11 @@ export const LESSONS: Lesson[] = [
       },
       {
         text: {
-          zh: '这张 9条 和其他牌都连不上。双击它，或者按住向上一滑，把它打出去。',
-          en: "This 9 Bamboo doesn't fit with anything. Double-tap it, or press and swipe up, to discard it.",
+          zh: '这张 9条 和其他牌都连不上。点它一下选中，再点一下就打出去了（双击或往上滑也可以）。',
+          en: "This 9 Bamboo doesn't fit with anything. Tap it to select it, then tap it again to discard (double-tap or a swipe up work too).",
         },
         expect: isDiscardOf('9s'),
-        hint: { zh: '先打 9条：双击它，或按住向上滑。', en: 'Discard the 9 Bamboo: double-tap it, or swipe it up.' },
+        hint: { zh: '先打 9条：点它两下，或往上滑。', en: 'Discard the 9 Bamboo: tap it twice, or swipe it up.' },
         thenAutoPlay: true,
       },
       {

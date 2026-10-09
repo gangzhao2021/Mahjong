@@ -1,5 +1,6 @@
 /** The player's own read on the hand: waits, what a discard would leave, and the tile tracker (记牌器). */
 import type { HandView, Tile as TileKind } from '@mahjong/engine';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { discardOutcome, unseenCounts, waitsOf, type Wait } from '../game/insight';
 import { T } from '../strings';
@@ -18,19 +19,15 @@ interface PanelProps {
  * - otherwise, my waits when ready (听牌).
  */
 export function InsightPanel({ view, focus, tileWidth }: PanelProps) {
-  const me = view.players[view.seat];
-  const hand = me.hand;
-  if (!hand || me.won || view.phase !== 'play') return null;
-  const unseen = unseenCounts(view);
-  const myDiscard = view.stage.kind === 'turn' && view.stage.seat === view.seat && !!view.legal.discard;
-
-  if (myDiscard) {
-    if (focus === null || !hand.includes(focus)) return null;
-    const outcome = discardOutcome(focus, view, unseen);
+  // Hand evaluation is costly and the table re-renders with every countdown tick: only redo it when the view or focus changes.
+  const insight = useMemo(() => computeInsight(view, focus), [view, focus]);
+  if (!insight) return null;
+  if (insight.kind === 'discard') {
+    const { focus: tile, outcome } = insight;
     return (
       <View style={styles.panel}>
         <Text style={styles.label}>{T.ifDiscard}</Text>
-        <Tile tile={focus} width={tileWidth} />
+        <Tile tile={tile} width={tileWidth} />
         {outcome.waits.length ? (
           <Waits waits={outcome.waits} tileWidth={tileWidth} />
         ) : (
@@ -40,15 +37,29 @@ export function InsightPanel({ view, focus, tileWidth }: PanelProps) {
     );
   }
 
+  return (
+    <View style={[styles.panel, styles.ready]}>
+      <Waits waits={insight.waits} tileWidth={tileWidth} />
+    </View>
+  );
+}
+
+type Insight = { kind: 'discard'; focus: TileKind; outcome: ReturnType<typeof discardOutcome> } | { kind: 'waits'; waits: Wait[] } | null;
+
+function computeInsight(view: HandView, focus: TileKind | null): Insight {
+  const me = view.players[view.seat];
+  const hand = me.hand;
+  if (!hand || me.won || view.phase !== 'play') return null;
+  const unseen = unseenCounts(view);
+  const myDiscard = view.stage.kind === 'turn' && view.stage.seat === view.seat && !!view.legal.discard;
+  if (myDiscard) {
+    if (focus === null || !hand.includes(focus)) return null;
+    return { kind: 'discard', focus, outcome: discardOutcome(focus, view, unseen) };
+  }
   // 13-tile hand (3n+1) between turns.
   if ((hand.length - 1) % 3 !== 0) return null;
   const waits = waitsOf(hand, view, unseen);
-  if (!waits.length) return null;
-  return (
-    <View style={[styles.panel, styles.ready]}>
-      <Waits waits={waits} tileWidth={tileWidth} />
-    </View>
-  );
+  return waits.length ? { kind: 'waits', waits } : null;
 }
 
 function Waits({ waits, tileWidth }: { waits: Wait[]; tileWidth: number }) {
