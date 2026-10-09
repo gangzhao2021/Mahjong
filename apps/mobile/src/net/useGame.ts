@@ -15,6 +15,8 @@ import {
   type GameOptions,
   type GameSummary,
   type RankResult,
+  type FriendRoomInfo,
+  type FriendRoomRejection,
   type EarnedReward,
   type ServerMessage,
   type StartRejection,
@@ -61,6 +63,9 @@ export interface GameState {
   /** Deal commitment as first received for each hand ("gameId:handIndex"), before any reveal. */
   commitments: Record<string, string>;
   startRejected: { reason: StartRejection; detail?: string; at: number } | null;
+  /** The friend-room waiting room this player is in. */
+  friendRoom: FriendRoomInfo | null;
+  friendRoomRejected: { reason: FriendRoomRejection; detail?: string; at: number } | null;
   /** Result of a game that finished while the player was away (PRD §14.1). */
   pendingResult: GameSummary | null;
   /** Result of the game just finished. */
@@ -79,6 +84,10 @@ export interface GameApi extends GameState {
   act(action: DistributiveOmit<Action, 'seat'>): void;
   setAutoPlay(on: boolean): void;
   setFastPace(on: boolean): void;
+  createFriendRoom(handsPerGame: number): void;
+  joinFriendRoom(code: string): void;
+  leaveFriendRoom(): void;
+  startFriendRoom(): void;
   skipToResults(): void;
   nextHand(): void;
   leaveGame(): void;
@@ -126,6 +135,8 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     gameSummary: null,
     notice: null,
     rewards: null,
+    friendRoom: null,
+    friendRoomRejected: null,
     leftReason: null,
     reported: [],
   });
@@ -208,6 +219,12 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
               lastWallet: msg.change ? { ...msg.change, gameId: tableRef.current?.gameId ?? null } : s.lastWallet,
             }));
             break;
+          case 'friendRoom':
+            setState((s) => ({ ...s, friendRoom: msg.room }));
+            break;
+          case 'friendRoomRejected':
+            setState((s) => ({ ...s, friendRoomRejected: { reason: msg.reason, detail: msg.detail, at: Date.now() } }));
+            break;
           case 'startRejected':
             setState((s) => ({ ...s, startRejected: { reason: msg.reason, detail: msg.detail, at: Date.now() } }));
             break;
@@ -286,6 +303,10 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     ),
     setAutoPlay: useCallback((on) => send({ type: 'setAutoPlay', on }), [send]),
     setFastPace: useCallback((on) => send({ type: 'setFastPace', on }), [send]),
+    createFriendRoom: useCallback((handsPerGame) => send({ type: 'createFriendRoom', handsPerGame }), [send]),
+    joinFriendRoom: useCallback((code) => send({ type: 'joinFriendRoom', code }), [send]),
+    leaveFriendRoom: useCallback(() => send({ type: 'leaveFriendRoom' }), [send]),
+    startFriendRoom: useCallback(() => send({ type: 'startFriendRoom' }), [send]),
     skipToResults: useCallback(() => send({ type: 'skipToResults' }), [send]),
     nextHand: useCallback(() => send({ type: 'nextHand' }), [send]),
     leaveGame: useCallback(() => send({ type: 'leaveGame' }), [send]),

@@ -188,6 +188,37 @@ const zh = {
     promoted: (tier: string) => `升段！成为 ${tier}`,
     note: '只有初级场及以上的金币场计入段位',
   },
+  friend: {
+    entry: '好友房',
+    hint: '和朋友一起打，只算分不算金币',
+    title: '好友房',
+    intro: '和朋友坐一桌，只算分、不算金币，也不计段位。坐不满 4 人时由 AI 补位。',
+    createTitle: '开一个房间',
+    create: '创建',
+    joinTitle: '输入朋友的房号',
+    join: '加入',
+    waitingTitle: '等朋友入座',
+    roomNumber: '房号',
+    share: '把房号发给朋友，在大厅点「好友房」输入即可加入',
+    aiFill: 'AI 补位',
+    host: '房主',
+    offline: '离线',
+    rules: (hands: number) => `${hands} 局 · 只算分不算金币 · 空位由 AI 补上`,
+    leave: '离开房间',
+    start: '开始游戏',
+    needFriend: '等朋友加入',
+    waitingHost: '等房主开始…',
+    tableName: '好友房',
+    readyWaiting: '已准备，等其他玩家…',
+    rejected: {
+      notFound: '没有这个房号，请核对一下',
+      full: '房间已经坐满了',
+      inGame: '你正在牌局中，先打完这一场',
+      notHost: '只有房主能开始',
+      needFriend: '至少要有一位朋友加入才能开始',
+      blocked: (name: string) => `${name} 现在不能开始游戏（游戏时间限制或实名认证）`,
+    } as Record<string, string | ((name: string) => string)>,
+  },
   achievements: {
     entry: '成就',
     title: '成就',
@@ -557,6 +588,37 @@ const en: Strings = {
     promoted: (tier: string) => `Promoted to ${tier}!`,
     note: 'Only coin tables (Beginner and up) count for rank',
   },
+  friend: {
+    entry: 'Friends',
+    hint: 'Play with friends, points only',
+    title: 'Friend room',
+    intro: 'Sit at one table with friends. Points only: no coins, no rank. Empty seats are filled by AI.',
+    createTitle: 'Open a room',
+    create: 'Create',
+    joinTitle: "Enter a friend's room number",
+    join: 'Join',
+    waitingTitle: 'Waiting for friends',
+    roomNumber: 'Room number',
+    share: 'Send the number to your friends; they tap "Friends" in the lobby and type it in',
+    aiFill: 'AI fills in',
+    host: 'Host',
+    offline: 'offline',
+    rules: (hands: number) => `${hands} hands · points only, no coins · AI fills empty seats`,
+    leave: 'Leave room',
+    start: 'Start',
+    needFriend: 'Waiting for a friend',
+    waitingHost: 'Waiting for the host to start…',
+    tableName: 'Friend room',
+    readyWaiting: 'Ready, waiting for the others…',
+    rejected: {
+      notFound: 'No room with that number',
+      full: 'That room is full',
+      inGame: "You're in a game: finish it first",
+      notHost: 'Only the host can start',
+      needFriend: 'At least one friend has to join first',
+      blocked: (name: string) => `${name} can't play right now (play-time limit or real-name check)`,
+    } as Record<string, string | ((name: string) => string)>,
+  },
   achievements: {
     entry: 'Achievements',
     title: 'Achievements',
@@ -846,6 +908,7 @@ export function setLocale(locale: Locale): void {
 /** Table names: the server's (admin-editable, Chinese) names, or the English names in English. */
 export function tableName(stake: { kind?: string; tableId?: string; id?: string; name: string }): string {
   if (stake.kind === 'private') return T.privateRoom;
+  if (stake.kind === 'friend') return T.friend.tableName;
   const id = stake.tableId ?? stake.id;
   return current === 'en' && id ? (T.tableNames[id] ?? stake.name) : stake.name;
 }

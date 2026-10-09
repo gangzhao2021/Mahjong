@@ -26,7 +26,7 @@ import {
   type Seat,
 } from '@mahjong/engine';
 import type { BanterLevel, Character, CharacterMemory, DialogueSettings, Language, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
-import type { ChatEntry, DealProof, GameSummary, SeatInfo, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
+import type { ChatEntry, DealProof, GameSummary, SeatInfo, ServerMessage, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
 import type { WebSocket } from 'ws';
 import type { ServerConfig } from './config';
 import type { LlmProvider } from './llm/provider';
@@ -67,7 +67,9 @@ export interface RoomOptions {
   seed: number;
   humanSeat: Seat;
   human: { playerId: string; name: string; avatar: string };
-  /** Three AI opponents, filling the non-human seats in seat order. */
+  /** Friend room: the other real players and their seats (the host is `human`). */
+  guests?: { seat: Seat; playerId: string; name: string; avatar: string }[];
+  /** AI opponents, filling the remaining seats in seat order. */
   ai: AiSeatSpec[];
   store: HandLogStore;
   rng: Rng;
@@ -106,21 +108,33 @@ interface Timer {
   info: TimerInfo | null;
 }
 
+/** Per real player at the table: their own countdown, 托管 and readiness for the next hand. */
+interface HumanState {
+  seat: Seat;
+  ctrl: HumanSeat;
+  autoPlay: boolean;
+  consecutiveTimeouts: number;
+  timer: Timer | null;
+  /** Pressed "next hand" (friend rooms wait for everyone, or the timer). */
+  ready: boolean;
+}
+
 export class Room {
   readonly id: string;
+  /** The host (the only player outside friend rooms). */
   readonly humanSeat: Seat;
   readonly human: HumanSeat;
   private readonly seats: SeatController[];
+  private readonly humans: HumanState[];
   private game: GameState;
   private hand!: HandState;
   private handIndex = 0;
   private log!: HandLog;
-  private autoPlay = false;
-  /** Quick pace (player setting): AI think time and auto-play delay cut to a fraction. */
+  /** Quick pace (player setting): AI think time and auto-play delay cut to a fraction. Single-player only. */
   private fastPace = false;
-  private consecutiveTimeouts = 0;
   private fastForward = false;
-  private timer: Timer | null = null;
+  /** The table-wide timer between hands. */
+  private nextHandTimer: Timer | null = null;
   private closed = false;
   private readonly talk: TableTalk;
   private coinChange = 0;
@@ -141,8 +155,11 @@ export class Room {
       { seat: opts.humanSeat, name: opts.human.name, avatar: opts.human.avatar, isHuman: true },
       opts.human.playerId,
     );
+    const guests = new Map((opts.guests ?? []).map((g) => [g.seat, new HumanSeat({ seat: g.seat, name: g.name, avatar: g.avatar, isHuman: true }, g.playerId)]));
     this.seats = SEATS.map((seat) => {
       if (seat === opts.humanSeat) return this.human;
+      const guest = guests.get(seat);
+      if (guest) return guest;
       const spec = ai.shift()!;
       const { character, personality } = spec;
       speakers.push({ seat, character, personality, memory: spec.memory ?? null });
@@ -179,20 +196,23 @@ export class Room {
       version: () => this.hand.actionCount,
       handIndex: () => this.handIndex,
       emit: (entry) => {
-        this.human.send({ type: 'chat', entry });
+        for (const h of this.humans) h.ctrl.send({ type: 'chat', entry });
         opts.talk.onLine?.(entry, this.seats[entry.seat].info.name);
       },
       onMemoryUsed: opts.talk.onMemoryUsed,
       onPlayerQuote: opts.talk.onPlayerQuote,
     });
     this.aiSeats = speakers.map((s) => ({ seat: s.seat, characterId: s.character.id, name: s.character.name }));
+    this.humans = this.seats
+      .filter((s): s is HumanSeat => s instanceof HumanSeat)
+      .map((ctrl) => ({ seat: ctrl.info.seat, ctrl, autoPlay: false, consecutiveTimeouts: 0, timer: null, ready: false }));
 
     const r = opts.restore;
     if (r) {
       this.hand = r.hand;
       this.handIndex = r.hand.phase === 'ended' ? r.game.handIndex - 1 : r.game.handIndex;
       this.log = r.log;
-      this.autoPlay = r.autoPlay;
+      this.stateOf(this.humanSeat).autoPlay = r.autoPlay;
       this.coinChange = opts.coinChange ?? 0;
       this.talk.restoreLog(r.chat);
     }
@@ -206,9 +226,37 @@ export class Room {
       game: this.game,
       hand: this.hand,
       log: this.log,
-      autoPlay: this.autoPlay,
+      autoPlay: this.stateOf(this.humanSeat).autoPlay,
       chat: this.talk.chatLog,
     };
+  }
+
+  /** More than one real player (a friend room). */
+  get multiplayer(): boolean {
+    return this.humans.length > 1;
+  }
+
+  /** The seat of a real player at this table, or null. */
+  seatOf(playerId: string): Seat | null {
+    return this.humans.find((h) => h.ctrl.playerId === playerId)?.seat ?? null;
+  }
+
+  /** Sends a message to the real player in `seat` (if connected). */
+  sendTo(seat: Seat, message: ServerMessage): void {
+    this.humans.find((h) => h.seat === seat)?.ctrl.send(message);
+  }
+
+  /** Every real player at the table. */
+  get players(): { seat: Seat; playerId: string; name: string; connected: boolean }[] {
+    return this.humans.map((h) => ({ seat: h.seat, playerId: h.ctrl.playerId, name: h.ctrl.info.name, connected: h.ctrl.connected }));
+  }
+
+  private stateOf(seat: Seat): HumanState {
+    return this.humans.find((h) => h.seat === seat)!;
+  }
+
+  private get anyoneWatching(): boolean {
+    return this.humans.some((h) => h.ctrl.connected);
   }
 
   /** Continues a restored game once the player reconnects, or after `graceMs` without them. */
@@ -222,7 +270,7 @@ export class Room {
     this.paused = false;
     if (this.graceTimer) clearTimeout(this.graceTimer);
     this.graceTimer = null;
-    if (!this.human.connected) this.autoPlay = true;
+    for (const h of this.humans) if (!h.ctrl.connected) h.autoPlay = true;
     this.publish([]);
   }
 
@@ -252,9 +300,10 @@ export class Room {
     return isGameOver(this.game) && this.hand?.phase === 'ended';
   }
 
-  /** Attach the player's socket first, so the opening turns are not treated as unattended. */
-  start(socket?: WebSocket): void {
+  /** Attach the players' sockets first, so the opening turns are not treated as unattended. */
+  start(socket?: WebSocket, guestSockets: Map<Seat, WebSocket> = new Map()): void {
     if (socket) this.human.attach(socket);
+    for (const [seat, s] of guestSockets) this.stateOf(seat).ctrl.attach(s);
     this.beginHand();
   }
 
@@ -262,73 +311,83 @@ export class Room {
   // Human intents
   // -------------------------------------------------------------------------
 
-  attach(socket: WebSocket): void {
-    this.human.attach(socket);
+  attach(socket: WebSocket, seat: Seat = this.humanSeat): void {
+    this.stateOf(seat).ctrl.attach(socket);
     if (this.paused) this.unpause();
     else this.publish([]);
   }
 
   detach(socket: WebSocket): void {
-    this.human.detach(socket);
-    // PRD §14.1: a disconnected player's seat is auto-played until they return.
-    if (!this.closed && !this.paused) this.setAutoPlay(true);
+    for (const h of this.humans) {
+      // The socket is already closed when this runs, so match it rather than its state.
+      if (!h.ctrl.holds(socket)) continue;
+      h.ctrl.detach(socket);
+      // PRD §14.1: a disconnected player's seat is auto-played until they return.
+      if (!this.closed && !this.paused) this.setAutoPlay(true, h.seat);
+    }
   }
 
   /** Returns an error message, or null when accepted (stale actions are silently ignored). */
-  humanAction(action: Action, version: number): string | null {
-    const result = this.submit({ ...action, seat: this.humanSeat }, version, 'human');
-    if (result === null) this.consecutiveTimeouts = 0;
+  humanAction(action: Action, version: number, seat: Seat = this.humanSeat): string | null {
+    const result = this.submit({ ...action, seat }, version, 'human');
+    if (result === null) this.stateOf(seat).consecutiveTimeouts = 0;
     return result === 'stale' ? null : result;
   }
 
-  setAutoPlay(on: boolean): void {
-    if (this.autoPlay === on) return;
-    this.autoPlay = on;
-    this.consecutiveTimeouts = 0;
+  setAutoPlay(on: boolean, seat: Seat = this.humanSeat): void {
+    const h = this.stateOf(seat);
+    if (h.autoPlay === on) return;
+    h.autoPlay = on;
+    h.consecutiveTimeouts = 0;
     this.publish([]);
   }
 
   setFastPace(on: boolean): void {
-    if (this.fastPace === on) return;
+    // One player's pace setting would speed up everyone else's game.
+    if (this.multiplayer || this.fastPace === on) return;
     this.fastPace = on;
     this.publish([]);
   }
 
-  /** "Skip to results" once the human has won (PRD §14). */
+  /** "Skip to results" once the human has won (PRD §14); not in friend rooms, where others are still playing. */
   skipToResults(): void {
-    if (this.hand.phase !== 'play' || !this.hand.players[this.humanSeat].won) return;
+    if (this.multiplayer || this.hand.phase !== 'play' || !this.hand.players[this.humanSeat].won) return;
     this.fastForward = true;
     for (const s of this.seats) if (s instanceof AiSeat) s.reset();
     this.publish([]);
   }
 
-  nextHand(): void {
+  /** In a friend room the next hand starts once every attending player is ready (or the timer runs out). */
+  nextHand(seat: Seat = this.humanSeat): void {
     if (this.hand.phase !== 'ended' || isGameOver(this.game)) return;
+    this.stateOf(seat).ready = true;
+    const waiting = this.humans.some((h) => !h.ready && h.ctrl.connected && !h.autoPlay);
+    if (waiting) return void this.publish([]);
     this.beginHand();
   }
 
   /** Leaving never voids settlement: the seat is auto-played to the end (PRD §14.1). */
-  leave(): void {
-    this.human.detach();
-    if (this.gameOver) this.close();
-    else this.setAutoPlay(true);
+  leave(seat: Seat = this.humanSeat): void {
+    this.stateOf(seat).ctrl.detach();
+    if (this.gameOver && !this.anyoneWatching) this.close();
+    else this.setAutoPlay(true, seat);
   }
 
   /** A moderated player chat message. */
-  playerChat(text: string, target: Seat | 'table'): void {
-    if (!this.closed) this.talk.onPlayerChat(text, target);
+  playerChat(text: string, target: Seat | 'table', seat: Seat = this.humanSeat): void {
+    if (!this.closed) this.talk.onPlayerChat(text, target, seat);
   }
 
-  quickPhrase(text: string): void {
-    if (!this.closed) this.talk.onQuickPhrase(text);
+  quickPhrase(text: string, seat: Seat = this.humanSeat): void {
+    if (!this.closed) this.talk.onQuickPhrase(text, seat);
   }
 
-  sticker(id: StickerId): void {
-    if (!this.closed) this.talk.onSticker(id);
+  sticker(id: StickerId, seat: Seat = this.humanSeat): void {
+    if (!this.closed) this.talk.onSticker(id, seat);
   }
 
-  snapshot(): TableSnapshot {
-    return this.snapshotFor(this.humanSeat);
+  snapshot(seat: Seat = this.humanSeat): TableSnapshot {
+    return this.snapshotFor(seat);
   }
 
   /** Records settled coins (for display); called by the lobby after the wallet update. Returns the game total. */
@@ -351,13 +410,13 @@ export class Room {
     return this.coinChange;
   }
 
-  summary(): GameSummary {
+  summary(seat: Seat = this.humanSeat): GameSummary {
     return {
       gameId: this.id,
       stake: this.opts.stake,
       handsPlayed: this.game.handIndex,
       totals: this.game.totals,
-      mySeat: this.humanSeat,
+      mySeat: seat,
       seats: this.seats.map((s) => s.info),
       coinChange: this.coinChange,
       endedAt: Date.now(),
@@ -372,6 +431,7 @@ export class Room {
     this.hand = startHand(this.game);
     this.handIndex = this.game.handIndex;
     this.fastForward = false;
+    for (const h of this.humans) h.ready = false;
     this.log = {
       gameId: this.id,
       handIndex: this.handIndex,
@@ -416,19 +476,24 @@ export class Room {
       this.game = recordHand(this.game, this.hand.result!);
       this.log.result = this.hand.result;
       this.log.endedAt = new Date().toISOString();
-      void this.opts.store.save(this.log).catch((err) => console.error('Failed to save hand log', err));
+      // Every real player gets the hand in their own history.
+      for (const h of this.humans) {
+        const log = h.seat === this.humanSeat ? this.log : { ...this.log, playerId: h.ctrl.playerId };
+        void this.opts.store.save(log).catch((err) => console.error('Failed to save hand log', err));
+      }
       this.opts.onHandEnd?.(this, this.handIndex, this.hand.result!);
     }
     this.publish(events);
-    // Conversation sees only public information (events redacted for the human seat).
-    this.talk.onEvents(events.map((e) => redactEvent(e, this.humanSeat)));
+    // Conversation sees only public information: redacted for the player, or for nobody when several share the table.
+    const viewer = this.multiplayer ? NOBODY : this.humanSeat;
+    this.talk.onEvents(events.map((e) => redactEvent(e, viewer)));
     return null;
   }
 
   private publish(events: GameEvent[]): void {
     if (this.closed || this.paused) return;
     this.opts.onChange?.(this);
-    this.scheduleHuman();
+    this.scheduleHumans();
     for (const seat of SEATS) {
       const view = viewFor(this.hand, seat);
       this.seats[seat].update({
@@ -440,31 +505,40 @@ export class Room {
     }
   }
 
-  /** Sets the human seat's timer: a countdown, an auto-play move, or the next-hand timer. */
-  private scheduleHuman(): void {
-    this.clearTimer();
+  /** Sets every real player's timer (a countdown or an auto-play move), and the table's next-hand timer. */
+  private scheduleHumans(): void {
+    this.clearTimers();
     const { timers } = this.opts.config;
-    const seat = this.humanSeat;
-    const unattended = this.autoPlay || !this.human.connected;
 
     if (this.hand.phase === 'ended') {
       if (isGameOver(this.game)) {
-        if (!this.human.connected) this.close();
+        if (!this.anyoneWatching) this.close();
         return;
       }
-      const ms = unattended ? timers.nextHandAutoPlayMs : timers.nextHandMs;
-      this.setTimer(ms, 'nextHand', () => this.nextHand());
+      const attended = this.humans.some((h) => h.ctrl.connected && !h.autoPlay);
+      const ms = attended ? timers.nextHandMs : timers.nextHandAutoPlayMs;
+      const deadline = Date.now() + ms;
+      const cancel = this.delay(ms, () => {
+        this.nextHandTimer = null;
+        if (this.hand.phase === 'ended' && !isGameOver(this.game)) this.beginHand();
+      });
+      this.nextHandTimer = { cancel, info: { kind: 'nextHand', deadline, remainingMs: ms, durationMs: ms } };
       return;
     }
 
+    for (const h of this.humans) this.scheduleSeat(h);
+  }
+
+  private scheduleSeat(h: HumanState): void {
+    const seat = h.seat;
     const legal = legalActions(this.hand, seat);
     if (!hasDecision(legal)) return;
     const version = this.hand.actionCount;
 
-    if (unattended) {
+    if (h.autoPlay || !h.ctrl.connected) {
       // 托管 plays like an intermediate player and does declare wins.
-      const delay = this.fastForward || !this.human.connected ? 0 : this.opts.config.autoPlayDelayMs * (this.fastPace ? FAST_PACE : 1);
-      this.setTimer(delay, null, () => {
+      const delay = this.fastForward || !h.ctrl.connected ? 0 : this.opts.config.autoPlayDelayMs * (this.fastPace ? FAST_PACE : 1);
+      this.setSeatTimer(h, delay, null, () => {
         const action = chooseAction(viewFor(this.hand, seat), 'intermediate', this.opts.rng);
         if (action) this.submit(action, version, 'autoPlay');
       });
@@ -476,38 +550,42 @@ export class Room {
     const practice = this.opts.stake.multiplier === 0;
     const ms = timerDuration(kind, config) * (practice ? config.practice.timerScale : 1);
     const autoPlayAfter = practice ? config.practice.autoPlayAfterTimeouts : config.autoPlayAfterTimeouts;
-    this.setTimer(ms, kind, () => {
-      this.consecutiveTimeouts++;
-      if (this.consecutiveTimeouts >= autoPlayAfter) this.autoPlay = true;
+    this.setSeatTimer(h, ms, kind, () => {
+      h.consecutiveTimeouts++;
+      if (h.consecutiveTimeouts >= autoPlayAfter) h.autoPlay = true;
       const action = timeoutAction(viewFor(this.hand, seat), this.opts.rng);
       if (action) this.submit(action, version, 'timeout');
     });
   }
 
-  private setTimer(ms: number, kind: TimerKind | null, fn: () => void): void {
+  private setSeatTimer(h: HumanState, ms: number, kind: TimerKind | null, fn: () => void): void {
     const deadline = Date.now() + ms;
     const cancel = this.delay(ms, () => {
-      this.timer = null;
+      h.timer = null;
       fn();
     });
-    this.timer = { cancel, info: kind ? { kind, deadline, remainingMs: ms, durationMs: ms } : null };
+    h.timer = { cancel, info: kind ? { kind, deadline, remainingMs: ms, durationMs: ms } : null };
   }
 
   /** Immediate steps of a game nobody is watching go through the shared pacer. */
   private delay(ms: number, fn: () => void): Cancel {
-    if (ms === 0 && !this.human.connected && this.opts.pacer) return this.opts.pacer.schedule(fn);
+    if (ms === 0 && !this.anyoneWatching && this.opts.pacer) return this.opts.pacer.schedule(fn);
     return after(ms, fn);
   }
 
-  private clearTimer(): void {
-    this.timer?.cancel();
-    this.timer = null;
+  private clearTimers(): void {
+    for (const h of this.humans) {
+      h.timer?.cancel();
+      h.timer = null;
+    }
+    this.nextHandTimer?.cancel();
+    this.nextHandTimer = null;
   }
 
   private aiThinkMs(skill: SkillLevel): number {
     const humanWon = this.hand.players[this.humanSeat].won !== null;
     // Nobody is watching: finish quickly.
-    if ((this.fastForward && humanWon) || !this.human.connected) return 0;
+    if ((this.fastForward && humanWon) || !this.anyoneWatching) return 0;
     const { minDelayMs, maxDelayMs, beginnerExtraMs } = this.opts.config.ai;
     const extra = skill === 'beginner' ? beginnerExtraMs : 0;
     const ms = minDelayMs + Math.floor(this.opts.rng() * (maxDelayMs - minDelayMs)) + extra;
@@ -515,7 +593,9 @@ export class Room {
   }
 
   private snapshotFor(seat: Seat): TableSnapshot {
-    const timer = seat === this.humanSeat && this.timer?.info ? { ...this.timer.info } : null;
+    const h = this.humans.find((x) => x.seat === seat);
+    const info = this.hand.phase === 'ended' ? this.nextHandTimer?.info : h?.timer?.info;
+    const timer = h && info ? { ...info } : null;
     if (timer) timer.remainingMs = Math.max(0, timer.deadline - Date.now());
     return {
       gameId: this.id,
@@ -526,7 +606,7 @@ export class Room {
       totals: this.game.totals,
       view: viewFor(this.hand, seat),
       timer,
-      autoPlay: this.autoPlay,
+      autoPlay: h?.autoPlay ?? false,
       fastForward: this.fastForward,
       fastPace: this.fastPace,
       deal: this.dealProof(),
@@ -547,13 +627,16 @@ export class Room {
   close(): void {
     if (this.closed) return;
     this.closed = true;
-    this.clearTimer();
+    this.clearTimers();
     if (this.graceTimer) clearTimeout(this.graceTimer);
     this.talk.dispose();
     for (const s of this.seats) s.dispose();
     this.opts.onClosed?.(this);
   }
 }
+
+/** A viewer who owns no seat: redacting for it leaves only public information. */
+const NOBODY = -1 as Seat;
 
 /** Share of the normal AI think time and auto-play delay used at quick pace. */
 const FAST_PACE = 0.3;

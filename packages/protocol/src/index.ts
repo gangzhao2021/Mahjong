@@ -130,13 +130,35 @@ export interface PrivateRules {
 }
 
 export interface StakeInfo {
-  kind: 'public' | 'private';
+  /** 'friend': real friends at one table (points only, no coins, unranked). */
+  kind: 'public' | 'private' | 'friend';
   tableId?: string;
   name: string;
   baseScore: number;
   multiplier: number;
   inviteCode?: string;
 }
+
+/** A friend room's waiting room, before the host starts the game. */
+export interface FriendRoomInfo {
+  /** 6-digit room number friends type in to join. */
+  code: string;
+  members: { playerId: string; name: string; avatar: string; isHost: boolean; online: boolean }[];
+  handsPerGame: number;
+  maxPlayers: number;
+}
+
+export type FriendRoomRejection =
+  | 'notFound'
+  /** Four players already. */
+  | 'full'
+  /** The player is in a game right now. */
+  | 'inGame'
+  | 'notHost'
+  /** Starting needs at least one friend. */
+  | 'needFriend'
+  /** A member may not play right now (play limits, real-name check); `detail` names them. */
+  | 'blocked';
 
 /** Result of a finished game, also delivered on next login if the player was away (PRD §14.1). */
 export interface GameSummary {
@@ -312,6 +334,11 @@ export type ClientMessage =
   /** `version` is the view version the action was chosen from; stale actions are ignored. */
   | { type: 'action'; action: DistributiveOmit<Action, 'seat'>; version: number }
   | { type: 'setAutoPlay'; on: boolean }
+  /** Friend rooms: open a waiting room, join one by number, leave it, or (host) start the game. */
+  | { type: 'createFriendRoom'; handsPerGame: number }
+  | { type: 'joinFriendRoom'; code: string }
+  | { type: 'leaveFriendRoom' }
+  | { type: 'startFriendRoom' }
   /** Quick pace: AI players move with little thinking time (a player setting). */
   | { type: 'setFastPace'; on: boolean }
   | { type: 'skipToResults' }
@@ -330,6 +357,9 @@ export type ServerMessage =
   | { type: 'left'; reason?: 'user' | 'minorTimeLimit' | 'guestTrialOver' }
   /** `gameTotal`: the player's net coins over the current game so far. */
   | { type: 'rank'; result: RankResult }
+  /** The waiting room this player is in (null once they leave or the game starts). */
+  | { type: 'friendRoom'; room: FriendRoomInfo | null }
+  | { type: 'friendRoomRejected'; reason: FriendRoomRejection; detail?: string }
   /** Rewards paid automatically (achievements after a hand, the login reward on the first visit of the day). */
   | { type: 'rewards'; items: EarnedReward[]; balance: number }
   | { type: 'wallet'; balance: number; change: { amount: number; requested: number; handIndex: number; gameTotal: number } | null }

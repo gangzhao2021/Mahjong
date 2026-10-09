@@ -22,6 +22,7 @@ import { Pacer } from './pacer';
 import { Room, type AiSeatSpec, type RoomCheckpoint } from './room';
 import { accountSummary, checkStart, type GamePlan, type Services } from './services';
 import { AlreadyClaimedError } from './economy/rewards';
+import { FriendTables, type FriendTable } from './friends';
 import type { HandLogStore } from './store';
 
 export interface LobbyDeps {
@@ -67,11 +68,28 @@ export class Lobby {
   private readonly pacer: Pacer;
   /** UI language per player, from their latest hello. */
   private languages = new Map<string, Language>();
+  /** Friend rooms waiting for their host to start. */
+  private readonly friends: FriendTables;
 
   constructor(private readonly deps: LobbyDeps) {
     this.rng = createRng(this.nextSeed());
     this.chatGuard = new ChatGuard(deps.dialogue.chat);
     this.pacer = new Pacer(deps.config.unattendedActionsPerSecond);
+    this.friends = new FriendTables(
+      (playerId, room) => this.sendToPlayer(playerId, { type: 'friendRoom', room }),
+      (playerId) => (this.sockets.get(playerId)?.size ?? 0) > 0,
+      () => this.rng(),
+    );
+  }
+
+  /** Sends to every open socket of a player. */
+  private sendToPlayer(playerId: string, message: ServerMessage): void {
+    for (const socket of this.sockets.get(playerId) ?? []) if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
+  }
+
+  /** The seat a player holds in their room (the host seat outside friend rooms). */
+  private seatIn(room: Room, playerId: string): Seat {
+    return room.seatOf(playerId) ?? room.humanSeat;
   }
 
   /** Chat catalog in the player's language (quick phrases are admin-configurable, so built per request). */
@@ -145,8 +163,10 @@ export class Lobby {
             account: await accountSummary(this.s, (login && (await this.s.accounts.get(player.id))) || player),
           });
           if (login) send({ type: 'rewards', items: [{ kind: 'login', id: 'login', amount: login.amount }], balance: login.balance });
-          if (room && !room.isClosed) room.attach(socket);
+          if (room && !room.isClosed) room.attach(socket, this.seatIn(room, player.id));
           else await this.deliverPendingResult(player.id, send);
+          const waiting = this.friends.tableOf(player.id);
+          if (waiting) this.friends.broadcast(waiting);
           return;
         }
         if (!player) return fail('helloRequired', 'Send hello first');
@@ -161,6 +181,8 @@ export class Lobby {
       if (!player) return;
       this.rooms.get(player.id)?.detach(socket);
       this.sockets.get(player.id)?.delete(socket);
+      const waiting = this.friends.tableOf(player.id);
+      if (waiting) this.friends.broadcast(waiting);
       void sessionId?.then(async (id) => {
         if (id !== null) await this.s.db.query('UPDATE play_sessions SET ended_at = $2 WHERE id = $1', [id, this.s.now()]).catch(() => undefined);
       });
@@ -178,28 +200,54 @@ export class Lobby {
     switch (msg.type) {
       case 'startGame': {
         if (room && !room.gameOver && !room.isClosed) {
-          room.attach(socket); // already playing: just resend the table
+          room.attach(socket, this.seatIn(room, player.id)); // already playing: just resend the table
           return;
         }
+        this.friends.leave(player.id);
         // Account state may have changed over HTTP since the socket connected (real-name, coins…).
         const fresh = await this.s.accounts.get(player.id);
         if (!fresh) return fail('unauthorized', 'Account no longer exists');
         Object.assign(player, fresh);
         const check = await checkStart(this.s, player, msg.options);
         if (!check.ok) return send({ type: 'startRejected', reason: check.reason, detail: check.detail });
-        room?.close();
+        if (room && !room.multiplayer) room.close();
         await this.createRoom(player, check.plan, socket);
+        return;
+      }
+      case 'createFriendRoom': {
+        if (room && !room.gameOver && !room.isClosed) return send({ type: 'friendRoomRejected', reason: 'inGame' });
+        const hands = Number.isInteger(msg.handsPerGame) ? Math.min(Math.max(msg.handsPerGame, 1), this.deps.config.maxHandsPerGame) : this.deps.config.defaultHandsPerGame;
+        this.friends.create({ playerId: player.id, name: player.nickname, avatar: player.avatar }, hands);
+        return;
+      }
+      case 'joinFriendRoom': {
+        if (room && !room.gameOver && !room.isClosed) return send({ type: 'friendRoomRejected', reason: 'inGame' });
+        if (typeof msg.code !== 'string') return fail('badMessage', 'Malformed room number');
+        const joined = this.friends.join({ playerId: player.id, name: player.nickname, avatar: player.avatar }, msg.code);
+        if (typeof joined === 'string') send({ type: 'friendRoomRejected', reason: joined });
+        return;
+      }
+      case 'leaveFriendRoom':
+        this.friends.leave(player.id);
+        return;
+      case 'startFriendRoom': {
+        const table = this.friends.tableOf(player.id);
+        if (!table) return send({ type: 'friendRoomRejected', reason: 'notFound' });
+        if (table.hostId !== player.id) return send({ type: 'friendRoomRejected', reason: 'notHost' });
+        if (table.members.length < 2) return send({ type: 'friendRoomRejected', reason: 'needFriend' });
+        await this.startFriendGame(table, socket);
         return;
       }
       case 'action': {
         if (!room) return fail('notInGame', 'No active game');
         if (!isWellFormedAction(msg.action) || !Number.isInteger(msg.version)) return fail('badMessage', 'Malformed action');
-        const error = room.humanAction({ ...msg.action, seat: room.humanSeat } as Action, msg.version);
+        const seat = this.seatIn(room, player.id);
+        const error = room.humanAction({ ...msg.action, seat } as Action, msg.version, seat);
         if (error) fail('illegalAction', error);
         return;
       }
       case 'setAutoPlay':
-        room?.setAutoPlay(!!msg.on);
+        room?.setAutoPlay(!!msg.on, this.seatIn(room, player.id));
         return;
       case 'setFastPace':
         room?.setFastPace(!!msg.on);
@@ -208,10 +256,10 @@ export class Lobby {
         room?.skipToResults();
         return;
       case 'nextHand':
-        room?.nextHand();
+        room?.nextHand(this.seatIn(room, player.id));
         return;
       case 'leaveGame':
-        room?.leave();
+        room?.leave(this.seatIn(room, player.id));
         send({ type: 'left', reason: 'user' });
         return;
       case 'setBanter': {
@@ -241,7 +289,7 @@ export class Lobby {
           ]);
           return send({ type: 'chatRejected', reason: this.chatGuard.isSuspended(player.id) ? 'suspended' : 'blocked' });
         }
-        room.playerChat(text, target);
+        room.playerChat(text, target, this.seatIn(room, player.id));
         return;
       }
       case 'quickPhrase': {
@@ -249,14 +297,14 @@ export class Lobby {
         if (!room || !phrase) return;
         const admitted = this.chatGuard.admit(player.id);
         if (admitted) return send({ type: 'chatRejected', reason: admitted });
-        room.quickPhrase((this.languageOf(player.id) === 'en' && phrase.textEn) || phrase.text);
+        room.quickPhrase((this.languageOf(player.id) === 'en' && phrase.textEn) || phrase.text, this.seatIn(room, player.id));
         return;
       }
       case 'sticker': {
         if (!room || !(msg.id in STICKERS)) return;
         const admitted = this.chatGuard.admit(player.id);
         if (admitted) return send({ type: 'chatRejected', reason: admitted });
-        room.sticker(msg.id);
+        room.sticker(msg.id, this.seatIn(room, player.id));
         return;
       }
       case 'reportLine': {
@@ -279,7 +327,11 @@ export class Lobby {
 
   /** Takes a player out of any game and disconnects them (suspension). */
   kick(playerId: string): void {
-    this.rooms.get(playerId)?.close();
+    const room = this.rooms.get(playerId);
+    // In a friend room the others play on; the kicked seat is auto-played.
+    if (room?.multiplayer) room.leave(this.seatIn(room, playerId));
+    else room?.close();
+    this.friends.leave(playerId);
     for (const socket of this.sockets.get(playerId) ?? []) {
       if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ type: 'error', code: 'unauthorized', message: 'Session ended' } satisfies ServerMessage));
       socket.close();
@@ -309,7 +361,14 @@ export class Lobby {
     });
   }
 
-  private buildRoom(player: PlayerRow, plan: GamePlan, ai: AiSeatSpec[], language: Language, restore?: { checkpoint: RoomCheckpoint; coinChange: number }): Room {
+  private buildRoom(
+    player: PlayerRow,
+    plan: GamePlan,
+    ai: AiSeatSpec[],
+    language: Language,
+    restore?: { checkpoint: RoomCheckpoint; coinChange: number },
+    guests: { seat: Seat; player: PlayerRow; plan: GamePlan }[] = [],
+  ): Room {
     const room: Room = new Room({
       gameId: restore?.checkpoint.gameId ?? `g_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
       config: this.deps.config,
@@ -321,6 +380,7 @@ export class Lobby {
       pacer: this.pacer,
       coinChange: restore?.coinChange,
       human: { playerId: player.id, name: player.nickname, avatar: player.avatar },
+      guests: guests.map((g) => ({ seat: g.seat, playerId: g.player.id, name: g.player.nickname, avatar: g.player.avatar })),
       ai,
       store: this.deps.hands,
       rng: createRng(this.nextSeed()),
@@ -336,7 +396,8 @@ export class Lobby {
         onLine: (entry, speaker) => {
           void this.s.db
             .query('INSERT INTO chat_log (player_id, game_id, seat, kind, speaker, text, sticker) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
-              player.id,
+              // A friend's own lines are logged under their account; AI lines under the host's table.
+              room.players.find((p) => p.seat === entry.seat)?.playerId ?? player.id,
               room.id,
               entry.seat,
               entry.kind,
@@ -352,15 +413,22 @@ export class Lobby {
         },
       },
       onHandEnd: (r, handIndex, result) => this.track(this.afterHand(player, r, plan, handIndex, result)),
-      onChange: (r) => this.scheduleCheckpoint(player.id, r, plan, language),
+      // Friend rooms are not checkpointed (MVP): a restart ends them.
+      onChange: (r) => (r.multiplayer ? undefined : this.scheduleCheckpoint(player.id, r, plan, language)),
       onClosed: (r) => {
-        if (this.rooms.get(player.id) === r) this.rooms.delete(player.id);
-        this.clearLimit(player.id);
-        if (!this.stopping) this.dropCheckpoint(player.id, r.id);
+        for (const id of [player.id, ...guests.map((g) => g.player.id)]) {
+          if (this.rooms.get(id) === r) this.rooms.delete(id);
+          this.clearLimit(id);
+        }
+        if (!this.stopping && !r.multiplayer) this.dropCheckpoint(player.id, r.id);
       },
     });
     this.rooms.set(player.id, room);
     this.scheduleLimit(player.id, room, plan);
+    for (const g of guests) {
+      this.rooms.set(g.player.id, room);
+      this.scheduleLimit(g.player.id, room, g.plan, g.seat);
+    }
     return room;
   }
 
@@ -469,6 +537,7 @@ export class Lobby {
   }
 
   private async afterHand(player: PlayerRow, room: Room, plan: GamePlan, handIndex: number, result: HandResult): Promise<void> {
+    if (room.multiplayer) return this.afterFriendHand(room, result);
     await this.settle(player.id, room, plan, handIndex, result);
     await this.remember(player, room, plan, result).catch((error) => console.error('Recording AI memory failed:', error));
     // After the memory write, so lifetime counts in the profile include this hand.
@@ -484,6 +553,48 @@ export class Lobby {
       });
       if (rank) room.human.send({ type: 'rank', result: rank });
     }
+  }
+
+  /** Friend rooms: points only (no coins, unranked, no AI memory); each player gets their achievements and result. */
+  private async afterFriendHand(room: Room, result: HandResult): Promise<void> {
+    for (const p of room.players) {
+      const rewards = await this.s.achievements.recordHand(p.playerId, p.seat, result).catch((error) => {
+        console.error('Recording achievements failed:', error);
+        return [];
+      });
+      if (rewards.length) room.sendTo(p.seat, { type: 'rewards', items: rewards, balance: await this.s.wallet.balance(p.playerId) });
+      if (room.gameOver) await this.finishGame(p.playerId, room.summary(p.seat), room, p.seat);
+    }
+  }
+
+  /** Starts a friend room: members take seats in join order, AI fill the rest. */
+  private async startFriendGame(table: FriendTable, hostSocket: WebSocket): Promise<void> {
+    const players: { player: PlayerRow; plan: GamePlan }[] = [];
+    for (const m of table.members) {
+      const p = await this.s.accounts.get(m.playerId);
+      if (!p) continue;
+      // Play limits (minors, guest trial, real name) apply to every member, not just the host.
+      const check = await checkStart(this.s, p, { private: { baseScore: 0, handsPerGame: table.handsPerGame } });
+      if (!check.ok) {
+        this.sendToPlayer(table.hostId, { type: 'friendRoomRejected', reason: 'blocked', detail: p.nickname });
+        this.sendToPlayer(p.id, { type: 'startRejected', reason: check.reason, detail: check.detail });
+        return;
+      }
+      players.push({ player: p, plan: { ...check.plan, stake: { kind: 'friend', name: '好友房', baseScore: 0, multiplier: 0, inviteCode: table.code } } });
+    }
+    if (players.length < 2) return void this.sendToPlayer(table.hostId, { type: 'friendRoomRejected', reason: 'needFriend' });
+    for (const { player } of players) {
+      const old = this.rooms.get(player.id);
+      if (old && !old.multiplayer) old.close();
+    }
+    const [host, ...rest] = players;
+    const guests = rest.map((g, i) => ({ seat: (i + 1) as Seat, player: g.player, plan: g.plan }));
+    const chosen = selectCharacters(this.deps.dialogue.roster, 4 - players.length, this.rng);
+    const ai: AiSeatSpec[] = chosen.map((c) => ({ ...c, skill: pickWeighted(this.deps.config.skillWeights, this.rng), memory: null }));
+    this.friends.close(table);
+    const room = this.buildRoom(host.player, host.plan, ai, this.languageOf(host.player.id), undefined, guests);
+    const openSocket = (id: string) => [...(this.sockets.get(id) ?? [])].find((s) => s.readyState === s.OPEN);
+    room.start(hostSocket, new Map(guests.flatMap((g) => (openSocket(g.player.id) ? [[g.seat, openSocket(g.player.id)!] as const] : []))));
   }
 
   /** Long-term memory write path (PRD Appendix B.2). */
@@ -526,9 +637,9 @@ export class Lobby {
   }
 
   /** Shows the result now, or stores it for the next login if the player is away (PRD §14.1). */
-  private async finishGame(playerId: string, summary: GameSummary, room: Room): Promise<void> {
-    if (room.human.connected) {
-      room.human.send({ type: 'gameSummary', summary });
+  private async finishGame(playerId: string, summary: GameSummary, room: Room, seat: Seat = room.humanSeat): Promise<void> {
+    if (room.players.find((p) => p.seat === seat)?.connected) {
+      room.sendTo(seat, { type: 'gameSummary', summary });
       return;
     }
     await this.s.db.query(
@@ -543,7 +654,7 @@ export class Lobby {
   }
 
   /** Minor play windows and the guest trial end games on time (Appendix D.2–D.3). */
-  private scheduleLimit(playerId: string, room: Room, plan: GamePlan): void {
+  private scheduleLimit(playerId: string, room: Room, plan: GamePlan, seat: Seat = room.humanSeat): void {
     this.clearLimit(playerId);
     const endsAt = plan.limitEndsAt;
     if (endsAt === null) return;
@@ -552,15 +663,15 @@ export class Lobby {
     const timers: NodeJS.Timeout[] = [];
     const warnAt = endsAt - LIMIT_WARNING_MS;
     if (warnAt > now) {
-      timers.push(setTimeout(() => room.human.send({ type: 'notice', kind, endsAt }), warnAt - now));
+      timers.push(setTimeout(() => room.sendTo(seat, { type: 'notice', kind, endsAt }), warnAt - now));
     }
     timers.push(
       setTimeout(() => {
         if (room.isClosed || room.gameOver) return;
-        room.human.send({ type: 'notice', kind, endsAt });
-        room.human.send({ type: 'left', reason: kind });
+        room.sendTo(seat, { type: 'notice', kind, endsAt });
+        room.sendTo(seat, { type: 'left', reason: kind });
         // Leaving never voids settlement: auto-play finishes the game (PRD §14.1).
-        room.leave();
+        room.leave(seat);
       }, Math.max(0, endsAt - now)),
     );
     this.limitTimers.set(playerId, timers);

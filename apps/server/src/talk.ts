@@ -119,20 +119,21 @@ export class TableTalk {
   }
 
   /** A moderated player message (PRD §7.1). */
-  onPlayerChat(text: string, target: Seat | 'table'): void {
-    this.record({ seat: this.deps.humanSeat, kind: 'player', text, sticker: null, target });
-    this.deps.onPlayerQuote?.(text, target);
-    this.handle({ ...this.trigger('playerChat', 'high'), subject: this.deps.humanSeat, object: target === 'table' ? undefined : target, text });
+  /** A real player's line; `seat` is the speaker (the host unless a friend at the same table spoke). */
+  onPlayerChat(text: string, target: Seat | 'table', seat: Seat = this.deps.humanSeat): void {
+    this.record({ seat, kind: 'player', text, sticker: null, target });
+    if (seat === this.deps.humanSeat) this.deps.onPlayerQuote?.(text, target);
+    this.handle({ ...this.trigger('playerChat', 'high'), subject: seat, object: target === 'table' ? undefined : target, text });
   }
 
-  onQuickPhrase(text: string): void {
-    this.record({ seat: this.deps.humanSeat, kind: 'quickPhrase', text, sticker: null, target: 'table' });
-    this.handle({ ...this.trigger('playerQuickPhrase', 'low'), subject: this.deps.humanSeat, text });
+  onQuickPhrase(text: string, seat: Seat = this.deps.humanSeat): void {
+    this.record({ seat, kind: 'quickPhrase', text, sticker: null, target: 'table' });
+    this.handle({ ...this.trigger('playerQuickPhrase', 'low'), subject: seat, text });
   }
 
-  onSticker(sticker: StickerId): void {
-    this.record({ seat: this.deps.humanSeat, kind: 'sticker', text: null, sticker, target: 'table' });
-    this.handle({ ...this.trigger('playerSticker', 'low'), subject: this.deps.humanSeat, text: sticker });
+  onSticker(sticker: StickerId, seat: Seat = this.deps.humanSeat): void {
+    this.record({ seat, kind: 'sticker', text: null, sticker, target: 'table' });
+    this.handle({ ...this.trigger('playerSticker', 'low'), subject: seat, text: sticker });
   }
 
   dispose(): void {
@@ -284,6 +285,6 @@ export class TableTalk {
     return this.log
       .filter((e) => e.text)
       .slice(-6)
-      .map((e) => ({ seat: e.seat, name: this.deps.nameOf(e.seat), text: e.text!, fromPlayer: e.seat === this.deps.humanSeat }));
+      .map((e) => ({ seat: e.seat, name: this.deps.nameOf(e.seat), text: e.text!, fromPlayer: e.kind !== 'ai' }));
   }
 }
