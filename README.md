@@ -74,6 +74,7 @@ pnpm admin:build
 | `ADMIN_USERNAME`、`ADMIN_PASSWORD_HASH`、`ADMIN_TOTP_SECRET` | 管理员账号（用 `pnpm admin:setup` 生成）；不设则后台关闭 |
 | `ADMIN_IP_ALLOWLIST` | 允许访问后台的 IP（逗号分隔，可选） |
 | `TRUST_PROXY=1` | 部署在反向代理后面时设置，后台 IP 白名单才能拿到真实 IP |
+| `WEB_CLIENT_URL` | 网页版客户端的地址（可选）。设置后，好友房邀请页 `/join/房号` 会多一个「在网页里玩」按钮 |
 
 客户端：`EXPO_PUBLIC_SERVER_URL`，以及 Google 登录用的 `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`、`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`、`EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME`。
 
