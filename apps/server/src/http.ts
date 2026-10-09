@@ -7,6 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { invitePage, isRoomCode } from './invite';
 import { legalPage } from './legal';
 import { registerAdminRoutes, type AdminDeps } from './admin/routes';
 import type { Moderator } from '@mahjong/dialogue';
@@ -136,6 +137,15 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
       return reply.type('text/html; charset=utf-8').send(legalPage(name, s.region, lang));
     });
   }
+
+  /** Friend-room invite links (shared into chat apps): a landing page that opens the app or the web version. */
+  app.get('/join/:code', (req, reply) => {
+    const { code } = req.params as { code: string };
+    if (!isRoomCode(code)) return reply.status(404).send({ error: 'notFound' });
+    const query = (req.query as { lang?: string }).lang;
+    const lang = query === 'en' || (!query && !/zh/i.test(req.headers['accept-language'] ?? 'zh')) ? 'en' : 'zh';
+    return reply.type('text/html; charset=utf-8').send(invitePage(code, process.env.WEB_CLIENT_URL ?? null, s.region === 'china' ? 'zh' : lang));
+  });
 
   // Sign-in attempts per IP per 10 minutes: stops scripted account creation (each new account gets coins).
   const authLimit = Number(process.env.AUTH_RATE_LIMIT) || 30;

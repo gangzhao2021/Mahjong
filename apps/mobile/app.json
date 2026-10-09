@@ -4,6 +4,7 @@
     "slug": "sichuan-mahjong",
     "version": "1.0.0",
     "orientation": "default",
+    "scheme": "sichuanmahjong",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {

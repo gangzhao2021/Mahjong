@@ -128,4 +128,14 @@ describe('friend rooms', () => {
     expect(totals.reduce((a, b) => a + b, 0)).toBe(0);
     for (const seat of [0, 1, 2, 3]) if (!seats.includes(seat)) expect(totals[seat]).toBe(0);
   });
+
+  it('serves an invite page that opens the app and shows the number', async () => {
+    const server = await startServer(PATIENT);
+    const page = await fetch(`${server.http}/join/123456?lang=zh`);
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain('sichuanmahjong://join/123456');
+    expect(html).toContain('123456');
+    expect((await fetch(`${server.http}/join/12ab56`)).status).toBe(404);
+  });
 });
