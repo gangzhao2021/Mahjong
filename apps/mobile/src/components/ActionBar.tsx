@@ -13,9 +13,13 @@ interface Props {
   selectedTiles: Tile[];
   tileWidth: number;
   onAct(action: Intent): void;
+  /** Ask for the AI's pick (discard) or recommendation (claim). */
+  onHint(): void;
+  /** The AI's recommendation for the current claim, once asked for. */
+  claimHint: Intent | null;
 }
 
-export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
+export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claimHint }: Props) {
   const legal = view.legal;
   const me = view.players[view.seat];
   const stage = view.stage;
@@ -41,7 +45,8 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
     const suggested = counts.indexOf(Math.min(...counts));
     return (
       <Bar>
-        <Hint text={T.dingqueHint} />
+        {/* Which way the swapped tiles just went, so the player knows who has them */}
+        <Hint text={view.swapDirection ? `${T.swapDirection[view.swapDirection]} · ${T.dingqueHint}` : T.dingqueHint} />
         {([0, 1, 2] as Suit[]).map((suit) => (
           <Btn key={suit} label={`${T.voidSuit(SUIT_NAMES[suit])} (${counts[suit]})`} primary={suit === suggested} onPress={() => onAct({ type: 'dingque', suit })} />
         ))}
@@ -52,11 +57,12 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
   if ((stage.kind === 'claim' || stage.kind === 'robKong') && stage.myOptions && !stage.responded) {
     return (
       <Bar>
+        {claimHint ? <Hint text={T.hintClaim(INTENT_LABEL[claimHint.type]?.() ?? T.pass)} /> : <Btn label={T.hint} onPress={onHint} />}
         <TileView tile={stage.tile} width={tileWidth * 0.8} highlighted />
         {legal.hu && <Btn label={T.hu} big danger onPress={() => onAct({ type: 'hu' })} />}
-        {legal.kong && <Btn label={T.kong} big onPress={() => onAct({ type: 'kong' })} />}
-        {legal.pong && <Btn label={T.pong} big onPress={() => onAct({ type: 'pong' })} />}
-        <Btn label={T.pass} onPress={() => onAct({ type: 'pass' })} />
+        {legal.kong && <Btn label={T.kong} big primary={claimHint?.type === 'kong'} onPress={() => onAct({ type: 'kong' })} />}
+        {legal.pong && <Btn label={T.pong} big primary={claimHint?.type === 'pong'} onPress={() => onAct({ type: 'pong' })} />}
+        <Btn label={T.pass} primary={claimHint?.type === 'pass'} onPress={() => onAct({ type: 'pass' })} />
       </Bar>
     );
   }
@@ -67,6 +73,7 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
     return (
       <Bar>
         <Hint text={voidFirst ? T.voidFirst : T.discardHint} />
+        <Btn label={T.hint} onPress={onHint} />
         {legal.zimo && <Btn label={T.zimo} big danger onPress={() => onAct({ type: 'zimo' })} />}
         {legal.selfKong?.map((tile) => (
           <Btn key={tile} label={`${T.kong} ${T.tileShort((tile % 9) + 1, TILE_SUITS[suitOf(tile)])}`} onPress={() => onAct({ type: 'selfKong', tile })} />
@@ -79,6 +86,13 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct }: Props) {
   }
   return null;
 }
+
+const INTENT_LABEL: Partial<Record<Intent['type'], () => string>> = {
+  hu: () => T.hu,
+  kong: () => T.kong,
+  pong: () => T.pong,
+  pass: () => T.pass,
+};
 
 function Bar({ children }: { children: React.ReactNode }) {
   return <View style={styles.bar}>{children}</View>;

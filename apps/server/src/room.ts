@@ -461,9 +461,13 @@ export class Room {
     }
 
     const kind = timerKind(legal);
-    this.setTimer(timerDuration(kind, this.opts.config), kind, () => {
+    const { config } = this.opts;
+    const practice = this.opts.stake.multiplier === 0;
+    const ms = timerDuration(kind, config) * (practice ? config.practice.timerScale : 1);
+    const autoPlayAfter = practice ? config.practice.autoPlayAfterTimeouts : config.autoPlayAfterTimeouts;
+    this.setTimer(ms, kind, () => {
       this.consecutiveTimeouts++;
-      if (this.consecutiveTimeouts >= this.opts.config.autoPlayAfterTimeouts) this.autoPlay = true;
+      if (this.consecutiveTimeouts >= autoPlayAfter) this.autoPlay = true;
       const action = timeoutAction(viewFor(this.hand, seat), this.opts.rng);
       if (action) this.submit(action, version, 'timeout');
     });

@@ -65,6 +65,7 @@ export class RetentionJob {
       // A checkpoint nobody resumed within a week is an abandoned game.
       staleGames: Number(await del('DELETE FROM active_games WHERE updated_at < $1', [before(7)])),
       handLogs: await this.purgeHandLogs(now - this.policy.handLogDays * DAY),
+      handHistory: Number(await del('DELETE FROM hand_history WHERE ended_at < $1', [before(this.policy.handLogDays)])),
     };
     return counts;
   }

@@ -1,9 +1,10 @@
 /** Hand / game settlement overlay. */
-import type { HandResult, Seat } from '@mahjong/engine';
+import { patternFan, type HandResult, type Pattern, type Seat, type WinRecord } from '@mahjong/engine';
 import type { TableSnapshot } from '@mahjong/protocol';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PATTERN_NAMES, PAYMENT_NAMES, T } from '../strings';
 import { Btn } from './ActionBar';
+import { PopIn } from './PopIn';
 import { Tile } from './Tile';
 
 interface Props {
@@ -36,19 +37,32 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, on
           {table.gameOver ? T.gameResult : T.handResult} · {T.hand(table.handIndex, table.handsPerGame)} ·{' '}
           {result.reason === 'threeWon' ? T.threeWon : T.wallExhausted}
         </Text>
-        {table.stake.multiplier > 0 && (
-          <Text style={styles.coins}>
-            {handCoins !== null ? T.handCoins(handCoins) : ''}
-            {table.gameOver ? `   ${T.gameCoins(gameCoins)}` : ''}
-          </Text>
+        {/* Coins spring in once the wallet update arrives */}
+        {table.stake.multiplier > 0 && handCoins !== null && (
+          <PopIn key={handCoins} from={1.8} style={[styles.coinBadge, handCoins < 0 && styles.coinLoss]}>
+            <Text style={styles.coins}>
+              🪙 {T.handCoins(handCoins)}
+              {table.gameOver ? `   ${T.gameCoins(gameCoins)}` : ''}
+            </Text>
+          </PopIn>
         )}
         <ScrollView style={styles.scroll} contentContainerStyle={{ gap: 6 }}>
           {result.wins.map((w) => (
             <View key={w.order} style={styles.win}>
               <Text style={styles.winText}>
-                {name(w.seat)} {w.selfDraw ? T.zimo : `${T.hu}${T.dealtInBy(name(w.from!))}`} · {T.fan(w.fan)} · {w.score}
+                {name(w.seat)} {w.selfDraw ? T.zimo : `${T.hu}${T.dealtInBy(name(w.from!))}`}
               </Text>
-              <Text style={styles.patterns}>{w.patterns.map((p) => PATTERN_NAMES[p]).join(' + ')}</Text>
+              {/* Each pattern with the fan it adds, then the total and who pays */}
+              <View style={styles.patternRow}>
+                {w.patterns.map((p, i) => (
+                  <Text key={i} style={styles.pattern}>
+                    {PATTERN_NAMES[p]} {patternLabel(p)}
+                  </Text>
+                ))}
+              </View>
+              <Text style={styles.payLine}>
+                {fanSummary(w)} → {w.selfDraw ? T.paysEach(w.score) : T.paysOne(name(w.from!), w.score)}
+              </Text>
               <View style={styles.tiles}>
                 {w.hand.map((t, i) => (
                   <Tile key={i} tile={t} width={20} highlighted={t === w.tile && i === w.hand.lastIndexOf(t)} />
@@ -56,14 +70,13 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, on
               </View>
             </View>
           ))}
-          {result.payments.some((p) => p.reason !== 'win') && (
-            <Text style={styles.details}>
-              {result.payments
-                .filter((p) => p.reason !== 'win')
-                .map((p) => `${PAYMENT_NAMES[p.reason]}${T.colon}${name(p.from)} → ${name(p.to)} ${p.amount}`)
-                .join(T.listSeparator)}
-            </Text>
-          )}
+          {result.payments
+            .filter((p) => p.reason !== 'win')
+            .map((p, i) => (
+              <Text key={i} style={styles.details}>
+                • {T.paymentExplain[p.reason]?.(name(p.from), name(p.to), p.amount) ?? `${PAYMENT_NAMES[p.reason]}${T.colon}${name(p.from)} → ${name(p.to)} ${p.amount}`}
+              </Text>
+            ))}
           <View style={styles.scores}>
             {table.seats.map((s) => {
               const delta = result.deltas[s.seat];
@@ -97,6 +110,18 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, on
   );
 }
 
+function patternLabel(p: Pattern): string {
+  const fan = patternFan(p);
+  if (fan !== null) return fan > 0 ? `+${T.patternFan(fan)}` : '';
+  return p === 'ziMo' ? '' : T.maxFanPattern;
+}
+
+/** "3 番", or "4 番（封顶 4 番）" when the patterns add up to more than the cap. */
+function fanSummary(w: WinRecord): string {
+  const raw = w.patterns.reduce((sum, p) => sum + (patternFan(p) ?? 0), 0);
+  return raw > w.fan ? `${T.fan(w.fan)}（${T.fanCapped(w.fan)}）` : T.fan(w.fan);
+}
+
 const styles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
@@ -119,13 +144,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: { fontSize: 17, fontWeight: '800', color: '#3e2723' },
-  coins: { fontSize: 15, fontWeight: '800', color: '#bf360c' },
+  coins: { fontSize: 17, fontWeight: '900', color: '#5d4100' },
+  coinBadge: { alignSelf: 'flex-start', backgroundColor: '#ffe082', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
+  coinLoss: { backgroundColor: '#ffccbc' },
   scroll: { flexGrow: 0 },
   win: { backgroundColor: '#fff3e0', borderRadius: 10, padding: 8, gap: 3 },
   winText: { fontWeight: '700', color: '#4e342e' },
-  patterns: { color: '#bf360c', fontSize: 13 },
+  patternRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  pattern: { color: '#bf360c', fontSize: 12, fontWeight: '700', backgroundColor: '#ffe0b2', borderRadius: 6, paddingHorizontal: 6, overflow: 'hidden' },
+  payLine: { color: '#4e342e', fontSize: 13 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
-  details: { color: '#6d4c41', fontSize: 12 },
+  details: { color: '#5d4037', fontSize: 13 },
   scores: { gap: 4, marginTop: 4 },
   scoreRow: { flexDirection: 'row', alignItems: 'center' },
   cell: { flex: 1, color: '#37474f' },

@@ -219,6 +219,25 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
     }
   });
 
+  /** Recent finished hands, the replay of one of them, and lifetime stats. */
+  app.get('/history', async (req) => {
+    const player = await requirePlayer(req);
+    return { hands: await s.history.list(player.id) };
+  });
+
+  app.get('/history/:gameId/:handIndex', async (req) => {
+    const player = await requirePlayer(req);
+    const { gameId, handIndex } = req.params as { gameId: string; handIndex: string };
+    const replay = await s.history.replay(player.id, gameId, Number(handIndex));
+    if (!replay) throw new HttpError(404, 'notFound');
+    return replay;
+  });
+
+  app.get('/stats', async (req) => {
+    const player = await requirePlayer(req);
+    return await s.history.stats(player.id);
+  });
+
   app.get('/ledger', async (req) => {
     const player = await requirePlayer(req);
     const limit = Number((req.query as { limit?: string }).limit ?? 50);

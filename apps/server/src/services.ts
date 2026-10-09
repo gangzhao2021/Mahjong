@@ -14,6 +14,7 @@ import { AppleTokens, ConsoleSmsSender, SmsCodes, type SmsSender } from './accou
 import { SessionTokens } from './accounts/tokens';
 import { ageOn, DevRealNameVerifier, guestTrialEnd, loadChinaConfig, minorWindowEnd, type ChinaConfig, type RealNameVerifier } from './china/compliance';
 import type { Db } from './db/db';
+import { HandHistory } from './history';
 import { loadEconomyConfig, privateRoomMaxBase, type EconomyConfig } from './economy/config';
 import { Rewards } from './economy/rewards';
 import { Wallet } from './economy/wallet';
@@ -37,6 +38,7 @@ export interface Services {
   accounts: Accounts;
   rewards: Rewards;
   memory: MemoryStore;
+  history: HandHistory;
   crashes: CrashReports;
   sms: SmsCodes;
   realName: RealNameVerifier;
@@ -77,6 +79,7 @@ export function createServices(o: ServiceOptions): Services {
     accounts: new Accounts(o.db, wallet, tokens, () => economy.startingCoins, now),
     rewards: new Rewards(o.db, wallet, economy),
     memory: new MemoryStore(o.db, now),
+    history: new HandHistory(o.db),
     crashes: new CrashReports(o.db, () => now().getTime()),
     sms: new SmsCodes(o.db, o.sms ?? new ConsoleSmsSender(), () => now().getTime()),
     realName: o.realName ?? new DevRealNameVerifier(),

@@ -1,5 +1,5 @@
 /** HTTP API client for accounts and economy. */
-import type { AccountSummary, BanterLevel, LoginMethod, ServerInfo } from '@mahjong/protocol';
+import type { AccountSummary, BanterLevel, HandHistoryEntry, HandReplay, LoginMethod, PlayerStats, ServerInfo } from '@mahjong/protocol';
 import { SERVER_HTTP } from '../config';
 import { getLocale } from '../strings';
 
@@ -56,5 +56,8 @@ export const api = {
   realName: (token: string, name: string, idNumber: string) => request<AccountOnly>('POST', '/account/real-name', { name, idNumber }, token),
   claimReward: (token: string) => request<{ amount: number; account: AccountSummary }>('POST', '/rewards/claim', {}, token),
   ledger: (token: string) => request<{ entries: LedgerEntry[] }>('GET', '/ledger?limit=50', undefined, token),
+  history: (token: string) => request<{ hands: HandHistoryEntry[] }>('GET', '/history', undefined, token),
+  replay: (token: string, gameId: string, handIndex: number) => request<HandReplay>('GET', `/history/${encodeURIComponent(gameId)}/${handIndex}`, undefined, token),
+  stats: (token: string) => request<PlayerStats>('GET', '/stats', undefined, token),
   deleteAccount: (token: string) => request<Record<string, never>>('DELETE', '/account', undefined, token),
 };

@@ -19,6 +19,7 @@ interface Props {
   onStart(options: GameOptions): void;
   onOpenAccount(): void;
   onOpenTutorial(): void;
+  onOpenHistory(): void;
   /** Lessons the player has finished (from local storage). */
   tutorialDone: number;
 }
@@ -33,7 +34,7 @@ const TIER: Record<string, { fill: string; rim: string; ink: string }> = {
 const TIER_FALLBACK = { fill: '#607d8b', rim: '#cfd8dc', ink: '#fff' };
 const LESSON_COUNT = 6;
 
-export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, tutorialDone }: Props) {
+export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, tutorialDone }: Props) {
   const [rewardOpen, setRewardOpen] = useState(false);
   const [privateOpen, setPrivateOpen] = useState(false);
   const { width, height } = useWindowDimensions();
@@ -64,6 +65,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </Pressable>
         <View style={styles.topButtons}>
           <Btn label={`📖 ${T.tutorial.entry}`} onPress={onOpenTutorial} />
+          <Btn label={`📊 ${T.record.entry}`} onPress={onOpenHistory} />
           <Btn label={`🎁 ${T.dailyReward}`} primary={account.reward.claimable} onPress={() => setRewardOpen(true)} />
           <Btn label={`⚙️ ${T.account}`} onPress={onOpenAccount} />
         </View>

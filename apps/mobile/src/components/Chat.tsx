@@ -8,7 +8,10 @@ import { getLocale, T } from '../strings';
 import { Btn } from './ActionBar';
 import { PopIn } from './PopIn';
 
-const BUBBLE_MS = 4500;
+/** How long a speech bubble stays up: long enough to read the whole line. */
+function bubbleMs(e: ChatEntry): number {
+  return Math.min(10_000, 5_000 + (e.text?.length ?? 0) * 120);
+}
 
 export function stickerEmoji(catalog: ChatCatalog | null, id: StickerId | null): string {
   if (!id) return '';
@@ -28,8 +31,8 @@ export function SpeechBubbles({
   const [now, setNow] = useState(() => Date.now());
   const latest = new Map<Seat, LocalChatEntry>();
   for (const e of chat) latest.set(e.seat, e);
-  const visible = [...latest.values()].filter((e) => e.localAt + BUBBLE_MS > now);
-  const nextExpiry = visible.length ? Math.min(...visible.map((e) => e.localAt + BUBBLE_MS)) : null;
+  const visible = [...latest.values()].filter((e) => e.localAt + bubbleMs(e) > now);
+  const nextExpiry = visible.length ? Math.min(...visible.map((e) => e.localAt + bubbleMs(e))) : null;
 
   useEffect(() => {
     if (nextExpiry === null) return;
@@ -159,18 +162,23 @@ export function BanterPicker({ level, onChange }: { level: BanterLevel; onChange
 const styles = StyleSheet.create({
   bubble: {
     position: 'absolute',
-    maxWidth: 220,
+    maxWidth: 260,
     backgroundColor: '#fffdf5',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#e0d6b8',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderColor: '#ffca28',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
   },
-  bubbleText: { color: '#3e2723', fontSize: 13, flexShrink: 1 },
+  bubbleText: { color: '#3e2723', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   bubbleSticker: { fontSize: 26 },
   panel: {
     position: 'absolute',

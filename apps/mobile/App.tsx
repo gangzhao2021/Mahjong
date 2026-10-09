@@ -15,6 +15,7 @@ import { useGame } from './src/net/useGame';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { ConsentScreen, loadConsent } from './src/screens/ConsentScreen';
 import { GameScreen } from './src/screens/GameScreen';
+import { HistoryScreen } from './src/screens/HistoryScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RealNameScreen } from './src/screens/RealNameScreen';
@@ -40,6 +41,7 @@ export default function App() {
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialDone, setTutorialDone] = useState(-1);
   const [consented, setConsented] = useState<boolean | undefined>(undefined);
@@ -127,6 +129,8 @@ export default function App() {
     screen = <LoginScreen info={info} onLoggedIn={onLoggedIn} onOpenTutorial={() => setTutorialOpen(true)} />;
   } else if (game.account!.realName.required && !game.account!.realName.verified) {
     screen = <RealNameScreen token={token} onVerified={setAccount} onLogout={logout} />;
+  } else if (historyOpen && !game.table) {
+    screen = <HistoryScreen token={token} onClose={() => setHistoryOpen(false)} />;
   } else if (game.table) {
     screen = <GameScreen game={{ ...game, table: game.table }} onNewGame={() => start(lastOptions.current)} />;
   } else {
@@ -140,6 +144,7 @@ export default function App() {
         onStart={start}
         onOpenAccount={() => setAccountOpen(true)}
         onOpenTutorial={() => setTutorialOpen(true)}
+        onOpenHistory={() => setHistoryOpen(true)}
         tutorialDone={tutorialDone}
       />
     );

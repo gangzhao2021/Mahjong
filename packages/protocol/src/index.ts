@@ -4,7 +4,7 @@
  * per-seat views (never the full state).
  */
 import type { BanterLevel, QuickPhrase, StickerId } from '@mahjong/dialogue';
-import type { Action, GameEvent, HandView, Seat } from '@mahjong/engine';
+import type { Action, GameEvent, HandResult, HandView, RuleSet, Seat } from '@mahjong/engine';
 
 export type { BanterLevel, QuickPhrase, StickerId };
 
@@ -126,6 +126,46 @@ export interface GameSummary {
   /** Net coins won or lost by the player over the game. */
   coinChange: number;
   endedAt: number;
+}
+
+/** One finished hand in the player's history list. */
+export interface HandHistoryEntry {
+  gameId: string;
+  handIndex: number;
+  endedAt: number;
+  mySeat: Seat;
+  seats: { seat: Seat; name: string; isHuman: boolean }[];
+  /** Points this hand, per seat. */
+  deltas: [number, number, number, number];
+  reason: HandResult['reason'];
+  /** I won this hand: fan and whether it was self-drawn. */
+  myWin: { fan: number; selfDraw: boolean } | null;
+}
+
+/** Everything the client needs to replay a finished hand move by move (all hands face up). */
+export interface HandReplay {
+  gameId: string;
+  handIndex: number;
+  mySeat: Seat;
+  seats: { seat: Seat; name: string; isHuman: boolean }[];
+  seed: number;
+  dealer: Seat;
+  baseScore: number;
+  ruleSet: RuleSet;
+  actions: Action[];
+}
+
+/** Lifetime numbers for the stats page. */
+export interface PlayerStats {
+  gamesPlayed: number;
+  handsPlayed: number;
+  wins: number;
+  selfDraws: number;
+  dealIns: number;
+  bigWins: number;
+  huaZhu: number;
+  /** Most fan in a single win among the hands still on record. */
+  bestFan: number | null;
 }
 
 export type StartRejection =
