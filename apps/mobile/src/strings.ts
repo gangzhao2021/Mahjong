@@ -199,7 +199,7 @@ const zh = {
     join: '加入',
     waitingTitle: '等朋友入座',
     roomNumber: '房号',
-    share: '把房号发给朋友，在大厅点「好友房」输入即可加入',
+    shareHint: '分享邀请链接，朋友点开就能进来；也可以把房号告诉他',
     aiFill: 'AI 补位',
     host: '房主',
     offline: '离线',
@@ -212,6 +212,11 @@ const zh = {
     waitingHost: '等房主开始…',
     tableName: '好友房',
     readyWaiting: '已准备，等其他玩家…',
+    share: '📤 分享邀请',
+    copied: '邀请已复制，粘贴给朋友就行',
+    shareFailed: '没能打开分享，请把房号告诉朋友',
+    inviteText: (code: string, url: string) => `来四川麻将好友房一起打牌！房号 ${code}
+点链接直接加入：${url}`,
     rejected: {
       notFound: '没有这个房号，请核对一下',
       full: '房间已经坐满了',
@@ -604,7 +609,7 @@ const en: Strings = {
     join: 'Join',
     waitingTitle: 'Waiting for friends',
     roomNumber: 'Room number',
-    share: 'Send the number to your friends; they tap "Friends" in the lobby and type it in',
+    shareHint: 'Share the invite link and friends join with one tap, or tell them the number',
     aiFill: 'AI fills in',
     host: 'Host',
     offline: 'offline',
@@ -617,6 +622,11 @@ const en: Strings = {
     waitingHost: 'Waiting for the host to start…',
     tableName: 'Friend room',
     readyWaiting: 'Ready, waiting for the others…',
+    share: '📤 Share invite',
+    copied: 'Invite copied: paste it to your friends',
+    shareFailed: "Couldn't open sharing; tell your friends the number",
+    inviteText: (code: string, url: string) => `Join my Sichuan Mahjong table! Room ${code}
+Tap to join: ${url}`,
     rejected: {
       notFound: 'No room with that number',
       full: 'That room is full',

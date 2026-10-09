@@ -69,4 +69,35 @@ describe('server restart (games in progress survive)', () => {
     await second.close();
     await db.close();
   });
+
+  it('brings a friend room back with every player in their own seat', async () => {
+    const db = await openDb({ dataDir: null });
+    const first = await startServer(PATIENT, { db });
+    const host = await Client.connect(first);
+    await host.hello('restart-host');
+    const friend = await Client.connect(first);
+    await friend.hello('restart-friend');
+    host.send({ type: 'createFriendRoom', handsPerGame: 2 });
+    const created = await host.next((m): m is Extract<ServerMessage, { type: 'friendRoom' }> => m.type === 'friendRoom' && !!m.room);
+    friend.send({ type: 'joinFriendRoom', code: created.room!.code });
+    await host.next((m): m is Extract<ServerMessage, { type: 'friendRoom' }> => m.type === 'friendRoom' && m.room?.members.length === 2);
+    host.send({ type: 'startFriendRoom' });
+    const hostBefore = (await host.next(myTurn)).table;
+    const friendBefore = (await friend.next(myTurn)).table;
+    await new Promise((r) => setTimeout(r, 300)); // let the checkpoint write
+    await first.close();
+
+    const second = await startServer(PATIENT, { db });
+    const h2 = await Client.connect(second);
+    expect((await h2.hello('restart-host')).inGame).toBe(true);
+    const f2 = await Client.connect(second);
+    expect((await f2.hello('restart-friend')).inGame).toBe(true);
+    const hostAfter = (await h2.next(isTable)).table;
+    const friendAfter = (await f2.next(isTable)).table;
+    expect(hostAfter.gameId).toBe(hostBefore.gameId);
+    expect(friendAfter.gameId).toBe(hostBefore.gameId);
+    expect([hostAfter.mySeat, friendAfter.mySeat]).toEqual([hostBefore.mySeat, friendBefore.mySeat]);
+    expect(friendAfter.view.players[friendAfter.mySeat].hand).toEqual(friendBefore.view.players[friendBefore.mySeat].hand);
+    expect(hostAfter.stake.kind).toBe('friend');
+  });
 });

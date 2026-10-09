@@ -17,6 +17,7 @@ import { ConsentScreen, loadConsent } from './src/screens/ConsentScreen';
 import { GameScreen } from './src/screens/GameScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { RulesScreen } from './src/rules/RulesScreen';
+import { usePendingInvite } from './src/net/invite';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RealNameScreen } from './src/screens/RealNameScreen';
@@ -85,6 +86,15 @@ export default function App() {
   }, []);
 
   const game = useGame(token ?? null, logout);
+  // An invite link (app or ?room= on the web) joins that friend room once signed in and not mid-game.
+  const invite = usePendingInvite();
+  const { joinFriendRoom } = game;
+  const canJoin = !!game.account && game.status === 'online' && !game.table;
+  useEffect(() => {
+    if (!invite.code || !canJoin) return;
+    joinFriendRoom(invite.code);
+    invite.clear();
+  }, [invite, canJoin, joinFriendRoom]);
   const { setAccount } = game;
 
   const onLoggedIn = useCallback(
