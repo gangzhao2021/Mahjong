@@ -25,6 +25,13 @@ export interface RuleSet {
   drawSettlement: { checkHuaZhu: boolean; checkDaJiao: boolean; kongRefund: boolean };
   dealerRule: 'firstWinner' | 'rotate';
   handsPerGame: number;
+  /**
+   * 血流成河: winners stay in and can win again; the hand ends only when the wall
+   * runs out. After a win the hand is locked (the winning tile is set aside):
+   * the winner discards whatever they draw unless it wins again.
+   * Off = 血战到底 (a winner leaves the hand; it ends when three have won).
+   */
+  xueliu: boolean;
 }
 
 export const DEFAULT_RULESET: RuleSet = {
@@ -47,6 +54,7 @@ export const DEFAULT_RULESET: RuleSet = {
   drawSettlement: { checkHuaZhu: true, checkDaJiao: true, kongRefund: true },
   dealerRule: 'firstWinner',
   handsPerGame: 4,
+  xueliu: false,
 };
 
 export function withRules(overrides: Partial<RuleSet>): RuleSet {

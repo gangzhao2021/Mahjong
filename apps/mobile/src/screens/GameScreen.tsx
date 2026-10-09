@@ -161,6 +161,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         dealer={view.dealer === seat}
         active={activeSeat === seat}
         win={p.won}
+        winCount={p.winCount}
         handCount={p.handCount}
       />
     );
@@ -217,7 +218,9 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
         <View style={styles.topSeat}>{opponent(2)}</View>
         <View style={styles.stake}>
-          <Text style={styles.handInfo}>{T.hand(table.handIndex, table.handsPerGame)}</Text>
+          <Text style={styles.handInfo}>
+            {T.modeName(view.ruleSet.xueliu)} · {T.hand(table.handIndex, table.handsPerGame)}
+          </Text>
           <Text style={styles.handInfo}>
             {tableName(table.stake)}
             {table.stake.inviteCode ? ` ${T.inviteCode} ${table.stake.inviteCode}` : ''} · {table.stake.multiplier ? T.baseScoreN(table.stake.baseScore) : T.noCoins}
@@ -280,6 +283,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
               dealer={view.dealer === view.seat}
               active={activeSeat === view.seat}
               win={me.won}
+              winCount={me.winCount}
               handCount={me.handCount}
             />
           </View>
@@ -289,7 +293,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             drawn={drawn}
             voidSuit={me.voidSuit}
             tileWidth={handTile}
-            discardable={table.autoPlay || iWon ? null : (view.legal.discard ?? null)}
+            // 血流成河 winners still play (their locked hand throws what it draws unless it wins again).
+            discardable={table.autoPlay || (iWon && !view.ruleSet.xueliu) ? null : (view.legal.discard ?? null)}
             selected={selected.map((s) => s.key)}
             onSelect={onSelect}
             onDiscard={(tile: TileKind) => game.act({ type: 'discard', tile })}
@@ -321,7 +326,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </Pressable>
       )}
 
-      {iWon && view.phase === 'play' && !table.fastForward && !friendTable && (
+      {iWon && view.phase === 'play' && !table.fastForward && !friendTable && !view.ruleSet.xueliu && (
         <View style={styles.skip}>
           <Btn label={T.skipToResults} primary onPress={game.skipToResults} />
         </View>

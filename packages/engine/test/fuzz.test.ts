@@ -92,4 +92,48 @@ describe('randomized full games', () => {
     expect(reasons.has('wallExhausted')).toBe(true);
     expect(patterns.size).toBeGreaterThan(0);
   });
+
+  it('血流成河: winners play on with locked hands; hands end only when the wall runs out', () => {
+    const ruleSet = withRules({ xueliu: true });
+    const rng = createRng(4321);
+    let repeatWinners = 0;
+    for (let g = 0; g < 40; g++) {
+      let game = createGame({ ruleSet, baseScore: 10, seed: g * 104729 + 3 });
+      while (!isGameOver(game)) {
+        let h = startHand(game);
+        let duplicatedWinTiles = 0;
+        for (let step = 0; h.phase !== 'ended'; step++) {
+          expect(step).toBeLessThan(3000);
+          const ready = SEATS.filter((s) => Object.keys(legalActions(h, s)).length > 0);
+          expect(ready.length).toBeGreaterThan(0);
+          const seat = ready[Math.floor(rng() * ready.length)];
+          // A locked winner may only throw the tile just drawn (or win again).
+          const legal = legalActions(h, seat);
+          if (h.players[seat].won && h.stage.kind === 'turn' && legal.discard) expect(legal.discard).toEqual([h.stage.drawn]);
+          if (h.players[seat].won) expect(legal.pong || legal.kong || legal.selfKong).toBeFalsy();
+          const r = apply(h, randomAction(h, seat, rng)!);
+          const claimWins = r.events.filter((e) => e.type === 'win' && !e.win.selfDraw).length;
+          duplicatedWinTiles += Math.max(0, claimWins - 1);
+          h = r.state;
+          if (h.phase === 'play') {
+            // Each winning tile is set aside instead of joining the hand.
+            expect(tileTotal(h)).toBe(108 + duplicatedWinTiles - h.wins.length);
+            // A winner's locked hand is 13 tiles, plus the one just drawn on their own turn.
+            for (const [i, p] of h.players.entries()) {
+              const drawing = h.stage.kind === 'turn' && h.stage.seat === i ? 1 : 0;
+              if (p.won) expect(p.hand.length + p.melds.length * 3).toBe(13 + drawing);
+            }
+          }
+        }
+        const result = h.result!;
+        expect(result.reason).toBe('wallExhausted');
+        expect(result.deltas.reduce((a, b) => a + b, 0)).toBe(0);
+        const perSeat = SEATS.map((s) => result.wins.filter((w) => w.seat === s).length);
+        if (perSeat.some((n) => n > 1)) repeatWinners++;
+        game = recordHand(game, result);
+      }
+      expect(game.totals.reduce((a, b) => a + b, 0)).toBe(0);
+    }
+    expect(repeatWinners).toBeGreaterThan(0);
+  });
 });

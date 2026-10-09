@@ -359,7 +359,8 @@ export class Room {
 
   /** "Skip to results" once the human has won (PRD §14); not in friend rooms, where others are still playing. */
   skipToResults(): void {
-    if (this.multiplayer || this.hand.phase !== 'play' || !this.hand.players[this.humanSeat].won) return;
+    // In 血流成河 the winner is still playing, so there is nothing to skip to.
+    if (this.multiplayer || this.hand.ruleSet.xueliu || this.hand.phase !== 'play' || !this.hand.players[this.humanSeat].won) return;
     this.fastForward = true;
     for (const s of this.seats) if (s instanceof AiSeat) s.reset();
     this.publish([]);
@@ -543,7 +544,9 @@ export class Room {
     if (!hasDecision(legal)) return;
     const version = this.hand.actionCount;
 
-    if (h.autoPlay || !h.ctrl.connected) {
+    // 血流成河: a winner's locked hand throws what it draws by itself; the player is only asked when it could win again.
+    const lockedThrow = this.hand.ruleSet.xueliu && this.hand.players[seat].won !== null && !legal.zimo && !legal.hu;
+    if (h.autoPlay || !h.ctrl.connected || lockedThrow) {
       // 托管 plays like an intermediate player and does declare wins.
       const delay = this.fastForward || !h.ctrl.connected ? 0 : this.opts.config.autoPlayDelayMs * (this.fastPace ? FAST_PACE : 1);
       this.setSeatTimer(h, delay, null, () => {

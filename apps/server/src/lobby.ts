@@ -219,7 +219,7 @@ export class Lobby {
       case 'createFriendRoom': {
         if (room && !room.gameOver && !room.isClosed) return send({ type: 'friendRoomRejected', reason: 'inGame' });
         const hands = Number.isInteger(msg.handsPerGame) ? Math.min(Math.max(msg.handsPerGame, 1), this.deps.config.maxHandsPerGame) : this.deps.config.defaultHandsPerGame;
-        this.friends.create({ playerId: player.id, name: player.nickname, avatar: player.avatar }, hands);
+        this.friends.create({ playerId: player.id, name: player.nickname, avatar: player.avatar }, hands, msg.xueliu === true);
         return;
       }
       case 'joinFriendRoom': {
@@ -586,7 +586,7 @@ export class Lobby {
       const p = await this.s.accounts.get(m.playerId);
       if (!p) continue;
       // Play limits (minors, guest trial, real name) apply to every member, not just the host.
-      const check = await checkStart(this.s, p, { private: { baseScore: 0, handsPerGame: table.handsPerGame } });
+      const check = await checkStart(this.s, p, { private: { baseScore: 0, handsPerGame: table.handsPerGame, rules: { xueliu: table.xueliu } } });
       if (!check.ok) {
         this.sendToPlayer(table.hostId, { type: 'friendRoomRejected', reason: 'blocked', detail: p.nickname });
         this.sendToPlayer(p.id, { type: 'startRejected', reason: check.reason, detail: check.detail });
