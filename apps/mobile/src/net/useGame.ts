@@ -14,6 +14,7 @@ import {
   type DistributiveOmit,
   type GameOptions,
   type GameSummary,
+  type RankResult,
   type ServerMessage,
   type StartRejection,
   type StickerId,
@@ -54,6 +55,8 @@ export interface GameState {
   account: AccountSummary | null;
   /** Latest coin settlement of a hand. */
   lastWallet: { amount: number; requested: number; handIndex: number; gameTotal: number; gameId: string | null } | null;
+  /** Rank change after the last ranked game. */
+  lastRank: RankResult | null;
   startRejected: { reason: StartRejection; detail?: string; at: number } | null;
   /** Result of a game that finished while the player was away (PRD §14.1). */
   pendingResult: GameSummary | null;
@@ -70,6 +73,7 @@ export interface GameApi extends GameState {
   startGame(options?: GameOptions): void;
   act(action: DistributiveOmit<Action, 'seat'>): void;
   setAutoPlay(on: boolean): void;
+  setFastPace(on: boolean): void;
   skipToResults(): void;
   nextHand(): void;
   leaveGame(): void;
@@ -110,6 +114,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     chatRejected: null,
     account: null,
     lastWallet: null,
+    lastRank: null,
     startRejected: null,
     pendingResult: null,
     gameSummary: null,
@@ -177,6 +182,9 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
               chat: [],
               leftReason: msg.reason === 'minorTimeLimit' || msg.reason === 'guestTrialOver' ? msg.reason : null,
             }));
+            break;
+          case 'rank':
+            setState((s) => ({ ...s, lastRank: msg.result, account: s.account ? { ...s.account, rank: msg.result.after } : s.account }));
             break;
           case 'wallet':
             setState((s) => ({
@@ -262,6 +270,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
       [send],
     ),
     setAutoPlay: useCallback((on) => send({ type: 'setAutoPlay', on }), [send]),
+    setFastPace: useCallback((on) => send({ type: 'setFastPace', on }), [send]),
     skipToResults: useCallback(() => send({ type: 'skipToResults' }), [send]),
     nextHand: useCallback(() => send({ type: 'nextHand' }), [send]),
     leaveGame: useCallback(() => send({ type: 'leaveGame' }), [send]),

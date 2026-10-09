@@ -69,6 +69,26 @@ export interface PlayLimit {
   until: number | null;
 }
 
+export type RankTierId = 'novice' | 'adept' | 'expert' | 'master' | 'saint';
+
+export interface RankInfo {
+  tier: RankTierId;
+  points: number;
+  /** Points where this tier starts (you can't drop below it) and where the next one starts. */
+  tierMin: number;
+  nextAt: number | null;
+}
+
+/** Rank change after a ranked game (public coin tables only). */
+export interface RankResult {
+  gameId: string;
+  /** 1 = first place. */
+  place: number;
+  change: number;
+  before: RankInfo;
+  after: RankInfo;
+}
+
 export interface AccountSummary {
   playerId: string;
   nickname: string;
@@ -80,6 +100,7 @@ export interface AccountSummary {
   reward: RewardStatus;
   realName: { required: boolean; verified: boolean };
   playLimit: PlayLimit | null;
+  rank: RankInfo;
 }
 
 /** Public, unauthenticated server info for the login and lobby screens. */
@@ -155,6 +176,58 @@ export interface HandReplay {
   actions: Action[];
 }
 
+/** How the player and one AI character have fared against each other. */
+export interface CharacterRelation {
+  characterId: string;
+  name: string;
+  nameEn: string | null;
+  avatar: string;
+  handsTogether: number;
+  gamesTogether: number;
+  /** Hands the character won / the player won while at the same table. */
+  theirWins: number;
+  myWins: number;
+  /** The player dealt in to them / they dealt in to the player. */
+  iDealtIn: number;
+  theyDealtIn: number;
+  lastSeenAt: number | null;
+}
+
+export type DailyTaskId = 'playHands' | 'win' | 'selfDraw';
+export type AchievementId =
+  | 'firstWin'
+  | 'firstSelfDraw'
+  | 'firstKong'
+  | 'duiDuiHu'
+  | 'qiDui'
+  | 'qingYiSe'
+  | 'gangShangHua'
+  | 'bigWin'
+  | 'wins10'
+  | 'wins50'
+  | 'games10';
+
+export interface DailyTaskStatus {
+  id: DailyTaskId;
+  progress: number;
+  target: number;
+  reward: number;
+  claimed: boolean;
+}
+
+export interface AchievementStatus {
+  id: AchievementId;
+  reward: number;
+  /** Null until earned. */
+  unlockedAt: number | null;
+  claimed: boolean;
+}
+
+export interface TasksStatus {
+  daily: DailyTaskStatus[];
+  achievements: AchievementStatus[];
+}
+
 /** Lifetime numbers for the stats page. */
 export interface PlayerStats {
   gamesPlayed: number;
@@ -203,6 +276,8 @@ export interface TableSnapshot {
   autoPlay: boolean;
   /** "Skip to results" is active for the rest of this hand. */
   fastForward: boolean;
+  /** Quick pace is on: AI players barely pause. */
+  fastPace: boolean;
   gameOver: boolean;
   /** Recent table chat, oldest first. */
   chat: ChatEntry[];
@@ -225,6 +300,8 @@ export type ClientMessage =
   /** `version` is the view version the action was chosen from; stale actions are ignored. */
   | { type: 'action'; action: DistributiveOmit<Action, 'seat'>; version: number }
   | { type: 'setAutoPlay'; on: boolean }
+  /** Quick pace: AI players move with little thinking time (a player setting). */
+  | { type: 'setFastPace'; on: boolean }
   | { type: 'skipToResults' }
   | { type: 'nextHand' }
   | { type: 'leaveGame' }
@@ -240,6 +317,7 @@ export type ServerMessage =
   | { type: 'table'; table: TableSnapshot; events: GameEvent[] }
   | { type: 'left'; reason?: 'user' | 'minorTimeLimit' | 'guestTrialOver' }
   /** `gameTotal`: the player's net coins over the current game so far. */
+  | { type: 'rank'; result: RankResult }
   | { type: 'wallet'; balance: number; change: { amount: number; requested: number; handIndex: number; gameTotal: number } | null }
   | { type: 'startRejected'; reason: StartRejection; detail?: string }
   | { type: 'pendingResult'; summary: GameSummary }

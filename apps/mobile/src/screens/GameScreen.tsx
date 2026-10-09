@@ -4,7 +4,7 @@ import type { DistributiveOmit, TableSnapshot } from '@mahjong/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { updateSoundSettings, useSoundSettings, useTableSounds } from '../audio/sound';
-import { ActionBar, Btn } from '../components/ActionBar';
+import { ActionBar, Btn, claimFanSize } from '../components/ActionBar';
 import { BanterPicker, ChatPanel, SpeechBubbles } from '../components/Chat';
 import { arrangeHand, PlayerHand, type HandTile } from '../components/PlayerHand';
 import { PopIn } from '../components/PopIn';
@@ -12,6 +12,8 @@ import { ResultPanel } from '../components/ResultPanel';
 import { Felt } from '../components/Felt';
 import { InsightPanel, TileTracker } from '../components/Insight';
 import { autoMove, updateAutoSettings, useAutoSettings, type AutoSettings } from '../game/autoActions';
+import { useVoiceCallouts } from '../audio/voice';
+import { useSettings } from '../settings';
 import { Compass, ConcealedTiles, Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
 import { Tile } from '../components/Tile';
 import type { GameApi, TimedEvent } from '../net/useGame';
@@ -41,12 +43,13 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const view = table.view;
   const me = view.players[view.seat];
   const window = useWindowDimensions();
+  const settings = useSettings();
   // Big screens (desktop browsers, tablets) get the phone layout scaled up as a whole, so tiles,
   // seats, buttons and text keep their proportions instead of shrinking into the corners.
   const scale = Math.max(1, Math.min(window.width / DESIGN_WIDTH, window.height / DESIGN_HEIGHT));
   const width = window.width / scale;
   const height = window.height / scale;
-  const smallTile = Math.max(16, Math.min(30, Math.floor(height / 18)));
+  const smallTile = Math.max(16, Math.min(Math.round(30 * settings.tileScale), Math.floor((height / 18) * settings.tileScale)));
   const seatAt = (side: Side) => ((view.seat + side) % 4) as Seat;
   const sideOf = (seat: Seat) => ((seat - view.seat + 4) % 4) as Side;
 
@@ -75,7 +78,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   // Size my tiles so the seat card, melds (drawn at 3/4 size) and the whole hand fit on one row.
   const meldTiles = me.melds.reduce((n, m) => n + (m.type === 'pong' ? 3 : 4), 0);
   const handSlots = me.handCount + (drawn !== null ? 0.4 : 0) + meldTiles * 0.75 + me.melds.length * 0.2 + 0.5;
-  const handTile = Math.max(24, Math.min(54, Math.floor((width - 24 - MY_SEAT_WIDTH) / handSlots)));
+  const handTile = Math.max(24, Math.min(Math.round(54 * settings.tileScale), Math.floor((width - 24 - MY_SEAT_WIDTH) / handSlots)));
 
   // Selections only make sense for the hand they were made on.
   const handKey = `${table.handIndex}:${view.phase}:${(me.hand ?? []).join(',')}`;
@@ -86,6 +89,12 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
   const auto = useAutoSettings();
+  useVoiceCallouts(game.events, settings.voice);
+  // Keep the room's pace in line with the player's setting.
+  const setFastPace = game.setFastPace;
+  useEffect(() => {
+    if (table.fastPace !== settings.fastPace) setFastPace(settings.fastPace);
+  }, [table.fastPace, settings.fastPace, setFastPace]);
   // Shortcut moves, at most one per view version, after a short beat so the player sees what happened.
   const autoActed = useRef(-1);
   const shortcut = table.autoPlay || me.won ? null : autoMove(view, auto);
@@ -238,7 +247,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         <View style={[styles.bottomBar, { paddingBottom: Math.round(handTile * 0.35) }]}>
         <InsightPanel view={view} focus={focusTile} tileWidth={Math.round(handTile * 0.55)} />
         <View style={styles.actions}>
-          {tipId && <CoachTip key={tipId} id={tipId} />}
+          {/* While the claim fan is up, the tip sits to its left instead of under it */}
+          {tipId && <CoachTip key={tipId} id={tipId} offset={tipId === 'claim' || (tipId === 'win' && stage.kind !== 'turn') ? claimFanSize(handTile).width + 8 : 0} />}
           {timeRunningOut && (
             <PopIn key={`warn${myTurnTimer}`} from={1.15} style={styles.warning}>
               <Text style={styles.warningText}>⏰ {T.timeoutWarning(myTurnTimer)}</Text>
@@ -318,6 +328,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           result={view.result}
           countdown={table.timer?.kind === 'nextHand' ? countdown : null}
           gameCoins={gameCoins}
+          rank={table.gameOver && game.lastRank?.gameId === table.gameId ? game.lastRank : null}
           handCoins={
             game.lastWallet && game.lastWallet.gameId === table.gameId && game.lastWallet.handIndex === table.handIndex ? game.lastWallet.amount : null
           }
@@ -411,10 +422,10 @@ function tipFor(view: HandView): TipId | null {
 }
 
 /** A first-time coaching card above the hand; counts as seen once dismissed or once its moment has passed. */
-function CoachTip({ id }: { id: TipId }) {
+function CoachTip({ id, offset }: { id: TipId; offset: number }) {
   useEffect(() => () => markTipSeen(id), [id]);
   return (
-    <PopIn from={0.9} style={styles.tip}>
+    <PopIn from={0.9} style={[styles.tip, { marginRight: offset }]}>
       <Text style={styles.tipText}>💡 {T.tips[id]}</Text>
       <Btn label={T.tips.gotIt} onPress={() => markTipSeen(id)} />
     </PopIn>

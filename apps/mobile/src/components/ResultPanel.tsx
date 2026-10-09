@@ -1,6 +1,6 @@
 /** Hand / game settlement overlay. */
 import { patternFan, type HandResult, type Pattern, type Seat, type WinRecord } from '@mahjong/engine';
-import type { TableSnapshot } from '@mahjong/protocol';
+import type { RankResult, TableSnapshot } from '@mahjong/protocol';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PATTERN_NAMES, PAYMENT_NAMES, T } from '../strings';
 import { Btn } from './ActionBar';
@@ -14,12 +14,14 @@ interface Props {
   /** Coins settled for this hand, once the wallet update has arrived. */
   handCoins: number | null;
   gameCoins: number;
+  /** Rank change for this game, once it is over (ranked tables only). */
+  rank: RankResult | null;
   onNextHand(): void;
   onNewGame(): void;
   onHome(): void;
 }
 
-export function ResultPanel({ table, result, countdown, handCoins, gameCoins, onNextHand, onNewGame, onHome }: Props) {
+export function ResultPanel({ table, result, countdown, handCoins, gameCoins, rank, onNextHand, onNewGame, onHome }: Props) {
   const name = (seat: Seat) => table.seats[seat].name;
   const draw = result.drawSettlement;
   const tag = (seat: Seat) => {
@@ -43,6 +45,14 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, on
             <Text style={styles.coins}>
               🪙 {T.handCoins(handCoins)}
               {table.gameOver ? `   ${T.gameCoins(gameCoins)}` : ''}
+            </Text>
+          </PopIn>
+        )}
+        {rank && (
+          <PopIn from={1.6} style={[styles.rankBadge, rank.after.tier !== rank.before.tier && styles.rankUp]}>
+            <Text style={styles.rankText}>
+              🏅 {T.rank.result(rank.place, rank.change)}
+              {rank.after.tier !== rank.before.tier ? `   ${T.rank.promoted(T.rank.tiers[rank.after.tier])}` : ''}
             </Text>
           </PopIn>
         )}
@@ -147,6 +157,9 @@ const styles = StyleSheet.create({
   coins: { fontSize: 17, fontWeight: '900', color: '#5d4100' },
   coinBadge: { alignSelf: 'flex-start', backgroundColor: '#ffe082', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
   coinLoss: { backgroundColor: '#ffccbc' },
+  rankBadge: { alignSelf: 'flex-start', backgroundColor: '#e0f2f1', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
+  rankUp: { backgroundColor: '#ffd54f' },
+  rankText: { fontSize: 15, fontWeight: '900', color: '#004d40' },
   scroll: { flexGrow: 0 },
   win: { backgroundColor: '#fff3e0', borderRadius: 10, padding: 8, gap: 3 },
   winText: { fontWeight: '700', color: '#4e342e' },

@@ -5,6 +5,8 @@ import { Pressable, StyleSheet, Switch, Text, TextInput, useWindowDimensions, Vi
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { formStyles, Sheet } from '../components/Sheet';
+import { SettingsSheet } from './SettingsSheet';
+import { TasksSheet, useClaimableTasks } from './TasksSheet';
 import { TileFan } from '../components/TileFan';
 import { api } from '../net/api';
 import type { ConnectionStatus } from '../net/useGame';
@@ -20,6 +22,7 @@ interface Props {
   onOpenAccount(): void;
   onOpenTutorial(): void;
   onOpenHistory(): void;
+  onOpenRules(): void;
   /** Lessons the player has finished (from local storage). */
   tutorialDone: number;
 }
@@ -34,9 +37,12 @@ const TIER: Record<string, { fill: string; rim: string; ink: string }> = {
 const TIER_FALLBACK = { fill: '#607d8b', rim: '#cfd8dc', ink: '#fff' };
 const LESSON_COUNT = 6;
 
-export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, tutorialDone }: Props) {
+export function LobbyScreen({ info, token, account, status, onAccount, onStart, onOpenAccount, onOpenTutorial, onOpenHistory, onOpenRules, tutorialDone }: Props) {
   const [rewardOpen, setRewardOpen] = useState(false);
   const [privateOpen, setPrivateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const claimable = useClaimableTasks(token, tasksOpen);
   const { width, height } = useWindowDimensions();
   const online = status === 'online';
   const limit = account.playLimit;
@@ -61,13 +67,15 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
               {account.nickname}
             </Text>
             <Text style={styles.coins}>🪙 {account.balance.toLocaleString()}</Text>
+            <Text style={styles.rank}>🏅 {T.rank.label(T.rank.tiers[account.rank.tier], account.rank.points)}</Text>
           </View>
         </Pressable>
         <View style={styles.topButtons}>
-          <Btn label={`📖 ${T.tutorial.entry}`} onPress={onOpenTutorial} />
           <Btn label={`📊 ${T.record.entry}`} onPress={onOpenHistory} />
+          <Btn label={`🎯 ${T.tasks.entry}${claimable ? ` · ${claimable}` : ''}`} primary={claimable > 0} onPress={() => setTasksOpen(true)} />
           <Btn label={`🎁 ${T.dailyReward}`} primary={account.reward.claimable} onPress={() => setRewardOpen(true)} />
-          <Btn label={`⚙️ ${T.account}`} onPress={onOpenAccount} />
+          <Btn label={`⚙️ ${T.settings.entry}`} onPress={() => setSettingsOpen(true)} />
+          <Btn label={`👤 ${T.account}`} onPress={onOpenAccount} />
         </View>
       </View>
 
@@ -97,6 +105,9 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
           <View style={styles.chips}>
             <Pressable onPress={onOpenTutorial} style={[styles.chip, tutorialDone === 0 && styles.chipHot]} accessibilityRole="button">
               <Text style={[styles.chipText, tutorialDone === 0 && styles.chipHotText]}>📖 {T.tutorialProgress(Math.max(0, tutorialDone), LESSON_COUNT)}</Text>
+            </Pressable>
+            <Pressable onPress={onOpenRules} style={styles.chip} accessibilityRole="button">
+              <Text style={styles.chipText}>📘 {T.rulesPage.entry}</Text>
             </Pressable>
             <Pressable onPress={() => setRewardOpen(true)} style={[styles.chip, account.reward.claimable && styles.chipHot]} accessibilityRole="button">
               <Text style={[styles.chipText, account.reward.claimable && styles.chipHotText]}>
@@ -168,6 +179,8 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </View>
       </View>
 
+      {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
+      {tasksOpen && <TasksSheet token={token} onAccount={onAccount} onClose={() => setTasksOpen(false)} />}
       {rewardOpen && <RewardSheet token={token} account={account} onAccount={onAccount} onClose={() => setRewardOpen(false)} />}
       {privateOpen && (
         <PrivateRoomSheet
@@ -293,6 +306,7 @@ const styles = StyleSheet.create({
   avatar: { fontSize: 30 },
   nickname: { color: '#fff', fontWeight: '800', fontSize: 15 },
   coins: { color: '#ffe082', fontWeight: '800', fontVariant: ['tabular-nums'] },
+  rank: { color: '#b2dfdb', fontSize: 12, fontWeight: '800' },
   limit: { color: '#ffcc80', fontSize: 13, alignSelf: 'center' },
   capped: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
   body: { flex: 1, flexDirection: 'row', gap: 24, minHeight: 0 },

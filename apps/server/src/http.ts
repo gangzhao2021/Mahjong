@@ -11,13 +11,14 @@ import { legalPage } from './legal';
 import { registerAdminRoutes, type AdminDeps } from './admin/routes';
 import type { Moderator } from '@mahjong/dialogue';
 import { BANTER_LEVELS } from '@mahjong/dialogue';
-import type { LoginMethod } from '@mahjong/protocol';
+import type { CharacterRelation, LoginMethod } from '@mahjong/protocol';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { createHmac } from 'node:crypto';
 import { AccountSuspendedError, PLAYER_AVATARS, type PlayerRow, type Provider } from './accounts/accounts';
 import { exchangeWechatCode, LoginError, verifyAppleIdToken, verifyGoogleIdToken } from './accounts/providers';
 import { hashIdNumber, parseIdNumber } from './china/compliance';
 import { AlreadyClaimedError } from './economy/rewards';
+import { NothingToClaimError } from './economy/tasks';
 import type { Lobby } from './lobby';
 import { accountSummary, loginMethods, serverInfo, type Services } from './services';
 
@@ -231,6 +232,51 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
     const replay = await s.history.replay(player.id, gameId, Number(handIndex));
     if (!replay) throw new HttpError(404, 'notFound');
     return replay;
+  });
+
+  /** The AI characters this player keeps meeting, with head-to-head numbers. */
+  app.get('/relationships', async (req) => {
+    const player = await requirePlayer(req);
+    const rows = await s.memory.relationships(player.id);
+    const roster = new Map(lobby.characters.map((c) => [c.id, c]));
+    const relations: CharacterRelation[] = rows
+      .filter((r) => roster.has(r.character_id))
+      .map((r) => {
+        const c = roster.get(r.character_id)!;
+        return {
+          characterId: r.character_id,
+          name: c.name,
+          nameEn: c.nameEn ?? null,
+          avatar: c.avatar,
+          handsTogether: r.hands_together,
+          gamesTogether: r.games_together,
+          theirWins: r.character_wins,
+          myWins: r.player_wins,
+          iDealtIn: r.dealt_in_by_player,
+          theyDealtIn: r.dealt_in_to_player,
+          lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at).getTime() : null,
+        };
+      });
+    return { relations };
+  });
+
+  /** Daily tasks and achievements, and claiming their coin rewards. */
+  app.get('/tasks', async (req) => {
+    const player = await requirePlayer(req);
+    return await s.tasks.status(player.id);
+  });
+
+  app.post('/tasks/claim', async (req, reply: FastifyReply) => {
+    const player = await requirePlayer(req);
+    const b = body(req);
+    if ((b.kind !== 'daily' && b.kind !== 'achievement') || typeof b.id !== 'string') throw new HttpError(400, 'badRequest');
+    try {
+      const amount = await s.tasks.claim(player.id, b.kind, b.id);
+      return { amount, tasks: await s.tasks.status(player.id), account: await accountSummary(s, (await s.accounts.get(player.id))!) };
+    } catch (error) {
+      if (error instanceof NothingToClaimError) return reply.status(409).send({ error: 'nothingToClaim' });
+      throw error;
+    }
   });
 
   app.get('/stats', async (req) => {

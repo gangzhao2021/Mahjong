@@ -28,6 +28,7 @@ export interface PlayerRow {
   id_hash: string | null;
   reward_day: number;
   last_reward_date: Date | string | null;
+  rank_points: number;
 }
 
 export class AccountSuspendedError extends Error {

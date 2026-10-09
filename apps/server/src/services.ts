@@ -15,6 +15,8 @@ import { SessionTokens } from './accounts/tokens';
 import { ageOn, DevRealNameVerifier, guestTrialEnd, loadChinaConfig, minorWindowEnd, type ChinaConfig, type RealNameVerifier } from './china/compliance';
 import type { Db } from './db/db';
 import { HandHistory } from './history';
+import { Tasks } from './economy/tasks';
+import { rankInfo, Ranks } from './economy/rank';
 import { loadEconomyConfig, privateRoomMaxBase, type EconomyConfig } from './economy/config';
 import { Rewards } from './economy/rewards';
 import { Wallet } from './economy/wallet';
@@ -39,6 +41,8 @@ export interface Services {
   rewards: Rewards;
   memory: MemoryStore;
   history: HandHistory;
+  tasks: Tasks;
+  ranks: Ranks;
   crashes: CrashReports;
   sms: SmsCodes;
   realName: RealNameVerifier;
@@ -80,6 +84,8 @@ export function createServices(o: ServiceOptions): Services {
     rewards: new Rewards(o.db, wallet, economy),
     memory: new MemoryStore(o.db, now),
     history: new HandHistory(o.db),
+    tasks: new Tasks(o.db, wallet, economy, now),
+    ranks: new Ranks(o.db),
     crashes: new CrashReports(o.db, () => now().getTime()),
     sms: new SmsCodes(o.db, o.sms ?? new ConsoleSmsSender(), () => now().getTime()),
     realName: o.realName ?? new DevRealNameVerifier(),
@@ -167,6 +173,7 @@ export async function accountSummary(s: Services, player: PlayerRow): Promise<Ac
     reward: s.rewards.status(player, s.now()),
     realName: { required: s.region === 'china' && !isGuest, verified: player.real_name_verified },
     playLimit: await playLimit(s, player, providers),
+    rank: rankInfo(player.rank_points ?? 0),
   };
 }
 

@@ -1,28 +1,31 @@
 /** Stats, recent hands, and a move-by-move replay of any of them with every hand face up. */
 import { apply, createHand, rankOf, suitOf, type Action, type HandState, type Seat, type Tile as TileKind } from '@mahjong/engine';
-import type { HandHistoryEntry, HandReplay, PlayerStats } from '@mahjong/protocol';
+import type { CharacterRelation, HandHistoryEntry, HandReplay, PlayerStats } from '@mahjong/protocol';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { Melds } from '../components/TableParts';
 import { Tile } from '../components/Tile';
+import { reviewHand, type ReviewNote } from '../game/review';
 import { api } from '../net/api';
-import { RANK_NAMES, SUIT_NAMES, T } from '../strings';
+import { getLocale, RANK_NAMES, SUIT_NAMES, T } from '../strings';
 
 export function HistoryScreen({ token, onClose }: { token: string; onClose(): void }) {
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [hands, setHands] = useState<HandHistoryEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [replay, setReplay] = useState<HandReplay | null>(null);
+  const [relations, setRelations] = useState<CharacterRelation[]>([]);
 
   useEffect(() => {
     let live = true;
-    Promise.all([api.stats(token), api.history(token)])
-      .then(([s, h]) => {
+    Promise.all([api.stats(token), api.history(token), api.relationships(token).catch(() => ({ relations: [] }))])
+      .then(([s, h, r]) => {
         if (!live) return;
         setStats(s);
         setHands(h.hands);
+        setRelations(r.relations);
       })
       .catch(() => live && setFailed(true));
     return () => {
@@ -56,6 +59,19 @@ export function HistoryScreen({ token, onClose }: { token: string; onClose(): vo
             <Stat label={T.record.dealInRate} value={pct(stats.dealIns, stats.handsPlayed)} />
             <Stat label={T.record.bestFan} value={stats.bestFan === null ? '—' : T.fan(stats.bestFan)} />
           </View>
+          {relations.length > 0 && (
+            <>
+              <Text style={styles.section}>
+                {T.record.regulars}
+                <Text style={styles.sectionHint}>{`  ${T.record.regularsHint}`}</Text>
+              </Text>
+              <View style={styles.regulars}>
+                {relations.map((r) => (
+                  <Regular key={r.characterId} r={r} />
+                ))}
+              </View>
+            </>
+          )}
           <Text style={styles.section}>{hands.length ? T.record.recent : T.record.empty}</Text>
           {hands.map((h) => {
             const delta = h.deltas[h.mySeat];
@@ -72,6 +88,26 @@ export function HistoryScreen({ token, onClose }: { token: string; onClose(): vo
         </ScrollView>
       )}
     </Felt>
+  );
+}
+
+/** One AI character's card: how often you meet and who gets the better of whom. */
+function Regular({ r }: { r: CharacterRelation }) {
+  // A nemesis: at least a few hands together and they clearly have your number.
+  const rival = r.handsTogether >= 8 && r.theirWins + r.iDealtIn >= 2 * (r.myWins + r.theyDealtIn) + 3;
+  return (
+    <View style={styles.regular}>
+      <Text style={styles.regularAvatar}>{r.avatar}</Text>
+      <View style={styles.regularText}>
+        <Text style={styles.regularName}>
+          {getLocale() === 'en' && r.nameEn ? r.nameEn : r.name}
+          <Text style={[styles.bond, rival && styles.bondRival]}>{`  ${T.record.bond(r.handsTogether, rival)}`}</Text>
+        </Text>
+        <Text style={styles.regularLine}>{T.record.together(r.handsTogether)}</Text>
+        <Text style={styles.regularLine}>{T.record.headToHead(r.myWins, r.theirWins)}</Text>
+        <Text style={styles.regularLine}>{T.record.dealIns(r.iDealtIn, r.theyDealtIn)}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -123,6 +159,7 @@ function ReplayView({ replay, onClose }: { replay: HandReplay; onClose(): void }
     }
     return out;
   }, [replay]);
+  const notes = useMemo(() => reviewHand(steps, replay.mySeat), [steps, replay.mySeat]);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const last = steps.length - 1;
@@ -162,6 +199,10 @@ function ReplayView({ replay, onClose }: { replay: HandReplay; onClose(): void }
         </View>
       </View>
       <Text style={styles.moveText}>{action ? describe(action, name) : T.replay.start}</Text>
+      <ReviewBar notes={notes} index={index} onJump={(step) => {
+        setPlaying(false);
+        setIndex(step);
+      }} />
       <ScrollView contentContainerStyle={styles.seats}>
         {order.map((seat) => {
           const p = state.players[seat];
@@ -199,6 +240,37 @@ function ReplayView({ replay, onClose }: { replay: HandReplay; onClose(): void }
   );
 }
 
+/** The review points as chips (tap to jump), and the explanation for the move on screen. */
+function ReviewBar({ notes, index, onJump }: { notes: ReviewNote[]; index: number; onJump(step: number): void }) {
+  const current = notes.find((n) => n.step === index);
+  return (
+    <View style={styles.review}>
+      <Text style={styles.reviewTitle}>
+        {T.review.title}
+        {notes.length ? <Text style={styles.reviewHint}>{`  ${T.review.hint}`}</Text> : null}
+      </Text>
+      {notes.length === 0 ? (
+        <Text style={styles.reviewText}>{T.review.none}</Text>
+      ) : (
+        <View style={styles.reviewChips}>
+          {notes.map((n) => (
+            <Pressable key={n.step} onPress={() => onJump(n.step)} style={[styles.reviewChip, n.step === index && styles.reviewChipOn]} accessibilityRole="button">
+              <Text style={[styles.reviewChipText, n.step === index && styles.reviewChipTextOn]}>{T.review.chip(n.step, tileName(n.played), tileName(n.better))}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      {current && (
+        <Text style={styles.reviewText}>
+          {current.kind === 'shanten'
+            ? T.review.shanten(tileName(current.played), tileName(current.better))
+            : T.review.acceptance(tileName(current.played), tileName(current.better), current.playedAcceptance, current.betterAcceptance)}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
@@ -210,6 +282,15 @@ const styles = StyleSheet.create({
   statValue: { color: '#ffe082', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'] },
   statLabel: { color: '#c8e6c9', fontSize: 12, fontWeight: '700' },
   section: { color: '#e8f5e9', fontWeight: '800', marginTop: 6 },
+  sectionHint: { color: '#a5d6a7', fontWeight: '600', fontSize: 12 },
+  regulars: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  regular: { flexGrow: 1, flexBasis: 220, flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 10 },
+  regularAvatar: { fontSize: 32 },
+  regularText: { flex: 1, gap: 1 },
+  regularName: { color: '#fff', fontWeight: '900' },
+  bond: { color: '#a5d6a7', fontSize: 12, fontWeight: '800' },
+  bondRival: { color: '#ff8a80' },
+  regularLine: { color: '#c8e6c9', fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12 },
   pressed: { opacity: 0.7 },
   when: { color: '#a5d6a7', fontSize: 12, width: 150 },
@@ -223,6 +304,15 @@ const styles = StyleSheet.create({
   stepText: { color: '#c8e6c9', fontVariant: ['tabular-nums'], minWidth: 60 },
   moveText: { color: '#ffe082', fontSize: 16, fontWeight: '800', alignSelf: 'center' },
   seats: { gap: 8, paddingBottom: 20 },
+  review: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 8, gap: 6 },
+  reviewTitle: { color: '#ffe082', fontWeight: '900' },
+  reviewHint: { color: '#a5d6a7', fontWeight: '600', fontSize: 12 },
+  reviewText: { color: '#fff8e1', fontSize: 14, fontWeight: '700' },
+  reviewChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  reviewChip: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(255,255,255,0.12)' },
+  reviewChipOn: { backgroundColor: '#ffd54f' },
+  reviewChipText: { color: '#e8f5e9', fontSize: 12, fontWeight: '700' },
+  reviewChipTextOn: { color: '#3e2723' },
   seat: { flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 8, borderWidth: 2, borderColor: 'transparent' },
   seatActing: { borderColor: '#ffd54f' },
   seatWon: { backgroundColor: 'rgba(120,20,20,0.45)' },

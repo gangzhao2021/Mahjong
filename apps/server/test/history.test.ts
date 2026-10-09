@@ -1,5 +1,5 @@
 import { replayHand } from '@mahjong/engine';
-import type { HandHistoryEntry, HandReplay, PlayerStats } from '@mahjong/protocol';
+import type { CharacterRelation, HandHistoryEntry, HandReplay, PlayerStats } from '@mahjong/protocol';
 import { describe, expect, it } from 'vitest';
 import { api, Client, FAST, gameOver, guestLogin, playAsBot, startServer } from './helpers';
 
@@ -31,6 +31,11 @@ describe('hand history, replay and stats', () => {
     const other = await guestLogin(server, 'device-history-other');
     expect((await api(server, 'GET', `/history/${entry.gameId}/0`, undefined, other)).status).toBe(404);
     expect((await api<{ hands: HandHistoryEntry[] }>(server, 'GET', '/history', undefined, other)).body.hands).toEqual([]);
+
+    // The three AI opponents now count as table regulars.
+    const regulars = await api<{ relations: CharacterRelation[] }>(server, 'GET', '/relationships', undefined, token);
+    expect(regulars.body.relations).toHaveLength(3);
+    for (const r of regulars.body.relations) expect(r).toMatchObject({ handsTogether: 2, name: expect.any(String), avatar: expect.any(String) });
 
     const stats = await api<PlayerStats>(server, 'GET', '/stats', undefined, token);
     expect(stats.body.handsPlayed).toBe(2);

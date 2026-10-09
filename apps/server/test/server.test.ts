@@ -59,6 +59,16 @@ describe('game server', () => {
     expect(sources).toContain('autoPlay');
   });
 
+  it('switches the table to quick pace on request', async () => {
+    const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 60_000 } });
+    const client = await Client.connect(server);
+    await client.hello();
+    client.send({ type: 'startGame' });
+    expect((await client.next(isTable)).table.fastPace).toBe(false);
+    client.send({ type: 'setFastPace', on: true });
+    await client.next((m): m is TableMsg => isTable(m) && m.table.fastPace);
+  });
+
   it('shows a countdown timer for the human decision', async () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 15_000 } });
     const client = await Client.connect(server);

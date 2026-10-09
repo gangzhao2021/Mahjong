@@ -16,6 +16,7 @@ import { AccountScreen } from './src/screens/AccountScreen';
 import { ConsentScreen, loadConsent } from './src/screens/ConsentScreen';
 import { GameScreen } from './src/screens/GameScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
+import { RulesScreen } from './src/rules/RulesScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RealNameScreen } from './src/screens/RealNameScreen';
@@ -42,6 +43,7 @@ export default function App() {
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [accountOpen, setAccountOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialDone, setTutorialDone] = useState(-1);
   const [consented, setConsented] = useState<boolean | undefined>(undefined);
@@ -111,6 +113,9 @@ export default function App() {
   let screen: React.ReactNode;
   if (SHOW_TILE_GALLERY) {
     screen = <TileGallery />;
+  } else if (rulesOpen) {
+    // Static content: readable before signing in and offline.
+    screen = <RulesScreen onClose={() => setRulesOpen(false)} />;
   } else if (tutorialOpen) {
     // Runs locally: works offline and before signing in.
     screen = <TutorialScreen onExit={() => setTutorialOpen(false)} />;
@@ -145,6 +150,7 @@ export default function App() {
         onOpenAccount={() => setAccountOpen(true)}
         onOpenTutorial={() => setTutorialOpen(true)}
         onOpenHistory={() => setHistoryOpen(true)}
+        onOpenRules={() => setRulesOpen(true)}
         tutorialDone={tutorialDone}
       />
     );
