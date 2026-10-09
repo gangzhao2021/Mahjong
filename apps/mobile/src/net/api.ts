@@ -1,5 +1,5 @@
 /** HTTP API client for accounts and economy. */
-import type { AccountSummary, BanterLevel, CharacterRelation, HandHistoryEntry, HandReplay, LoginMethod, PlayerStats, ServerInfo, TasksStatus } from '@mahjong/protocol';
+import type { AccountSummary, BanterLevel, CharacterRelation, HandHistoryEntry, HandReplay, LoginMethod, PlayerStats, ServerInfo, AchievementsStatus } from '@mahjong/protocol';
 import { SERVER_HTTP } from '../config';
 import { getLocale } from '../strings';
 
@@ -59,9 +59,9 @@ export const api = {
   history: (token: string) => request<{ hands: HandHistoryEntry[] }>('GET', '/history', undefined, token),
   replay: (token: string, gameId: string, handIndex: number) => request<HandReplay>('GET', `/history/${encodeURIComponent(gameId)}/${handIndex}`, undefined, token),
   relationships: (token: string) => request<{ relations: CharacterRelation[] }>('GET', '/relationships', undefined, token),
-  tasks: (token: string) => request<TasksStatus>('GET', '/tasks', undefined, token),
-  claimTask: (token: string, kind: 'daily' | 'achievement', id: string) =>
-    request<{ amount: number; tasks: TasksStatus; account: AccountSummary }>('POST', '/tasks/claim', { kind, id }, token),
+  achievements: (token: string) => request<AchievementsStatus>('GET', '/achievements', undefined, token),
+  claimAchievement: (token: string, id: string) =>
+    request<{ amount: number; achievements: AchievementsStatus; account: AccountSummary }>('POST', '/achievements/claim', { id }, token),
   stats: (token: string) => request<PlayerStats>('GET', '/stats', undefined, token),
   deleteAccount: (token: string) => request<Record<string, never>>('DELETE', '/account', undefined, token),
 };

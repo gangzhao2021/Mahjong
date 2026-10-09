@@ -18,7 +18,7 @@ import { AccountSuspendedError, PLAYER_AVATARS, type PlayerRow, type Provider } 
 import { exchangeWechatCode, LoginError, verifyAppleIdToken, verifyGoogleIdToken } from './accounts/providers';
 import { hashIdNumber, parseIdNumber } from './china/compliance';
 import { AlreadyClaimedError } from './economy/rewards';
-import { NothingToClaimError } from './economy/tasks';
+import { NothingToClaimError } from './economy/achievements';
 import type { Lobby } from './lobby';
 import { accountSummary, loginMethods, serverInfo, type Services } from './services';
 
@@ -260,19 +260,19 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
     return { relations };
   });
 
-  /** Daily tasks and achievements, and claiming their coin rewards. */
-  app.get('/tasks', async (req) => {
+  /** Achievements (paid automatically; claim covers anything earned but not yet paid). */
+  app.get('/achievements', async (req) => {
     const player = await requirePlayer(req);
-    return await s.tasks.status(player.id);
+    return await s.achievements.status(player.id);
   });
 
-  app.post('/tasks/claim', async (req, reply: FastifyReply) => {
+  app.post('/achievements/claim', async (req, reply: FastifyReply) => {
     const player = await requirePlayer(req);
     const b = body(req);
-    if ((b.kind !== 'daily' && b.kind !== 'achievement') || typeof b.id !== 'string') throw new HttpError(400, 'badRequest');
+    if (typeof b.id !== 'string') throw new HttpError(400, 'badRequest');
     try {
-      const amount = await s.tasks.claim(player.id, b.kind, b.id);
-      return { amount, tasks: await s.tasks.status(player.id), account: await accountSummary(s, (await s.accounts.get(player.id))!) };
+      const amount = await s.achievements.claim(player.id, b.id);
+      return { amount, achievements: await s.achievements.status(player.id), account: await accountSummary(s, (await s.accounts.get(player.id))!) };
     } catch (error) {
       if (error instanceof NothingToClaimError) return reply.status(409).send({ error: 'nothingToClaim' });
       throw error;

@@ -205,7 +205,6 @@ export interface CharacterRelation {
   lastSeenAt: number | null;
 }
 
-export type DailyTaskId = 'playHands' | 'win' | 'selfDraw';
 export type AchievementId =
   | 'firstWin'
   | 'firstSelfDraw'
@@ -219,14 +218,6 @@ export type AchievementId =
   | 'wins50'
   | 'games10';
 
-export interface DailyTaskStatus {
-  id: DailyTaskId;
-  progress: number;
-  target: number;
-  reward: number;
-  claimed: boolean;
-}
-
 export interface AchievementStatus {
   id: AchievementId;
   reward: number;
@@ -235,15 +226,15 @@ export interface AchievementStatus {
   claimed: boolean;
 }
 
-/** A task or achievement reward that was just paid. */
+/** A reward that was just paid automatically: an achievement, or the daily login reward. */
 export interface EarnedReward {
-  kind: 'daily' | 'achievement';
-  id: DailyTaskId | AchievementId;
+  kind: 'achievement' | 'login';
+  /** Achievement id; 'login' for the login reward. */
+  id: AchievementId | 'login';
   amount: number;
 }
 
-export interface TasksStatus {
-  daily: DailyTaskStatus[];
+export interface AchievementsStatus {
   achievements: AchievementStatus[];
 }
 
@@ -339,7 +330,7 @@ export type ServerMessage =
   | { type: 'left'; reason?: 'user' | 'minorTimeLimit' | 'guestTrialOver' }
   /** `gameTotal`: the player's net coins over the current game so far. */
   | { type: 'rank'; result: RankResult }
-  /** Task / achievement rewards paid automatically after a hand. */
+  /** Rewards paid automatically (achievements after a hand, the login reward on the first visit of the day). */
   | { type: 'rewards'; items: EarnedReward[]; balance: number }
   | { type: 'wallet'; balance: number; change: { amount: number; requested: number; handIndex: number; gameTotal: number } | null }
   | { type: 'startRejected'; reason: StartRejection; detail?: string }

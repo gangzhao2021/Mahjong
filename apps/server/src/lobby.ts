@@ -21,6 +21,7 @@ import { summarizeGame } from './memory/summarizer';
 import { Pacer } from './pacer';
 import { Room, type AiSeatSpec, type RoomCheckpoint } from './room';
 import { accountSummary, checkStart, type GamePlan, type Services } from './services';
+import { AlreadyClaimedError } from './economy/rewards';
 import type { HandLogStore } from './store';
 
 export interface LobbyDeps {
@@ -131,6 +132,8 @@ export class Lobby {
             .query<{ id: string }>('INSERT INTO play_sessions (player_id, started_at) VALUES ($1, $2) RETURNING id', [player.id, this.s.now()])
             .then((r) => Number(r[0].id))
             .catch(() => null);
+          // The login reward arrives by itself: no button to remember to press.
+          const login = this.deps.config.autoLoginReward ? await this.payLoginReward(player.id) : null;
           const room = this.rooms.get(player.id);
           send({
             type: 'welcome',
@@ -138,8 +141,10 @@ export class Lobby {
             inGame: !!room && !room.isClosed,
             banterLevel: this.banterOf(player),
             catalog: this.catalogFor(language),
-            account: await accountSummary(this.s, player),
+            // Re-read after paying the login reward so the summary shows it as taken.
+            account: await accountSummary(this.s, (login && (await this.s.accounts.get(player.id))) || player),
           });
+          if (login) send({ type: 'rewards', items: [{ kind: 'login', id: 'login', amount: login.amount }], balance: login.balance });
           if (room && !room.isClosed) room.attach(socket);
           else await this.deliverPendingResult(player.id, send);
           return;
@@ -447,6 +452,17 @@ export class Lobby {
   }
 
   /** Coins first (what the player sees), then memory (best effort). */
+  /** Pays today's login reward if it is still due; null otherwise (already paid, or a concurrent connection paid it). */
+  private async payLoginReward(playerId: string): Promise<{ amount: number; balance: number } | null> {
+    try {
+      const claim = await this.s.rewards.claim(playerId, this.s.now());
+      return { amount: claim.amount, balance: claim.balance };
+    } catch (error) {
+      if (!(error instanceof AlreadyClaimedError)) console.error('Login reward failed:', error);
+      return null;
+    }
+  }
+
   /** The character roster (live: admins can edit it). */
   get characters(): DialogueConfig['roster']['characters'] {
     return this.deps.dialogue.roster.characters;
@@ -456,8 +472,8 @@ export class Lobby {
     await this.settle(player.id, room, plan, handIndex, result);
     await this.remember(player, room, plan, result).catch((error) => console.error('Recording AI memory failed:', error));
     // After the memory write, so lifetime counts in the profile include this hand.
-    const rewards = await this.s.tasks.recordHand(player.id, room.humanSeat, result).catch((error) => {
-      console.error('Recording task progress failed:', error);
+    const rewards = await this.s.achievements.recordHand(player.id, room.humanSeat, result).catch((error) => {
+      console.error('Recording achievements failed:', error);
       return [];
     });
     if (rewards.length) room.human.send({ type: 'rewards', items: rewards, balance: await this.s.wallet.balance(player.id) });
