@@ -3,6 +3,7 @@ import type { AccountSummary, FriendRoomInfo, GameOptions, PrivateRules, ServerI
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
+import { MuteButton } from '../components/MuteButton';
 import { Felt } from '../components/Felt';
 import { formStyles, Sheet } from '../components/Sheet';
 import { SettingsSheet } from './SettingsSheet';
@@ -198,6 +199,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
           {/* Rewards pay themselves, so this is just a place to look, with no badge nagging */}
           <Btn label={`🏆 ${T.achievements.entry}`} onPress={() => setAchievementsOpen(true)} />
           <Btn label={`⚙️ ${T.settings.entry}`} onPress={() => setSettingsOpen(true)} />
+          <MuteButton />
           <Btn label={`👤 ${T.account}`} onPress={onOpenAccount} />
         </View>
       </View>

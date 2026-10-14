@@ -28,6 +28,8 @@ interface Props {
   onHover?(item: HandTile | null): void;
   /** Small tiles (portrait phones): show the pressed tile enlarged above the finger, which covers it. */
   magnify?: boolean;
+  /** Tiles that can be konged now: marked with a purple bar so the option is hard to miss. */
+  kongable?: TileKind[];
 }
 
 const DOUBLE_TAP_MS = 320;
@@ -49,7 +51,7 @@ export function arrangeHand(hand: TileKind[], drawn: TileKind | null, voidSuit: 
   return { main: tiles.map((tile, i) => ({ key: `h${i}-${tile}`, tile })), drawn: drawnItem };
 }
 
-export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, selected, onSelect, onDiscard, onHover, magnify = false }: Props) {
+export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, selected, onSelect, onDiscard, onHover, magnify = false, kongable = [] }: Props) {
   const arranged = useMemo(() => arrangeHand(hand, drawn, voidSuit), [hand, drawn, voidSuit]);
   const items = arranged.drawn ? [...arranged.main, arranged.drawn] : arranged.main;
 
@@ -68,6 +70,7 @@ export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, sele
           onDiscard={onDiscard}
           onHover={onHover}
           magnify={magnify}
+          kongable={kongable.includes(item.tile)}
         />
       ))}
     </View>
@@ -85,12 +88,13 @@ interface TileViewProps {
   onDiscard(tile: TileKind): void;
   onHover?(item: HandTile | null): void;
   magnify: boolean;
+  kongable: boolean;
 }
 
 /** How much bigger the magnified tile is than the tile under the finger. */
 const MAGNIFY = 1.8;
 
-function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect, onDiscard, onHover, magnify }: TileViewProps) {
+function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect, onDiscard, onHover, magnify, kongable }: TileViewProps) {
   const lastTap = useRef(0);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -151,6 +155,7 @@ function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect
       }}
     >
       <Tile tile={item.tile} width={width} dimmed={dimmed} highlighted={selected} />
+      {kongable && <View pointerEvents="none" style={[styles.kongMark, { top: -Math.max(5, width * 0.14) }]} />}
       {magnify && pressed && (
         <View pointerEvents="none" style={[styles.magnifier, { bottom: width * 1.6, left: (width - width * MAGNIFY) / 2 }]}>
           <Tile tile={item.tile} width={Math.round(width * MAGNIFY)} highlighted={selected} />
@@ -165,5 +170,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
+  // Same purple as the 杠 claim button.
+  kongMark: { position: 'absolute', left: 2, right: 2, height: 4, borderRadius: 2, backgroundColor: '#9b6ae0' },
   magnifier: { position: 'absolute', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 8 },
 });

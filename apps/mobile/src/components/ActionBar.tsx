@@ -72,7 +72,7 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claim
         <Btn label={T.hint} onPress={onHint} />
         {legal.zimo && <Btn label={T.zimo} big danger onPress={() => onAct({ type: 'zimo' })} />}
         {legal.selfKong?.map((tile) => (
-          <Btn key={tile} label={`${T.kong} ${T.tileShort((tile % 9) + 1, TILE_SUITS[suitOf(tile)])}`} onPress={() => onAct({ type: 'selfKong', tile })} />
+          <Btn key={tile} big kong label={`${T.kong} ${T.tileShort((tile % 9) + 1, TILE_SUITS[suitOf(tile)])}`} onPress={() => onAct({ type: 'selfKong', tile })} />
         ))}
         {selected !== null && legal.discard.includes(selected) && (
           <Btn label={T.discard} primary onPress={() => onAct({ type: 'discard', tile: selected })} />
@@ -192,9 +192,11 @@ interface BtnProps {
   primary?: boolean;
   danger?: boolean;
   big?: boolean;
+  /** Purple, like the 杠 claim button. */
+  kong?: boolean;
 }
 
-export function Btn({ label, onPress, disabled, primary, danger, big }: BtnProps) {
+export function Btn({ label, onPress, disabled, primary, danger, big, kong }: BtnProps) {
   return (
     <Pressable
       onPress={() => {
@@ -207,12 +209,13 @@ export function Btn({ label, onPress, disabled, primary, danger, big }: BtnProps
         styles.btn,
         primary && styles.primary,
         danger && styles.danger,
+        kong && styles.kong,
         big && styles.big,
         disabled && styles.disabled,
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[styles.btnText, big && styles.bigText]}>{label}</Text>
+      <Text style={[styles.btnText, big && styles.bigText, kong && styles.kongText]}>{label}</Text>
     </Pressable>
   );
 }
@@ -250,6 +253,8 @@ const styles = StyleSheet.create({
   },
   primary: { backgroundColor: '#ffd54f', borderColor: '#c49000' },
   danger: { backgroundColor: '#ef5350', borderColor: '#a31515' },
+  kong: { backgroundColor: CLAIM_STYLE.kong.fill, borderColor: CLAIM_STYLE.kong.edge },
+  kongText: { color: CLAIM_STYLE.kong.ink },
   big: { minWidth: 64, minHeight: 48 },
   disabled: { opacity: 0.4 },
   pressed: { transform: [{ translateY: 2 }] },
