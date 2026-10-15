@@ -43,6 +43,11 @@ const SWAP_DIRECTIONS: SwapDirection[] = ['clockwise', 'counterClockwise', 'oppo
 /** Seat offset that receives a player's swap tiles. Turn order is counter-clockwise. */
 const SWAP_OFFSET: Record<SwapDirection, number> = { counterClockwise: 1, opposite: 2, clockwise: 3 };
 
+/** The seat whose three tiles `receiver` got in the swap. */
+export function swapGiver(receiver: Seat, direction: SwapDirection): Seat {
+  return nextSeat(receiver, 4 - SWAP_OFFSET[direction]);
+}
+
 const HAND_SIZE = 13;
 
 function emptyPlayer(): PlayerState {
@@ -515,6 +520,7 @@ function declareWin(ctx: Ctx, seat: Seat, tile: Tile, finalHand: Tile[], winCtx:
     fan: fan.fan,
     patterns: fan.patterns,
     score: fan.score,
+    paidBy: payers,
     order: s.wins.length,
     hand,
     melds: p.melds,

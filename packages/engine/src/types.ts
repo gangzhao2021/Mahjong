@@ -31,6 +31,8 @@ export interface WinRecord {
   patterns: Pattern[];
   /** Score per paying player. */
   score: number;
+  /** Who actually paid: the discarder, or every player still in the hand on a self-draw (absent in records from before it was kept). */
+  paidBy?: Seat[];
   /** Order of this win within the hand (0 = first winner). */
   order: number;
   /** Final concealed hand including the winning tile. */

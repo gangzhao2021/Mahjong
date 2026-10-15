@@ -28,6 +28,12 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
   // In a friend room the next hand waits for everyone; show that this player is ready.
   const [ready, setReady] = useState(false);
   const name = (seat: Seat) => table.seats[seat].name;
+  // Who actually paid: on a self-draw only the players still in the hand (血战 winners who left don't).
+  const payers = (w: WinRecord) => {
+    if (!w.selfDraw) return T.paysOne(name(w.from!), w.score);
+    if (!w.paidBy) return T.paysEach(w.score);
+    return w.paidBy.length === 1 ? T.paysOne(name(w.paidBy[0]), w.score) : T.paysSeveral(w.paidBy.map(name), w.score);
+  };
   const draw = result.drawSettlement;
   const tag = (seat: Seat) => {
     if (!draw) return '';
@@ -76,7 +82,7 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
                 ))}
               </View>
               <Text style={styles.payLine}>
-                {fanSummary(w)} → {w.selfDraw ? T.paysEach(w.score) : T.paysOne(name(w.from!), w.score)}
+                {fanSummary(w)} → {payers(w)}
               </Text>
               <View style={styles.tiles}>
                 {w.hand.map((t, i) => (
@@ -93,6 +99,11 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
               </Text>
             ))}
           <View style={styles.scores}>
+            <View style={styles.scoreRow}>
+              <Text style={styles.cell} />
+              <Text style={[styles.num, styles.columnHead]}>{T.scoreColumns.hand}</Text>
+              <Text style={[styles.total, styles.columnHead]}>{T.scoreColumns.total}</Text>
+            </View>
             {/* Empty seats at two- and three-player tables have nothing to show */}
             {table.seats.filter((s) => !s.empty).map((s) => {
               const delta = result.deltas[s.seat];
@@ -218,6 +229,7 @@ const styles = StyleSheet.create({
   cell: { flex: 1, color: '#37474f' },
   num: { width: 70, textAlign: 'right', fontWeight: '800', fontVariant: ['tabular-nums'], color: '#455a64' },
   total: { width: 70, textAlign: 'right', color: '#78909c', fontVariant: ['tabular-nums'] },
+  columnHead: { fontSize: 12, fontWeight: '700', color: '#90a4ae' },
   plus: { color: '#2e7d32' },
   minus: { color: '#c62828' },
   buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },

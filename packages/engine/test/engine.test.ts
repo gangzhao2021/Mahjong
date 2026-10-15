@@ -6,6 +6,7 @@ import {
   IllegalActionError,
   legalActions,
   suitOf,
+  swapGiver,
   viewFor,
   withRules,
   type HandState,
@@ -60,6 +61,15 @@ describe('Huan San Zhang and Dingque', () => {
       expect(h.players[(seat + 1) % 4].swapReceived).toEqual(h.players[seat].swapSelection);
     }
     expect(h.players.map((p) => p.hand.length)).toEqual([14, 13, 13, 13]);
+  });
+
+  it('swapGiver names the seat each player received from, in every direction', () => {
+    for (const direction of ['clockwise', 'counterClockwise', 'opposite'] as const) {
+      const h = swapAll(createHand({ ruleSet: withRules({ huanSanZhang: { enabled: true, direction } }), baseScore: 1, seed: 7, dealer: 0 }));
+      for (const seat of [0, 1, 2, 3] as Seat[]) {
+        expect(h.players[seat].swapReceived).toEqual(h.players[swapGiver(seat, direction)].swapSelection);
+      }
+    }
   });
 
   it('rejects a swap of mixed suits', () => {
@@ -342,6 +352,7 @@ describe('self-draw', () => {
       [1, 200],
       [2, 200],
     ]);
+    expect(state.wins[0].paidBy).toEqual([1, 2]);
   });
 
   it('海底捞月 on the last tile', () => {
