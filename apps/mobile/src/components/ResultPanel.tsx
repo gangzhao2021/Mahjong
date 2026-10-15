@@ -174,10 +174,10 @@ function patternLabel(p: Pattern): string {
   return p === 'ziMo' ? '' : T.maxFanPattern;
 }
 
-/** "3 番", or "4 番（封顶 4 番）" when the patterns add up to more than the cap. */
+/** "2 番（4 倍）", plus "封顶 4 番" when the patterns add up to more than the cap. */
 function fanSummary(w: WinRecord): string {
   const raw = w.patterns.reduce((sum, p) => sum + (patternFan(p) ?? 0), 0);
-  return raw > w.fan ? `${T.fan(w.fan)}（${T.fanCapped(w.fan)}）` : T.fan(w.fan);
+  return raw > w.fan ? `${T.fanTimes(w.fan)} · ${T.fanCapped(w.fan)}` : T.fanTimes(w.fan);
 }
 
 const styles = StyleSheet.create({

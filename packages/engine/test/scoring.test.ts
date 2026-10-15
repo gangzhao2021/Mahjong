@@ -125,3 +125,57 @@ describe('patternFan', () => {
     expect(patternFan('tianHu')).toBeNull();
   });
 });
+
+describe('optional Chengdu patterns (幺九将对, 门清中张, 夹心五)', () => {
+  const extras = withRules({
+    maxFan: 13,
+    enabledPatterns: { ...DEFAULT_RULESET.enabledPatterns, yaoJiu: true, menQing: true, zhongZhang: true, jiaXinWu: true },
+  });
+  const yaoJiuOnly = withRules({ maxFan: 13, enabledPatterns: { ...DEFAULT_RULESET.enabledPatterns, yaoJiu: true } });
+
+  it('are all off by default', () => {
+    expect(score('123m789m111s789s99s').patterns).toEqual(['pingHu']);
+    expect(score('234m456m678m234s55s').patterns).toEqual(['pingHu']);
+  });
+
+  it('带幺九: every group holds a 1 or 9 (2 fan); 清幺九 in one suit (4 fan)', () => {
+    expect(score('123m789m111s789s99s', { rules: yaoJiuOnly })).toMatchObject({ patterns: ['daiYaoJiu'], fan: 2 });
+    expect(score('123m789m789m111m99m', { rules: yaoJiuOnly }).patterns[0]).toBe('qingYaoJiu');
+    // A pong of a middle tile, or a middle pair, breaks it.
+    expect(score('123m789m789s99s', { rules: yaoJiuOnly, melds: [pong('5s')] }).patterns[0]).toBe('pingHu');
+    expect(score('123m789m111s789s55s', { rules: yaoJiuOnly }).patterns[0]).toBe('pingHu');
+    // Exposed 1 / 9 pongs count.
+    expect(score('123m789m789s99s', { rules: yaoJiuOnly, melds: [pong('1s')] }).patterns[0]).toBe('daiYaoJiu');
+  });
+
+  it('将七对: seven pairs of 2, 5 and 8 (4 fan)', () => {
+    const r = score('2222m55m88m22s55s88s', { rules: yaoJiuOnly });
+    expect(r.patterns).toEqual(['jiangQiDui', 'gen']);
+    expect(r.rawFan).toBe(5);
+  });
+
+  it('门清 +1 fan without pongs or exposed kongs, but not on top of seven pairs', () => {
+    expect(score('123m456m789m234s55s', { rules: extras }).patterns).toEqual(['pingHu', 'menQing']);
+    expect(score('123m456m234s55s', { rules: extras, melds: [pong('8m')] }).patterns).not.toContain('menQing');
+    expect(score('123m456m234s55s', { rules: extras, melds: [{ type: 'concealedKong', tile: t('8m') }] }).patterns).toContain('menQing');
+    expect(score('11m22m33m44m55s66s77s', { rules: extras }).patterns).not.toContain('menQing');
+  });
+
+  it('中张 +1 fan with no 1 or 9 anywhere', () => {
+    expect(score('234m456m678m234s55s', { rules: extras }).patterns).toContain('zhongZhang');
+    expect(score('123m456m678m234s55s', { rules: extras }).patterns).not.toContain('zhongZhang');
+  });
+
+  it('夹心五 +1 fan when the winning 5 sits between a 4 and a 6', () => {
+    const win = (hand: string, tile: string) => scoreWin(parseTiles(hand), [], NO_SITUATION, extras, 1, t(tile)).patterns;
+    expect(win('123m456m789m234s55s', '5m')).toContain('jiaXinWu');
+    expect(win('123m456m789m234s55s', '6m')).not.toContain('jiaXinWu');
+    expect(win('123m456m789m234s55s', '5s')).not.toContain('jiaXinWu'); // the 5 is the pair
+  });
+
+  it('add up to the raw fan', () => {
+    const r = scoreWin(parseTiles('234m456m678m345s55s'), [], NO_SITUATION, extras, 1, t('5m'));
+    expect(r.patterns).toEqual(['pingHu', 'menQing', 'zhongZhang', 'jiaXinWu']);
+    expect(r.patterns.reduce((sum, p) => sum + (patternFan(p) ?? 0), 0)).toBe(r.rawFan);
+  });
+});

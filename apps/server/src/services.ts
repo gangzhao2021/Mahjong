@@ -279,6 +279,9 @@ export function privateRuleSet(rules: Partial<PrivateRules> | undefined): RuleSe
     gangShangPao: bool(r.gangShangPao, d.enabledPatterns.gangShangPao),
     qiangGang: bool(r.qiangGang, d.enabledPatterns.qiangGang),
     xueliu: bool(r.xueliu, d.xueliu),
+    yaoJiu: bool(r.yaoJiu, false),
+    menQingZhongZhang: bool(r.menQingZhongZhang, false),
+    jiaXinWu: bool(r.jiaXinWu, false),
   };
   if (Object.values(flags).some((v) => v === null)) return null;
   return {
@@ -295,6 +298,10 @@ export function privateRuleSet(rules: Partial<PrivateRules> | undefined): RuleSe
       haiDi: flags.haiDi!,
       gangShangPao: flags.gangShangPao!,
       qiangGang: flags.qiangGang!,
+      yaoJiu: flags.yaoJiu!,
+      menQing: flags.menQingZhongZhang!,
+      zhongZhang: flags.menQingZhongZhang!,
+      jiaXinWu: flags.jiaXinWu!,
     },
   };
 }
