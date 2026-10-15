@@ -3,7 +3,9 @@ import type { Rng } from '@mahjong/ai-play';
 import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, textLength, type Language, type Moderator, type StickerId } from '@mahjong/dialogue';
 import { createRng, smallTableRules, isValidTile, type Action, type HandResult, type Seat } from '@mahjong/engine';
 import {
+  AI_LEVELS,
   PROTOCOL_VERSION,
+  type AiLevel,
   type ChatCatalog,
   type ClientMessage,
   type ErrorCode,
@@ -219,7 +221,8 @@ export class Lobby {
       case 'createFriendRoom': {
         if (room && !room.gameOver && !room.isClosed) return send({ type: 'friendRoomRejected', reason: 'inGame' });
         const hands = Number.isInteger(msg.handsPerGame) ? Math.min(Math.max(msg.handsPerGame, 1), this.deps.config.maxHandsPerGame) : this.deps.config.defaultHandsPerGame;
-        this.friends.create({ playerId: player.id, name: player.nickname, avatar: player.avatar }, hands, msg.xueliu === true);
+        const aiLevel = AI_LEVELS.includes(msg.aiLevel as AiLevel) ? (msg.aiLevel as AiLevel) : null;
+        this.friends.create({ playerId: player.id, name: player.nickname, avatar: player.avatar }, hands, msg.xueliu === true, aiLevel);
         return;
       }
       case 'joinFriendRoom': {
@@ -606,7 +609,7 @@ export class Lobby {
     const [host, ...rest] = players;
     const guests = rest.map((g, i) => ({ seat: seats[i + 1], player: g.player, plan: g.plan }));
     const chosen = selectCharacters(this.deps.dialogue.roster, seats.length - players.length, this.rng);
-    const ai: AiSeatSpec[] = chosen.map((c) => ({ ...c, skill: pickWeighted(this.deps.config.skillWeights, this.rng), memory: null }));
+    const ai: AiSeatSpec[] = chosen.map((c) => ({ ...c, skill: table.aiLevel ?? pickWeighted(this.deps.config.skillWeights, this.rng), memory: null }));
     this.friends.close(table);
     const room = this.buildRoom(host.player, host.plan, ai, this.languageOf(host.player.id), undefined, guests);
     const openSocket = (id: string) => [...(this.sockets.get(id) ?? [])].find((s) => s.readyState === s.OPEN);

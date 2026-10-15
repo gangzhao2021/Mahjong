@@ -67,6 +67,24 @@ describe('friend rooms', () => {
     expect(summaries.map((s) => s.summary.mySeat)).toEqual([0, 1]);
   });
 
+  it('fills empty seats with AIs at the strength the host chose', async () => {
+    const server = await startServer(PATIENT);
+    const host = await Client.connect(server);
+    await host.hello('device-level-host');
+    const friend = await Client.connect(server);
+    await friend.hello('device-level-friend');
+
+    host.send({ type: 'createFriendRoom', handsPerGame: 1, aiLevel: 'expert' });
+    const created = (await host.next(roomWith(1))).room as FriendRoomInfo;
+    expect(created.aiLevel).toBe('expert');
+    friend.send({ type: 'joinFriendRoom', code: created.code });
+    await host.next(roomWith(2));
+
+    host.send({ type: 'startFriendRoom' });
+    const table = (await host.next(isTable)) as TableMsg;
+    expect(table.table.seats.filter((s) => !s.isHuman && !s.empty).map((s) => s.skill)).toEqual(['expert', 'expert']);
+  });
+
   it('auto-plays a friend who drops out while the others play on', async () => {
     const server = await startServer(PATIENT);
     const host = await Client.connect(server);

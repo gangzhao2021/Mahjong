@@ -1,5 +1,5 @@
 /** 好友房: open a room or join one by its 6-digit number, then wait for friends until the host starts. */
-import type { FriendRoomInfo } from '@mahjong/protocol';
+import { AI_LEVELS, type AiLevel, type FriendRoomInfo } from '@mahjong/protocol';
 import { useState } from 'react';
 import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
@@ -8,7 +8,7 @@ import { shareInvite } from '../net/invite';
 import { T } from '../strings';
 
 export interface FriendActions {
-  create(handsPerGame: number, xueliu: boolean): void;
+  create(handsPerGame: number, xueliu: boolean, aiLevel: AiLevel | null): void;
   join(code: string): void;
   leave(): void;
   /** `fillWithAi: false` plays with just the friends present (两房). */
@@ -19,6 +19,7 @@ export interface FriendActions {
 export function FriendRoomEntrySheet({ maxHands, actions, onClose }: { maxHands: number; actions: FriendActions; onClose(): void }) {
   const [hands, setHands] = useState(4);
   const [xueliu, setXueliu] = useState(false);
+  const [aiLevel, setAiLevel] = useState<AiLevel | null>(null);
   const [code, setCode] = useState('');
   const valid = /^\d{6}$/.test(code);
   return (
@@ -30,12 +31,20 @@ export function FriendRoomEntrySheet({ maxHands, actions, onClose }: { maxHands:
         <Btn label="−" onPress={() => setHands((h) => Math.max(1, h - 1))} />
         <Text style={styles.stepper}>{hands}</Text>
         <Btn label="+" onPress={() => setHands((h) => Math.min(maxHands, h + 1))} />
-        <Btn label={T.friend.create} primary onPress={() => actions.create(hands, xueliu)} />
       </View>
       <View style={formStyles.switchRow}>
         <Switch value={xueliu} onValueChange={setXueliu} />
         <Text style={[formStyles.label, formStyles.switchLabel]}>{T.rules.xueliu}</Text>
       </View>
+      {/* For the AIs that fill empty seats */}
+      <View style={formStyles.row}>
+        <Text style={formStyles.label}>{T.aiDifficulty}</Text>
+        {([null, ...AI_LEVELS] as (AiLevel | null)[]).map((level) => (
+          <Btn key={level ?? 'mixed'} label={level ? T.aiLevels[level] : T.aiMixed} primary={aiLevel === level} onPress={() => setAiLevel(level)} />
+        ))}
+      </View>
+      {/* Create comes after every option, so none is skipped on the way */}
+      <Btn label={T.friend.create} primary onPress={() => actions.create(hands, xueliu, aiLevel)} />
       <Text style={styles.section}>{T.friend.joinTitle}</Text>
       <View style={formStyles.row}>
         <TextInput
@@ -90,7 +99,10 @@ export function WaitingRoomSheet({ room, myId, actions }: { room: FriendRoomInfo
           </View>
         ))}
       </View>
-      <Text style={formStyles.hint}>{T.friend.rules(room.handsPerGame, T.modeName(room.xueliu))}</Text>
+      <Text style={formStyles.hint}>
+        {T.friend.rules(room.handsPerGame, T.modeName(room.xueliu))}
+        {room.aiLevel ? ` · ${T.aiDifficulty} ${T.aiLevels[room.aiLevel]}` : ''}
+      </Text>
       <View style={styles.buttons}>
         <Btn label={T.friend.leave} onPress={actions.leave} />
         {isHost && room.members.length < 2 ? (
