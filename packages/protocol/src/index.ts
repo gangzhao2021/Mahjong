@@ -166,6 +166,8 @@ export interface FriendRoomInfo {
   maxPlayers: number;
   /** 血流成河 instead of 血战到底. */
   xueliu: boolean;
+  /** Strength of the AIs filling empty seats; absent = the usual mix. */
+  aiLevel?: AiLevel;
 }
 
 export type FriendRoomRejection =
@@ -357,7 +359,8 @@ export type ClientMessage =
   | { type: 'action'; action: DistributiveOmit<Action, 'seat'>; version: number }
   | { type: 'setAutoPlay'; on: boolean }
   /** Friend rooms: open a waiting room, join one by number, leave it, or (host) start the game. */
-  | { type: 'createFriendRoom'; handsPerGame: number; xueliu?: boolean }
+  /** `aiLevel`: every AI that fills an empty seat plays at this strength (absent = the usual mix). */
+  | { type: 'createFriendRoom'; handsPerGame: number; xueliu?: boolean; aiLevel?: AiLevel }
   | { type: 'joinFriendRoom'; code: string }
   | { type: 'leaveFriendRoom' }
   /** `fillWithAi: false` plays with just the friends present (三人两房 / 二人两房). */

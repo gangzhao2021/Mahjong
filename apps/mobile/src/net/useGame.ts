@@ -6,6 +6,7 @@ import type { Action, GameEvent, Seat } from '@mahjong/engine';
 import {
   PROTOCOL_VERSION,
   type AccountSummary,
+  type AiLevel,
   type BanterLevel,
   type ChatCatalog,
   type ChatEntry,
@@ -84,7 +85,7 @@ export interface GameApi extends GameState {
   act(action: DistributiveOmit<Action, 'seat'>): void;
   setAutoPlay(on: boolean): void;
   setFastPace(on: boolean): void;
-  createFriendRoom(handsPerGame: number, xueliu: boolean): void;
+  createFriendRoom(handsPerGame: number, xueliu: boolean, aiLevel: AiLevel | null): void;
   joinFriendRoom(code: string): void;
   leaveFriendRoom(): void;
   startFriendRoom(fillWithAi: boolean): void;
@@ -303,7 +304,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     ),
     setAutoPlay: useCallback((on) => send({ type: 'setAutoPlay', on }), [send]),
     setFastPace: useCallback((on) => send({ type: 'setFastPace', on }), [send]),
-    createFriendRoom: useCallback((handsPerGame, xueliu) => send({ type: 'createFriendRoom', handsPerGame, xueliu }), [send]),
+    createFriendRoom: useCallback((handsPerGame, xueliu, aiLevel) => send({ type: 'createFriendRoom', handsPerGame, xueliu, ...(aiLevel ? { aiLevel } : {}) }), [send]),
     joinFriendRoom: useCallback((code) => send({ type: 'joinFriendRoom', code }), [send]),
     leaveFriendRoom: useCallback(() => send({ type: 'leaveFriendRoom' }), [send]),
     startFriendRoom: useCallback((fillWithAi) => send({ type: 'startFriendRoom', fillWithAi }), [send]),

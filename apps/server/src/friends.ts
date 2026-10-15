@@ -4,7 +4,7 @@
  * empty seats). Held in memory; a waiting room disappears when everyone has
  * left it or the game starts.
  */
-import type { FriendRoomInfo, FriendRoomRejection } from '@mahjong/protocol';
+import type { AiLevel, FriendRoomInfo, FriendRoomRejection } from '@mahjong/protocol';
 
 export const FRIEND_ROOM_SEATS = 4;
 
@@ -21,6 +21,8 @@ export interface FriendTable {
   members: FriendMember[];
   handsPerGame: number;
   xueliu: boolean;
+  /** Strength of the AIs filling empty seats; null = the usual mix. */
+  aiLevel: AiLevel | null;
 }
 
 export class FriendTables {
@@ -39,9 +41,9 @@ export class FriendTables {
     return code ? (this.tables.get(code) ?? null) : null;
   }
 
-  create(host: FriendMember, handsPerGame: number, xueliu = false): FriendTable {
+  create(host: FriendMember, handsPerGame: number, xueliu = false, aiLevel: AiLevel | null = null): FriendTable {
     this.leave(host.playerId);
-    const table: FriendTable = { code: this.freshCode(), hostId: host.playerId, members: [host], handsPerGame, xueliu };
+    const table: FriendTable = { code: this.freshCode(), hostId: host.playerId, members: [host], handsPerGame, xueliu, aiLevel };
     this.tables.set(table.code, table);
     this.memberOf.set(host.playerId, table.code);
     this.broadcast(table);
@@ -91,6 +93,7 @@ export class FriendTables {
       handsPerGame: table.handsPerGame,
       maxPlayers: FRIEND_ROOM_SEATS,
       xueliu: table.xueliu,
+      ...(table.aiLevel ? { aiLevel: table.aiLevel } : {}),
     };
   }
 
