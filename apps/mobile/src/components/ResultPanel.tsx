@@ -134,8 +134,9 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
         <View style={styles.buttons}>
           {table.gameOver ? (
             <>
-              <Btn label={T.backHome} onPress={onHome} />
-              <Btn label={T.newGame} primary onPress={onNewGame} />
+              <Btn label={T.backHome} primary={table.stake.kind === 'friend'} onPress={onHome} />
+              {/* A friend room closes when its game starts, so "again" would start a solo game: friends regroup from the lobby */}
+              {table.stake.kind !== 'friend' && <Btn label={T.newGame} primary onPress={onNewGame} />}
             </>
           ) : (
             <Btn

@@ -12,6 +12,8 @@ import { api } from './src/net/api';
 import { setCrashReportToken } from './src/net/crash';
 import { loadToken, saveToken } from './src/net/session';
 import { useGame } from './src/net/useGame';
+import { nextGameOptions } from './src/game/nextGame';
+import { getSettings } from './src/settings';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { ConsentScreen, loadConsent } from './src/screens/ConsentScreen';
 import { GameScreen } from './src/screens/GameScreen';
@@ -158,7 +160,7 @@ export default function App() {
   } else if (historyOpen && !game.table) {
     screen = <HistoryScreen token={token} onClose={() => setHistoryOpen(false)} />;
   } else if (game.table) {
-    screen = <GameScreen game={{ ...game, table: game.table }} onNewGame={() => start(lastOptions.current)} />;
+    screen = <GameScreen game={{ ...game, table: game.table }} onNewGame={() => start(nextGameOptions(game.table!.stake, lastOptions.current, getSettings().practiceAiLevel))} />;
   } else {
     screen = (
       <LobbyScreen
