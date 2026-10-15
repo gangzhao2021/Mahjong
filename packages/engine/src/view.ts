@@ -38,6 +38,8 @@ export interface PlayerView {
   won: WinRecord | null;
   /** Wins this hand: 0 or 1 in 血战到底, any number in 血流成河. */
   winCount: number;
+  /** Own seat only: passed on a win this turn round, so no discard win until the next draw (过手胡). */
+  passedWin?: boolean;
 }
 
 export type StageView =
@@ -84,7 +86,9 @@ export function viewFor(s: HandState, seat: Seat): HandView {
       swapDone: p.swapSelection !== null,
       dingqueDone: p.voidSuit !== null,
       won: p.won,
-      winCount: s.wins.filter((w) => w.seat === seat).length,
+      winCount: s.wins.filter((w) => w.seat === i).length,
+      // 过手胡 is only ever shown to its owner: it tells them why a winning discard isn't offered.
+      ...(own && s.ruleSet.passedWinRestriction ? { passedWin: p.passedWin } : {}),
     };
   });
 

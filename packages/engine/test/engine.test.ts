@@ -179,6 +179,13 @@ describe('wins on a discard', () => {
     expect(state.stage).toMatchObject({ kind: 'turn', seat: 2 });
   });
 
+  it('counts wins per player in every seat\'s view', () => {
+    const { state } = run(multi(), { type: 'discard', seat: 0, tile: t('5s') }, { type: 'hu', seat: 1 }, { type: 'pass', seat: 2 });
+    for (const viewer of [0, 1, 2, 3] as Seat[]) {
+      expect(viewFor(state, viewer).players.map((p) => p.winCount)).toEqual([0, 1, 0, 0]);
+    }
+  });
+
   it('winners leave the hand and take no further actions', () => {
     const { state } = run(multi(), { type: 'discard', seat: 0, tile: t('5s') }, { type: 'hu', seat: 1 }, { type: 'pass', seat: 2 });
     expect(state.players[1].won).not.toBeNull();
@@ -204,6 +211,13 @@ describe('过手胡 (passed win restriction)', () => {
     // No claim stage for seat 2 — it simply draws.
     expect(state.stage).toMatchObject({ kind: 'turn', seat: 2 });
     expect(state.players[2].passedWin).toBe(false);
+  });
+
+  it('shows the restriction to its owner only', () => {
+    const { state } = run(setup(), { type: 'discard', seat: 0, tile: t('5s') }, { type: 'pass', seat: 2 });
+    expect(viewFor(state, 2).players[2].passedWin).toBe(true);
+    expect(viewFor(state, 0).players[2].passedWin).toBeUndefined();
+    expect(viewFor(state, 0).players[0].passedWin).toBe(false);
   });
 
   it('can be disabled', () => {

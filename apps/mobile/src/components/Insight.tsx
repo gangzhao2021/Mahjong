@@ -2,7 +2,7 @@
 import type { HandView, Tile as TileKind } from '@mahjong/engine';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { discardOutcome, unseenCounts, waitsOf, type Wait } from '../game/insight';
+import { discardOutcome, handWarning, unseenCounts, waitsOf, type Wait } from '../game/insight';
 import { T } from '../strings';
 import { Tile } from './Tile';
 
@@ -43,6 +43,22 @@ export function InsightPanel({ view, focus, tileWidth }: PanelProps) {
     </View>
   );
 }
+
+/**
+ * One-line warnings above the insight panel: why a winning discard isn't offered (过手胡), and,
+ * late in the hand, what a draw would cost (查花猪 for void tiles still held, 查大叫 for not ready).
+ */
+export function HandWarnings({ view }: { view: HandView }) {
+  const warning = useMemo(() => handWarning(view), [view]);
+  if (!warning) return null;
+  return (
+    <View style={styles.warning}>
+      <Text style={styles.warningText}>⚠️ {WARNING_TEXT[warning]()}</Text>
+    </View>
+  );
+}
+
+const WARNING_TEXT = { passedWin: () => T.warnPassedWin, huaZhu: () => T.warnHuaZhu, daJiao: () => T.warnDaJiao };
 
 type Insight = { kind: 'discard'; focus: TileKind; outcome: ReturnType<typeof discardOutcome> } | { kind: 'waits'; waits: Wait[] } | null;
 
@@ -118,6 +134,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   ready: { borderWidth: 1.5, borderColor: '#ffd54f' },
+  warning: { alignSelf: 'flex-start', backgroundColor: 'rgba(198,40,40,0.9)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  warningText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   label: { color: '#ffe082', fontSize: 13, fontWeight: '800' },
   muted: { color: '#c8e6c9', fontSize: 13 },
   wait: { alignItems: 'center' },
