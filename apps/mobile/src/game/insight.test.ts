@@ -70,6 +70,12 @@ describe('ready discards (听 marks)', () => {
     expect(readyDiscards(viewFor(state, 1))).toEqual([]);
   });
 
+  it('marks nothing when the hand can already win', () => {
+    const s = customHand({ hands: ['123m456m789m11s23s4s', '1112223334445m', '5556667778889s', '1111p2223334p'], voids: [2, 1, 1, 0], wall: '6s7s8s', turn: 0, drawn: '4s' });
+    expect(viewFor(s, 0).legal.zimo).toBe(true);
+    expect(readyDiscards(viewFor(s, 0))).toEqual([]);
+  });
+
   it('can offer several', () => {
     // 123m 456m 789m 11s 23s + drawn 5s: throwing 5s waits on 1s/4s, 2s on 4s (kanchan), 1s on 5s (single wait).
     const s = customHand({ hands: ['123m456m789m11s23s5s', '1112223334445m', '5556667778889s', '1111p2223334p'], voids: [2, 1, 1, 0], wall: '6s7s8s', turn: 0, drawn: '5s' });
