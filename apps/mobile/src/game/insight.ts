@@ -82,6 +82,8 @@ export function readyDiscards(view: HandView): Tile[] {
   const me = view.players[view.seat];
   const legal = view.legal.discard;
   if (!me.hand || !legal || me.won || view.stage.kind !== 'turn' || view.stage.seat !== view.seat) return [];
+  // A winning hand stays ready whatever it throws: marking every tile would only hide the 自摸 button's point.
+  if (view.legal.zimo) return [];
   const unseen = unseenCounts(view);
   return legal.filter((tile) => waitsOf(removeTiles(me.hand!, [tile]), view, unseen).length > 0);
 }
