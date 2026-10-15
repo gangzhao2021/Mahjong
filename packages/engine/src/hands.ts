@@ -40,6 +40,49 @@ export function isStandardShape(counts: number[]): boolean {
   return false;
 }
 
+/** One group of a standard hand: a pair, a triplet, or a sequence starting at `tile`. */
+export interface HandGroup {
+  kind: 'pair' | 'triplet' | 'sequence';
+  tile: number;
+}
+
+/** Can `counts` be split into sets using only groups `ok` accepts? (multiple of 3 tiles) */
+function decomposesWhere(counts: number[], ok: (g: HandGroup) => boolean): boolean {
+  let i = 0;
+  while (i < TILE_KINDS && counts[i] === 0) i++;
+  if (i === TILE_KINDS) return true;
+  if (counts[i] >= 3 && ok({ kind: 'triplet', tile: i })) {
+    counts[i] -= 3;
+    const done = decomposesWhere(counts, ok);
+    counts[i] += 3;
+    if (done) return true;
+  }
+  if (rankOf(i) <= 7 && counts[i + 1] > 0 && counts[i + 2] > 0 && ok({ kind: 'sequence', tile: i })) {
+    counts[i]--;
+    counts[i + 1]--;
+    counts[i + 2]--;
+    const done = decomposesWhere(counts, ok);
+    counts[i]++;
+    counts[i + 1]++;
+    counts[i + 2]++;
+    if (done) return true;
+  }
+  return false;
+}
+
+/** Standard shape (sets + one pair) where every group passes `ok`, e.g. 带幺九 (each group holds a 1 or 9). */
+export function isStandardShapeWhere(counts: number[], ok: (g: HandGroup) => boolean): boolean {
+  const c = [...counts];
+  for (let p = 0; p < TILE_KINDS; p++) {
+    if (c[p] < 2 || !ok({ kind: 'pair', tile: p })) continue;
+    c[p] -= 2;
+    const done = decomposesWhere(c, ok);
+    c[p] += 2;
+    if (done) return true;
+  }
+  return false;
+}
+
 /** Concealed tiles are exactly triplets plus one pair (no sequences possible). */
 export function isAllTripletsShape(counts: number[]): boolean {
   let pairs = 0;

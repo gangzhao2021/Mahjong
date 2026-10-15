@@ -139,6 +139,12 @@ export interface PrivateRules {
   qiangGang: boolean;
   /** 血流成河 instead of 血战到底. */
   xueliu: boolean;
+  /** 幺九将对: 带幺九 / 清幺九 and 将七对. */
+  yaoJiu?: boolean;
+  /** 门清中张: +1 fan each for 门清 and 中张. */
+  menQingZhongZhang?: boolean;
+  /** 夹心五: +1 fan winning on a 5 between a 4 and a 6. */
+  jiaXinWu?: boolean;
 }
 
 export interface StakeInfo {

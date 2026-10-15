@@ -507,7 +507,7 @@ function declareWin(ctx: Ctx, seat: Seat, tile: Tile, finalHand: Tile[], winCtx:
   const { s, events } = ctx;
   const p = s.players[seat];
   const hand = sortTiles(finalHand);
-  const fan = scoreWin(hand, p.melds, winCtx, s.ruleSet, s.baseScore);
+  const fan = scoreWin(hand, p.melds, winCtx, s.ruleSet, s.baseScore, tile);
 
   const payers = from === undefined ? seatsAfter(seat).filter((o) => isActive(s, o)) : [from];
   const payments = payers.map((payer) => pay(s, payer, seat, fan.score, 'win'));
@@ -572,7 +572,7 @@ export function maxPotentialScore(s: HandState, seat: Seat): number {
   const p = s.players[seat];
   let best = 0;
   for (const t of winningTiles(p.hand, p.melds, p.voidSuit)) {
-    best = Math.max(best, scoreWin([...p.hand, t], p.melds, NO_SITUATION, s.ruleSet, s.baseScore).score);
+    best = Math.max(best, scoreWin([...p.hand, t], p.melds, NO_SITUATION, s.ruleSet, s.baseScore, t).score);
   }
   return best;
 }

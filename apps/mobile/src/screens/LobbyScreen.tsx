@@ -279,6 +279,9 @@ const DEFAULT_RULES: PrivateRules = {
   gangShangPao: true,
   qiangGang: true,
   xueliu: false,
+  yaoJiu: false,
+  menQingZhongZhang: false,
+  jiaXinWu: false,
 };
 
 /** How a table's AI mix plays, in one word for its card (the server-wide mix is 20 / 50 / 30). */
@@ -299,7 +302,7 @@ function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerIn
   const [aiLevel, setAiLevel] = useState<AiLevel | null>(null);
   const baseNum = Number(base);
   const valid = Number.isInteger(baseNum) && baseNum >= 0 && baseNum <= maxBase;
-  const toggle = (key: 'huanSanZhang' | 'callTransfer' | 'xueliu') => setRules((r) => ({ ...r, [key]: !r[key] }));
+  const toggle = (key: 'huanSanZhang' | 'callTransfer' | 'xueliu' | 'yaoJiu' | 'menQingZhongZhang' | 'jiaXinWu') => setRules((r) => ({ ...r, [key]: !r[key] }));
 
   return (
     <Sheet title={T.privateRoom} onClose={onClose}>
@@ -328,6 +331,10 @@ function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerIn
         value={rules.selfDrawBonus === 'fan'}
         onChange={() => setRules((r) => ({ ...r, selfDrawBonus: r.selfDrawBonus === 'fan' ? 'base' : 'fan' }))}
       />
+      {/* Chengdu extras some tables play with */}
+      <RuleSwitch label={T.rules.yaoJiu} value={!!rules.yaoJiu} onChange={() => toggle('yaoJiu')} />
+      <RuleSwitch label={T.rules.menQingZhongZhang} value={!!rules.menQingZhongZhang} onChange={() => toggle('menQingZhongZhang')} />
+      <RuleSwitch label={T.rules.jiaXinWu} value={!!rules.jiaXinWu} onChange={() => toggle('jiaXinWu')} />
       {/* With no coins at stake the player picks how strong the AI is */}
       {baseNum === 0 && (
         <View style={formStyles.row}>

@@ -22,6 +22,14 @@ export interface RuleSet {
     haiDi: boolean;
     gangShangPao: boolean;
     qiangGang: boolean;
+    /** 幺九将对: 带幺九 / 清幺九 and 将七对. Absent in rule sets saved before it existed = off. */
+    yaoJiu?: boolean;
+    /** 门清: +1 fan with no pong or exposed kong. */
+    menQing?: boolean;
+    /** 中张: +1 fan with no 1 or 9 anywhere. */
+    zhongZhang?: boolean;
+    /** 夹心五: +1 fan winning on a 5 between a 4 and a 6. */
+    jiaXinWu?: boolean;
   };
   /** 呼叫转移 */
   callTransfer: boolean;
@@ -62,6 +70,11 @@ export const DEFAULT_RULESET: RuleSet = {
     haiDi: true,
     gangShangPao: true,
     qiangGang: true,
+    // The optional Chengdu extras stay off at public tables; private rooms can turn them on.
+    yaoJiu: false,
+    menQing: false,
+    zhongZhang: false,
+    jiaXinWu: false,
   },
   callTransfer: true,
   drawSettlement: { checkHuaZhu: true, checkDaJiao: true, kongRefund: true },

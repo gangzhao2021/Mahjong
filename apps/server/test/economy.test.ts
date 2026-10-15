@@ -88,10 +88,11 @@ describe('starting games (PRD §11–§13)', () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, swapMs: 60_000, dingqueMs: 60_000 } });
     const client = await Client.connect(server);
     await client.hello('device-private');
-    client.send({ type: 'startGame', options: { private: { baseScore: 200, handsPerGame: 2, rules: { huanSanZhang: false, maxFan: 6 } } } });
+    client.send({ type: 'startGame', options: { private: { baseScore: 200, handsPerGame: 2, rules: { huanSanZhang: false, maxFan: 6, yaoJiu: true, menQingZhongZhang: true } } } });
     const t = await client.next(isTable);
     expect(t.table.view.phase).toBe('dingque'); // no swap
     expect(t.table.view.ruleSet).toMatchObject({ maxFan: 6, handsPerGame: 2 });
+    expect(t.table.view.ruleSet.enabledPatterns).toMatchObject({ yaoJiu: true, menQing: true, zhongZhang: true, jiaXinWu: false });
     expect(t.table.stake).toMatchObject({ kind: 'private', baseScore: 200, multiplier: 1 });
     expect(t.table.stake.inviteCode).toMatch(/^\d{6}$/);
   });

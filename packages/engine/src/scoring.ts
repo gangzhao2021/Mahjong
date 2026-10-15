@@ -1,4 +1,4 @@
-import { allTilesOf, isAllTripletsShape, isSevenPairsShape, isStandardShape } from './hands';
+import { allTilesOf, isAllTripletsShape, isSevenPairsShape, isStandardShape, isStandardShapeWhere, type HandGroup } from './hands';
 import type { RuleSet } from './ruleset';
 import { rankOf, suitOf, toCounts, type Tile } from './tiles';
 import type { Meld } from './types';
@@ -15,6 +15,12 @@ export type Pattern =
   | 'longQiDui' // 龙七对
   | 'qingQiDui' // 清七对
   | 'qingLongQiDui' // 清龙七对
+  | 'daiYaoJiu' // 带幺九 (幺九将对 rule)
+  | 'qingYaoJiu' // 清幺九 (幺九将对 rule)
+  | 'jiangQiDui' // 将七对 (幺九将对 rule)
+  | 'menQing' // 门清 (门清中张 rule)
+  | 'zhongZhang' // 中张 (门清中张 rule)
+  | 'jiaXinWu' // 夹心五
   | 'gen' // 根 (one entry per root)
   | 'gangShangHua' // 杠上花
   | 'gangShangPao' // 杠上炮
@@ -65,7 +71,15 @@ const BASE_FAN: Record<string, number> = {
   longQiDui: 3,
   qingQiDui: 4,
   qingLongQiDui: 5,
+  daiYaoJiu: 2,
+  qingYaoJiu: 4,
+  jiangQiDui: 4,
 };
+
+const SEVEN_PAIRS: readonly Pattern[] = ['qiDui', 'longQiDui', 'qingQiDui', 'qingLongQiDui', 'jiangQiDui'];
+const isTerminal = (t: number) => rankOf(t) === 1 || rankOf(t) === 9;
+/** A group holding a 1 or a 9: a terminal pair or triplet, or a 1-2-3 / 7-8-9 sequence. */
+const hasTerminal = (g: HandGroup) => (g.kind === 'sequence' ? rankOf(g.tile) === 1 || rankOf(g.tile) === 7 : isTerminal(g.tile));
 
 /** Fan a pattern contributes on its own; null for 自摸 (depends on the rules) and 天胡/地胡 (the cap). */
 export function patternFan(pattern: Pattern): number | null {
@@ -84,6 +98,7 @@ function basePattern(hand: readonly Tile[], melds: readonly Meld[], rules: RuleS
     const dragon = counts.some((n) => n === 4);
     if (flush) candidates.push(dragon ? 'qingLongQiDui' : 'qingQiDui');
     candidates.push(dragon ? 'longQiDui' : 'qiDui');
+    if (rules.enabledPatterns.yaoJiu && all.every((t) => [2, 5, 8].includes(rankOf(t)))) candidates.push('jiangQiDui');
   }
   if (isStandardShape(counts)) {
     candidates.push('pingHu');
@@ -96,6 +111,10 @@ function basePattern(hand: readonly Tile[], melds: readonly Meld[], rules: RuleS
         candidates.push('jiangDui');
       }
     }
+    // 带幺九: every meld and every concealed group holds a 1 or a 9.
+    if (rules.enabledPatterns.yaoJiu && melds.every((m) => isTerminal(m.tile)) && isStandardShapeWhere(counts, hasTerminal)) {
+      candidates.push(flush ? 'qingYaoJiu' : 'daiYaoJiu');
+    }
   }
   if (candidates.length === 0) throw new Error('Not a winning hand');
   return candidates.reduce((best, p) => (BASE_FAN[p] > BASE_FAN[best] ? p : best));
@@ -106,13 +125,28 @@ export function countRoots(hand: readonly Tile[], melds: readonly Meld[]): numbe
   return toCounts(allTilesOf(hand, melds)).filter((n) => n === 4).length;
 }
 
-/** Scores a winning hand. `hand` is the concealed hand including the winning tile. */
+/** 夹心五: the winning 5 can sit between a 4 and a 6 of its suit in a standard reading of the hand. */
+function winsInTheMiddleFive(hand: readonly Tile[], tile: Tile): boolean {
+  if (rankOf(tile) !== 5) return false;
+  const counts = toCounts(hand);
+  if (!counts[tile - 1] || !counts[tile] || !counts[tile + 1]) return false;
+  counts[tile - 1]--;
+  counts[tile]--;
+  counts[tile + 1]--;
+  return isStandardShape(counts);
+}
+
+/**
+ * Scores a winning hand. `hand` is the concealed hand including the winning tile, which is
+ * `winningTile` when known (needed for 夹心五).
+ */
 export function scoreWin(
   hand: readonly Tile[],
   melds: readonly Meld[],
   ctx: WinContext,
   rules: RuleSet,
   baseScore: number,
+  winningTile?: Tile,
 ): FanResult {
   const base = basePattern(hand, melds, rules);
   const patterns: Pattern[] = [base];
@@ -125,6 +159,11 @@ export function scoreWin(
   fan += roots;
 
   const p = rules.enabledPatterns;
+  const sevenPairs = SEVEN_PAIRS.includes(base);
+  // 门清: nothing claimed from others (concealed kongs are fine). Seven pairs are concealed by nature, so it doesn't add.
+  if (p.menQing && !sevenPairs && melds.every((m) => m.type === 'concealedKong')) (fan++, patterns.push('menQing'));
+  if (p.zhongZhang && allTilesOf(hand, melds).every((t) => !isTerminal(t))) (fan++, patterns.push('zhongZhang'));
+  if (p.jiaXinWu && !sevenPairs && winningTile !== undefined && winsInTheMiddleFive(hand, winningTile)) (fan++, patterns.push('jiaXinWu'));
   if (ctx.gangShangHua) (fan++, patterns.push('gangShangHua'));
   if (ctx.gangShangPao && p.gangShangPao) (fan++, patterns.push('gangShangPao'));
   if (ctx.qiangGang && p.qiangGang) (fan++, patterns.push('qiangGang'));
