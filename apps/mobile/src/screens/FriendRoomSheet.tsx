@@ -32,9 +32,9 @@ export function FriendRoomEntrySheet({ maxHands, actions, onClose }: { maxHands:
         <Btn label="+" onPress={() => setHands((h) => Math.min(maxHands, h + 1))} />
         <Btn label={T.friend.create} primary onPress={() => actions.create(hands, xueliu)} />
       </View>
-      <View style={formStyles.row}>
+      <View style={formStyles.switchRow}>
         <Switch value={xueliu} onValueChange={setXueliu} />
-        <Text style={formStyles.label}>{T.rules.xueliu}</Text>
+        <Text style={[formStyles.label, formStyles.switchLabel]}>{T.rules.xueliu}</Text>
       </View>
       <Text style={styles.section}>{T.friend.joinTitle}</Text>
       <View style={formStyles.row}>

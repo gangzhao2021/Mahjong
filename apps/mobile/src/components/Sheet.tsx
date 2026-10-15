@@ -31,6 +31,9 @@ export const formStyles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   label: { color: '#37474f', fontSize: 14, fontWeight: '600' },
+  /** A switch with its label: long labels wrap beside the switch instead of dropping under it. */
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  switchLabel: { flexShrink: 1 },
   hint: { color: '#78909c', fontSize: 12 },
   error: { color: '#c62828', fontSize: 13 },
 });

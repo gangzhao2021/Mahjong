@@ -356,9 +356,9 @@ function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerIn
 
 function RuleSwitch({ label, value, onChange }: { label: string; value: boolean; onChange(): void }) {
   return (
-    <View style={formStyles.row}>
+    <View style={formStyles.switchRow}>
       <Switch value={value} onValueChange={onChange} />
-      <Text style={formStyles.label}>{label}</Text>
+      <Text style={[formStyles.label, formStyles.switchLabel]}>{label}</Text>
     </View>
   );
 }
