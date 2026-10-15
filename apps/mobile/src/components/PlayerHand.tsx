@@ -5,7 +5,8 @@
  */
 import { suitOf, type Suit, type Tile as TileKind } from '@mahjong/engine';
 import { useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import { StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
+import { T } from '../strings';
 import { Tile } from './Tile';
 
 export interface HandTile {
@@ -32,6 +33,8 @@ interface Props {
   kongable?: TileKind[];
   /** The three tiles just received in the swap: marked with a blue bar (one mark per received copy). */
   received?: TileKind[];
+  /** Tiles whose discard leaves the hand ready: tagged 听 above. */
+  readyAfter?: TileKind[];
 }
 
 const DOUBLE_TAP_MS = 320;
@@ -53,7 +56,7 @@ export function arrangeHand(hand: TileKind[], drawn: TileKind | null, voidSuit: 
   return { main: tiles.map((tile, i) => ({ key: `h${i}-${tile}`, tile })), drawn: drawnItem };
 }
 
-export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, selected, onSelect, onDiscard, onHover, magnify = false, kongable = [], received = [] }: Props) {
+export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, selected, onSelect, onDiscard, onHover, magnify = false, kongable = [], received = [], readyAfter = [] }: Props) {
   const arranged = useMemo(() => arrangeHand(hand, drawn, voidSuit), [hand, drawn, voidSuit]);
   const items = arranged.drawn ? [...arranged.main, arranged.drawn] : arranged.main;
   // Mark exactly as many copies as were received, so a tile already held twice shows one mark, not three.
@@ -80,6 +83,7 @@ export function PlayerHand({ hand, drawn, voidSuit, tileWidth, discardable, sele
           magnify={magnify}
           kongable={kongable.includes(item.tile)}
           received={receivedKeys.has(item.key)}
+          ready={readyAfter.includes(item.tile)}
         />
       ))}
     </View>
@@ -99,12 +103,13 @@ interface TileViewProps {
   magnify: boolean;
   kongable: boolean;
   received: boolean;
+  ready: boolean;
 }
 
 /** How much bigger the magnified tile is than the tile under the finger. */
 const MAGNIFY = 1.8;
 
-function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect, onDiscard, onHover, magnify, kongable, received }: TileViewProps) {
+function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect, onDiscard, onHover, magnify, kongable, received, ready }: TileViewProps) {
   const lastTap = useRef(0);
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -166,6 +171,11 @@ function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect
     >
       <Tile tile={item.tile} width={width} dimmed={dimmed} highlighted={selected} />
       {(kongable || received) && <View pointerEvents="none" style={[styles.mark, kongable ? styles.kongMark : styles.receivedMark, { top: -Math.max(5, width * 0.14) }]} />}
+      {ready && (
+        <View pointerEvents="none" style={[styles.readyWrap, { top: -Math.max(5, width * 0.14) - 16 }]}>
+          <Text style={styles.readyMark}>{T.readyMark}</Text>
+        </View>
+      )}
       {magnify && pressed && (
         <View pointerEvents="none" style={[styles.magnifier, { bottom: width * 1.6, left: (width - width * MAGNIFY) / 2 }]}>
           <Tile tile={item.tile} width={Math.round(width * MAGNIFY)} highlighted={selected} />
@@ -184,5 +194,7 @@ const styles = StyleSheet.create({
   // Same purple as the 杠 claim button.
   kongMark: { backgroundColor: '#9b6ae0' },
   receivedMark: { backgroundColor: '#4fc3f7' },
+  readyWrap: { position: 'absolute', left: -6, right: -6, alignItems: 'center' },
+  readyMark: { fontSize: 11, fontWeight: '900', color: '#ffe082', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 2 },
   magnifier: { position: 'absolute', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 8 },
 });

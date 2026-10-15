@@ -21,6 +21,7 @@ export function SettingsSheet({ onClose }: { onClose(): void }) {
   return (
     <Sheet title={T.settings.title} onClose={onClose} width={440}>
       {toggle(T.settings.fastPace, settings.fastPace, (v) => updateSettings({ fastPace: v }), T.settings.fastPaceHint)}
+      {toggle(T.settings.markReady, settings.markReady, (v) => updateSettings({ markReady: v }))}
       {toggle(T.settings.voice, settings.voice, (v) => updateSettings({ voice: v }))}
       {toggle(T.settings.announceTiles, settings.announceTiles, (v) => updateSettings({ announceTiles: v }), T.settings.announceTilesHint)}
       {toggle(T.settings.aiVoice, settings.aiVoice, (v) => updateSettings({ aiVoice: v }), T.settings.aiVoiceHint)}

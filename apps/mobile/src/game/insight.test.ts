@@ -1,6 +1,6 @@
 import { customHand, parseTiles, viewFor } from '@mahjong/engine';
 import { describe, expect, it } from 'vitest';
-import { discardOutcome, handWarning, unseenCounts, waitsOf } from './insight';
+import { discardOutcome, handWarning, readyDiscards, unseenCounts, waitsOf } from './insight';
 
 // Seat 0 holds 123m 456m 789m 11s 23s + drawn 9p (void dots): discarding 9p leaves 1s-4s waits.
 const state = customHand({
@@ -61,5 +61,19 @@ describe('hand warnings', () => {
     expect(handWarning(viewFor(at('123m456m789m11s29s', LATE), 0))).toBe('daJiao');
     expect(handWarning(viewFor(at('123m456m789m11s23s', LATE), 0))).toBeNull(); // ready
     expect(handWarning(viewFor(at('123m456m789m11s2s9p', EARLY), 0))).toBeNull(); // still early
+  });
+});
+
+describe('ready discards (听 marks)', () => {
+  it('lists the discards that leave the hand ready, only on my turn', () => {
+    expect(readyDiscards(view)).toEqual([t('9p')]);
+    expect(readyDiscards(viewFor(state, 1))).toEqual([]);
+  });
+
+  it('can offer several', () => {
+    // 123m 456m 789m 11s 23s + drawn 5s: throwing 5s waits on 1s/4s, 2s on 4s (kanchan), 1s on 5s (single wait).
+    const s = customHand({ hands: ['123m456m789m11s23s5s', '1112223334445m', '5556667778889s', '1111p2223334p'], voids: [2, 1, 1, 0], wall: '6s7s8s', turn: 0, drawn: '5s' });
+    const ready = readyDiscards(viewFor(s, 0));
+    expect(ready).toEqual([t('1s'), t('2s'), t('5s')]);
   });
 });
