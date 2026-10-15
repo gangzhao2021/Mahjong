@@ -112,6 +112,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const [autoOpen, setAutoOpen] = useState(false);
   // Portrait keeps 托管 and chat on the top bar; the rest drop down from ⋯.
   const [moreOpen, setMoreOpen] = useState(false);
+  // Small landscape phones (e.g. 568 wide) can't fit six menu buttons beside the opposite seat either.
+  const compactMenu = portrait || width < COMPACT_MENU_WIDTH;
   const auto = useAutoSettings();
   useVoiceCallouts(game.events, table.seats, view.seat, { callouts: settings.voice, tiles: settings.announceTiles });
   useAiVoice(game.chat, table.seats, settings.aiVoice);
@@ -300,10 +302,10 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       {/* Top row: menu, opposite player, hand info */}
       <View style={[styles.topRow, portrait && styles.topRowPortrait]}>
         <View style={styles.menu}>
-          {!portrait && leaveButton()}
+          {!compactMenu && leaveButton()}
           <Btn label={T.autoPlay} primary={table.autoPlay} onPress={() => game.setAutoPlay(!table.autoPlay)} />
           <Btn label={`💬 ${T.chat}${unreadChat ? ` · ${unreadChat}` : ''}`} primary={unreadChat > 0} onPress={() => showChat(true)} />
-          {portrait ? <Btn label="⋯" primary={moreOpen} onPress={() => setMoreOpen(!moreOpen)} /> : menuExtras()}
+          {compactMenu ? <Btn label="⋯" primary={moreOpen} onPress={() => setMoreOpen(!moreOpen)} /> : menuExtras()}
         </View>
         {!portrait && (
           <View style={styles.topSeat} onLayout={(e) => setTopSeatWidth(e.nativeEvent.layout.width)}>
@@ -642,6 +644,8 @@ function portraitPondTile({ width, height }: { width: number; height: number }, 
   const tall = (height - 16 - 8 * margin - POND_LINE_PORTRAIT * 2 * margin) / (4 * TILE_RATIO + POND_LINE_PORTRAIT);
   return Math.max(min, Math.min(34, Math.floor(Math.min(across, besideCompass, tall))));
 }
+/** Narrower than this, landscape folds 静音 / 记牌 / 自动 / 离开 into the ⋯ menu like portrait. */
+const COMPACT_MENU_WIDTH = 760;
 /** Room the opposite player's card takes beside their face-down row (landscape). */
 const TOP_CARD_ROOM = 200;
 /** Face-down tiles narrower than this read as dots: leave the row out instead. */
