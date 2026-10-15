@@ -7,6 +7,7 @@ import type { GameEvent } from '@mahjong/engine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { useEffect, useRef, useState } from 'react';
+import { winSound } from './winSound';
 
 // Frequent sounds come in variants, picked at random so repeated hits do not sound machine-made.
 const SOURCES = {
@@ -18,6 +19,10 @@ const SOURCES = {
   kongRain: [require('../../assets/sounds/kong_rain.wav')],
   zimo: [require('../../assets/sounds/zimo.wav')],
   hu: [require('../../assets/sounds/hu.wav')],
+  // Someone else wins: you dealt in, they self-drew (you pay too), or it's between other players.
+  dealIn: [require('../../assets/sounds/deal_in.wav')],
+  otherZimo: [require('../../assets/sounds/other_zimo.wav')],
+  otherHu: [require('../../assets/sounds/other_hu.wav')],
   tap: [require('../../assets/sounds/tap.wav')],
   chat: [require('../../assets/sounds/chat.wav')],
   // Cues (see cues.ts) and the moments between hands.
@@ -113,7 +118,7 @@ export function useTableSounds(events: { id: number; event: GameEvent }[], chat:
       else if (event.type === 'pong') playSfx('pong');
       else if (event.type === 'kong') playSfx(event.kongType === 'concealedKong' ? 'kongRain' : 'kongWind');
       else if (event.type === 'win') {
-        playSfx(event.win.selfDraw ? 'zimo' : 'hu');
+        playSfx(winSound(event.win, mySeat));
         lastWinAt.current = Date.now();
       }
       else if (event.type === 'swapDone') playSfx('swap', 0.8);
