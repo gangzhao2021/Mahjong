@@ -9,7 +9,7 @@ import { Melds } from '../components/TableParts';
 import { Tile } from '../components/Tile';
 import { reviewHand, type ReviewNote } from '../game/review';
 import { api } from '../net/api';
-import { getLocale, RANK_NAMES, SUIT_NAMES, T } from '../strings';
+import { formatDateTime, getLocale, RANK_NAMES, SUIT_NAMES, T } from '../strings';
 
 export function HistoryScreen({ token, onClose }: { token: string; onClose(): void }) {
   const [stats, setStats] = useState<PlayerStats | null>(null);
@@ -77,7 +77,7 @@ export function HistoryScreen({ token, onClose }: { token: string; onClose(): vo
             const delta = h.deltas[h.mySeat];
             return (
               <Pressable key={`${h.gameId}-${h.handIndex}`} onPress={() => open(h)} style={({ pressed }) => [styles.row, pressed && styles.pressed]} accessibilityRole="button">
-                <Text style={styles.when}>{new Date(h.endedAt).toLocaleString()}</Text>
+                <Text style={styles.when}>{formatDateTime(h.endedAt)}</Text>
                 <Text style={styles.hand}>{T.record.handOf(h.handIndex)}</Text>
                 <Text style={styles.outcome}>{h.myWin ? T.record.won(h.myWin.fan, h.myWin.selfDraw) : h.reason === 'wallExhausted' ? T.wallExhausted : ''}</Text>
                 <Text style={[styles.delta, delta > 0 ? styles.plus : delta < 0 ? styles.minus : null]}>{delta > 0 ? `+${delta}` : delta}</Text>

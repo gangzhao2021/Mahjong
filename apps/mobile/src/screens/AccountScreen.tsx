@@ -9,7 +9,7 @@ import { updateSoundSettings, useSoundSettings } from '../audio/sound';
 import { BanterPicker } from '../components/Chat';
 import { formStyles, Sheet } from '../components/Sheet';
 import { api, ApiError, type LedgerEntry } from '../net/api';
-import { T } from '../strings';
+import { formatDateTime, T } from '../strings';
 import { credentialsFor, errorText, PhoneLogin } from './LoginScreen';
 
 interface Props {
@@ -141,7 +141,7 @@ export function AccountScreen({ info, token, account, onAccount, onBanter, onLog
               {e.amount.toLocaleString()}
             </Text>
             <Text style={styles.ledgerBalance}>{e.balanceAfter.toLocaleString()}</Text>
-            <Text style={styles.ledgerTime}>{new Date(e.createdAt).toLocaleString()}</Text>
+            <Text style={styles.ledgerTime}>{formatDateTime(e.createdAt)}</Text>
           </View>
         ))}
       </View>
