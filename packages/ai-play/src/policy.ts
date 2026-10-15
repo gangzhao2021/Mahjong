@@ -125,6 +125,9 @@ export interface DiscardScore {
 }
 
 /** Every candidate discard with the shanten and acceptance (进张) it leaves, best first for `skill`. */
+/** With this many tiles or fewer left, a dead ready hand is worth keeping for 查大叫. */
+const DEAD_WAIT_WALL = 8;
+
 export function rankDiscards(view: HandView, candidates: Tile[], skill: SkillLevel): DiscardScore[] {
   const me = self(view);
   const seen = visibleCounts(view);
@@ -142,6 +145,9 @@ export function rankDiscards(view: HandView, candidates: Tile[], skill: SkillLev
     const sh = shanten(after, me.meldCount);
     const acc = acceptance(after, me.meldCount, me.voidSuit, seen);
     let score = -sh * 100 + acc;
+    // A ready hand whose winning tiles are all gone can't win: while the wall is long, score it like a
+    // hand one step away so a live 1-away shape beats it. Near the end it still guards against 查大叫.
+    if (sh === 0 && acc === 0 && skill !== 'beginner' && wallLeft > DEAD_WAIT_WALL) score = -100;
 
     if (skill !== 'beginner') {
       const late = wallLeft < 30 ? 1 : 0.3;

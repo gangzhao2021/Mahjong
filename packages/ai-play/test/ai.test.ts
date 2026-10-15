@@ -2,6 +2,7 @@ import {
   apply,
   createGame,
   createRng,
+  customHand,
   isGameOver,
   legalActions,
   parseTiles,
@@ -101,5 +102,38 @@ describe('timeout fallback', () => {
     expect(h.result!.wins).toHaveLength(0);
     expect(steps).toBeGreaterThan(50);
     game = recordHand(game, h.result!);
+  });
+});
+
+describe('dead waits', () => {
+  // Seat 0 drew 9s holding 123m 456m 789m 11s 46s: throwing 9s is ready on 5s alone (kanchan).
+  const setup = (wall: string, deadFive: boolean) => {
+    const s = customHand({
+      hands: ['123m456m789m11s46s9s', '1112223334445m', '1112223334446p', '5556667778889p'],
+      voids: [2, 2, 1, 1],
+      wall,
+      turn: 0,
+      drawn: '9s',
+    });
+    // All four 5s already on the table: the wait is dead.
+    if (deadFive) for (const seat of [1, 1, 2, 3] as const) s.players[seat].discards.push({ tile: parseTiles('5s')[0], claimed: false });
+    return viewFor(s, 0);
+  };
+  const LONG = '7s7s8s8s2s2s3s3s6s9s';
+  const SHORT = '7s8s2s';
+  const nine = parseTiles('9s')[0];
+
+  it('keeps a live wait', () => {
+    expect(chooseAction(setup(LONG, false), 'expert', () => 0.5)).toMatchObject({ type: 'discard', tile: nine });
+  });
+
+  it('gives up a dead wait while the wall is long', () => {
+    for (const skill of ['expert', 'intermediate'] as SkillLevel[]) {
+      expect(chooseAction(setup(LONG, true), skill, () => 0.5)).not.toMatchObject({ type: 'discard', tile: nine });
+    }
+  });
+
+  it('keeps even a dead wait near the end, against 查大叫', () => {
+    expect(chooseAction(setup(SHORT, true), 'expert', () => 0.5)).toMatchObject({ type: 'discard', tile: nine });
   });
 });
