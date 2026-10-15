@@ -381,6 +381,10 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
               claimCountdown={table.timer?.kind === 'claim' && !table.autoPlay ? myTurnTimer : null}
             />
           )}
+          {/* After my win (血战) the others play on; this bar is free, so the shortcut to the results sits here, off the ponds */}
+          {iWon && view.phase === 'play' && !table.fastForward && !friendTable && !view.ruleSet.xueliu && (
+            <Btn label={T.skipToResults} primary onPress={game.skipToResults} />
+          )}
         </View>
         </View>
         <View style={[styles.myRow, portrait && styles.myRowPortrait]}>
@@ -435,18 +439,13 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </PopIn>
       ))}
 
-      {table.autoPlay && (
+      {/* Once I've won at 血战 the hand goes on without me, so 托管 no longer matters (and the skip button takes that spot) */}
+      {table.autoPlay && !(iWon && !view.ruleSet.xueliu) && (
         // Sits where the action buttons would be (they are hidden while auto-playing), clear of the discards.
         // In portrait my seat card sits above the hand, so the banner goes above that too.
         <Pressable style={[styles.banner, { bottom: Math.round(handTile * 1.4) + (portrait ? 72 : 14) }]} onPress={() => game.setAutoPlay(false)}>
           <Text style={styles.bannerText}>{T.autoPlayOn}</Text>
         </Pressable>
-      )}
-
-      {iWon && view.phase === 'play' && !table.fastForward && !friendTable && !view.ruleSet.xueliu && (
-        <View style={styles.skip}>
-          <Btn label={T.skipToResults} primary onPress={game.skipToResults} />
-        </View>
       )}
 
       {view.phase === 'ended' && view.result && (
@@ -776,7 +775,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   bannerText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  skip: { position: 'absolute', alignSelf: 'center', bottom: '30%' },
   chatLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   chatBanter: {
     position: 'absolute',
