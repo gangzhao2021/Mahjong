@@ -393,4 +393,27 @@ RATE = 44100;
   writeWav('settle_lose', b, 0.5);
 }
 
+// Somebody else wins — told apart by what it means for you.
+// You dealt in (点炮): your tile is snatched with a slap, then a falling "uh-oh".
+{
+  const b = buffer(1);
+  hit(b, { start: 0.005, gain: 1, pitch: 1050, thump: 0.9 });
+  plucks(b, [[0.1, 330, 0.32, 0.5], [0.26, 247, 0.32, 0.7], [0.27, 123, 0.25, 0.7]]);
+  writeWav('deal_in', b, 0.7);
+}
+// Another player self-draws (自摸) and you pay too: the hand pushed down, a low muted chord.
+{
+  const b = buffer(0.9);
+  hit(b, { start: 0.005, gain: 0.8, pitch: 1050, thump: 0.9 });
+  hit(b, { start: 0.03, gain: 0.9, pitch: 1000, thump: 1 });
+  plucks(b, [[0.1, 147, 0.3, 0.6], [0.11, 220, 0.25, 0.6], [0.12, 294, 0.22, 0.6]]);
+  writeWav('other_zimo', b, 0.55);
+}
+// Another player wins off someone else's discard: none of your business — one knock, one soft note.
+{
+  const b = buffer(0.7);
+  hit(b, { start: 0.005, gain: 0.9, pitch: 1050, thump: 0.8 });
+  plucks(b, [[0.08, 196, 0.25, 0.5]]);
+  writeWav('other_hu', b, 0.45);
+}
 console.log(`Sounds written to ${OUT}`);
