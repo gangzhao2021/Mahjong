@@ -9,7 +9,16 @@ interface Table {
   baseScore: number;
   minCoins: number;
   multiplier: number;
+  /** Relative odds of each AI strength; absent = the server-wide mix. */
+  aiSkill?: Record<AiLevel, number>;
 }
+
+type AiLevel = 'beginner' | 'intermediate' | 'expert';
+const AI_LEVELS: [AiLevel, string][] = [
+  ['beginner', '新手'],
+  ['intermediate', '中等'],
+  ['expert', '高手'],
+];
 
 interface Economy {
   startingCoins: number;
@@ -33,6 +42,11 @@ export function Economy() {
   if (!form) return null;
 
   const setTable = (i: number, patch: Partial<Table>) => setForm({ ...form, tables: form.tables.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
+  // All zero (or blank) means "use the server-wide mix", which the server stores as no aiSkill at all.
+  const setSkill = (i: number, level: AiLevel, value: number) => {
+    const next = { beginner: 0, intermediate: 0, expert: 0, ...form.tables[i].aiSkill, [level]: value };
+    setTable(i, { aiSkill: next.beginner + next.intermediate + next.expert > 0 ? next : undefined });
+  };
 
   return (
     <>
@@ -77,6 +91,7 @@ export function Economy() {
               <th className="num">底分</th>
               <th className="num">准入金币</th>
               <th className="num">结算倍率</th>
+              <th>AI 强弱比例（新手 / 中等 / 高手）</th>
               <th />
             </tr>
           </thead>
@@ -99,6 +114,18 @@ export function Economy() {
                   <input value={t.multiplier} onChange={(e) => setTable(i, { multiplier: Number(e.target.value) || 0 })} style={{ width: 60 }} aria-label="倍率" />
                 </td>
                 <td>
+                  {AI_LEVELS.map(([level, label]) => (
+                    <input
+                      key={level}
+                      value={t.aiSkill?.[level] ?? ''}
+                      placeholder="默认"
+                      onChange={(e) => setSkill(i, level, num(e.target.value))}
+                      style={{ width: 48, marginRight: 4 }}
+                      aria-label={`${label} AI 比例`}
+                    />
+                  ))}
+                </td>
+                <td>
                   <button onClick={() => setForm({ ...form, tables: form.tables.filter((_, j) => j !== i) })}>删除</button>
                 </td>
               </tr>
@@ -108,7 +135,7 @@ export function Economy() {
         <button style={{ marginTop: 8 }} onClick={() => setForm({ ...form, tables: [...form.tables, { id: 'new', name: '新场次', baseScore: 10, minCoins: 1000, multiplier: 1 }] })}>
           添加场次
         </button>
-        <p className="muted">必须保留一个底分 0、准入 0 的练习场（不结算金币）。</p>
+        <p className="muted">必须保留一个底分 0、准入 0 的练习场（不结算金币）。AI 比例是相对权重（如 0 / 0 / 100 = 全是高手）；留空 = 默认比例 20 / 50 / 30。练习场和底分 0 的私人房里，玩家可以自己选 AI 难度。</p>
       </div>
 
       <div className="card">

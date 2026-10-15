@@ -1,5 +1,5 @@
 /** Lobby: coins, daily reward, table selection and private rooms (PRD §10–§13, §24). */
-import type { AccountSummary, FriendRoomInfo, GameOptions, PrivateRules, ServerInfo } from '@mahjong/protocol';
+import { AI_LEVELS, type AccountSummary, type AiLevel, type FriendRoomInfo, type GameOptions, type PrivateRules, type ServerInfo, type TableInfo } from '@mahjong/protocol';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
@@ -58,7 +58,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   // Quick start: new players go to practice; others to the highest table they can comfortably afford (10× the entry).
   // Quick start goes back to the table played last, or the closest cheaper one the player can still afford.
   // It never moves anyone up to higher stakes on its own; new players start at practice.
-  const { lastTableId, bindReminderSnoozedUntil } = useSettings();
+  const { lastTableId, bindReminderSnoozedUntil, practiceAiLevel } = useSettings();
   // Guests who keep playing get a quiet reminder to link an account; "not now" hides it for a week.
   const [now] = useState(() => Date.now());
   const remindBind = account.isGuest && account.gamesPlayed >= 2 && bindReminderSnoozedUntil < now;
@@ -67,7 +67,14 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   const quick = tutorialDone >= 0 && tutorialDone < 2 && !lastTableId ? info.tables[0] : (affordable[affordable.length - 1] ?? info.tables[0]);
   const play = (tableId: string) => {
     updateSettings({ lastTableId: tableId });
-    onStart({ tableId });
+    // The practice table plays at the strength the player picked on its card; coin tables set their own.
+    const free = info.tables.find((t) => t.id === tableId)?.multiplier === 0;
+    onStart(free && practiceAiLevel ? { tableId, aiLevel: practiceAiLevel } : { tableId });
+  };
+  // Tapping the practice card's opponent line cycles 混合 → 新手 → 中等 → 高手.
+  const cycleAiLevel = () => {
+    const order: (AiLevel | null)[] = [null, ...AI_LEVELS];
+    updateSettings({ practiceAiLevel: order[(order.indexOf(practiceAiLevel) + 1) % order.length] });
   };
   const fanTile = Math.round(Math.min(height * 0.15, 72));
   // Cards size to the screen but stop growing on big monitors, so they never turn into empty slabs.
@@ -145,6 +152,17 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
                       ? T.noCoins
                       : `${T.baseScoreN(t.baseScore)} · ${T.minCoinsN(t.minCoins)}`}
                 </Text>
+                {t.multiplier === 0 ? (
+                  <Pressable accessibilityRole="button" onPress={cycleAiLevel} hitSlop={6}>
+                    <Text style={styles.cardAiPick} numberOfLines={1}>
+                      {T.aiPick(practiceAiLevel ? T.aiLevels[practiceAiLevel] : T.aiMixed)}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Text style={styles.cardAi} numberOfLines={1}>
+                    {T.aiMix[aiMixKind(t.aiSkill)]}
+                  </Text>
+                )}
               </View>
             </Pressable>
           );
@@ -263,11 +281,22 @@ const DEFAULT_RULES: PrivateRules = {
   xueliu: false,
 };
 
+/** How a table's AI mix plays, in one word for its card (the server-wide mix is 20 / 50 / 30). */
+function aiMixKind(skill: TableInfo['aiSkill']): string {
+  const w = skill ?? { beginner: 20, intermediate: 50, expert: 30 };
+  const total = w.beginner + w.intermediate + w.expert || 1;
+  if (w.expert / total >= 0.7) return 'expert';
+  if (w.expert / total >= 0.3) return 'strong';
+  if (w.beginner / total >= 0.35) return 'mostlyEasy';
+  return 'medium';
+}
+
 function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerInfo; balance: number; onClose(): void; onCreate(o: GameOptions): void }) {
   const maxBase = Math.max(0, Math.min(Math.floor(balance * info.privateRoom.maxBaseRatio), info.privateRoom.maxBase));
   const [base, setBase] = useState(String(Math.min(10, maxBase)));
   const [hands, setHands] = useState(4);
   const [rules, setRules] = useState<PrivateRules>(DEFAULT_RULES);
+  const [aiLevel, setAiLevel] = useState<AiLevel | null>(null);
   const baseNum = Number(base);
   const valid = Number.isInteger(baseNum) && baseNum >= 0 && baseNum <= maxBase;
   const toggle = (key: 'huanSanZhang' | 'callTransfer' | 'xueliu') => setRules((r) => ({ ...r, [key]: !r[key] }));
@@ -299,7 +328,21 @@ function PrivateRoomSheet({ info, balance, onClose, onCreate }: { info: ServerIn
         value={rules.selfDrawBonus === 'fan'}
         onChange={() => setRules((r) => ({ ...r, selfDrawBonus: r.selfDrawBonus === 'fan' ? 'base' : 'fan' }))}
       />
-      <Btn label={T.privateCreate} primary disabled={!valid} onPress={() => onCreate({ private: { baseScore: baseNum, handsPerGame: hands, rules } })} />
+      {/* With no coins at stake the player picks how strong the AI is */}
+      {baseNum === 0 && (
+        <View style={formStyles.row}>
+          <Text style={formStyles.label}>{T.aiDifficulty}</Text>
+          {([null, ...AI_LEVELS] as (AiLevel | null)[]).map((level) => (
+            <Btn key={level ?? 'mixed'} label={level ? T.aiLevels[level] : T.aiMixed} primary={aiLevel === level} onPress={() => setAiLevel(level)} />
+          ))}
+        </View>
+      )}
+      <Btn
+        label={T.privateCreate}
+        primary
+        disabled={!valid}
+        onPress={() => onCreate({ private: { baseScore: baseNum, handsPerGame: hands, rules }, ...(baseNum === 0 && aiLevel ? { aiLevel } : {}) })}
+      />
     </Sheet>
   );
 }
@@ -404,6 +447,8 @@ const styles = StyleSheet.create({
   cardName: { fontSize: 17, fontWeight: '900', color: '#fff8e1' },
   badge: { position: 'absolute', top: -8, right: 10, fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
   cardInfo: { fontSize: 12, color: '#a5d6a7', fontWeight: '700' },
+  cardAi: { fontSize: 11, color: '#c8e6c9', marginTop: 2 },
+  cardAiPick: { fontSize: 11, color: '#ffe082', fontWeight: '800', marginTop: 2 },
   roomRow: { flexDirection: 'row', gap: 10 },
   private: {
     flex: 1,

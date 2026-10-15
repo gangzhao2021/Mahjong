@@ -1,6 +1,6 @@
 /** Small presentational pieces of the table: melds, ponds, seat cards, countdown. */
 import type { DiscardRecord, Meld, Suit, WinRecord } from '@mahjong/engine';
-import type { SeatInfo, TimerInfo } from '@mahjong/protocol';
+import type { AiLevel, SeatInfo, TimerInfo } from '@mahjong/protocol';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SUIT_NAMES, T } from '../strings';
@@ -88,6 +88,7 @@ export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount 
           {info.name}
         </Text>
         <View style={styles.badgesCompact}>
+          {info.skill && <Text style={[styles.badge, skillStyle(info.skill)]}>{T.aiLevels[info.skill]}</Text>}
           {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
           {voidSuit !== null && !won && <Text style={[styles.badge, styles.voidBadge]}>{T.voidSuit(SUIT_NAMES[voidSuit])}</Text>}
         </View>
@@ -109,6 +110,7 @@ export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount 
             {info.name}
           </Text>
           {!info.isHuman && <Text style={[styles.badge, styles.aiBadge]}>{T.aiBadge}</Text>}
+          {info.skill && <Text style={[styles.badge, skillStyle(info.skill)]}>{T.aiLevels[info.skill]}</Text>}
           {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
           {/* After a win the win line below says it all; the void suit no longer matters */}
           {voidSuit !== null && !won && <Text style={[styles.badge, styles.voidBadge]}>{T.voidSuit(SUIT_NAMES[voidSuit])}</Text>}
@@ -143,6 +145,8 @@ export function useCountdown(timer: TimerInfo | null, receivedAt: number): numbe
   const elapsed = Math.max(0, now - receivedAt);
   return Math.max(0, Math.ceil((timer.remainingMs - elapsed) / 1000));
 }
+
+const skillStyle = (skill: AiLevel) => (skill === 'expert' ? styles.skillExpert : skill === 'intermediate' ? styles.skillIntermediate : styles.skillBeginner);
 
 const styles = StyleSheet.create({
   backsRow: { flexDirection: 'row', gap: 1 },
@@ -195,6 +199,10 @@ const styles = StyleSheet.create({
   // AI-generated characters are always labelled as AI (Appendix D.4).
   aiBadge: { backgroundColor: '#80deea', color: '#004d55' },
   personality: { color: '#b2dfdb', fontSize: 11 },
+  // How strong each AI plays at this table: green easy, grey medium, orange hard.
+  skillBeginner: { backgroundColor: '#c5e1a5', color: '#33691e' },
+  skillIntermediate: { backgroundColor: '#b0bec5', color: '#263238' },
+  skillExpert: { backgroundColor: '#ff8a65', color: '#4e1600' },
   voidBadge: { backgroundColor: '#eceff1', color: '#37474f' },
   score: { color: '#e0f2e9', fontSize: 12, fontVariant: ['tabular-nums'] },
   plus: { color: '#ffe082' },

@@ -173,6 +173,7 @@ export class Room {
         avatar: character.avatar,
         isHuman: false,
         personality: (en && personality.nameEn) || personality.name,
+        skill: spec.skill,
       };
       return new AiSeat(
         info,

@@ -10,6 +10,10 @@ export type { BanterLevel, QuickPhrase, StickerId };
 
 export const PROTOCOL_VERSION = 3;
 
+/** How strong an AI player is (PRD §4.2). */
+export type AiLevel = 'beginner' | 'intermediate' | 'expert';
+export const AI_LEVELS: readonly AiLevel[] = ['beginner', 'intermediate', 'expert'];
+
 export interface SeatInfo {
   /** Nobody sits here (a two- or three-player friends' table). */
   empty?: boolean;
@@ -20,6 +24,8 @@ export interface SeatInfo {
   isHuman: boolean;
   /** AI character's personality name, e.g. 毒舌 (PRD §5). */
   personality?: string;
+  /** AI players: how strong this one plays at this table. */
+  skill?: AiLevel;
 }
 
 /** One line at the table: AI speech, player chat, quick phrase or sticker. */
@@ -62,6 +68,8 @@ export interface TableInfo {
   minCoins: number;
   /** Coins per point; 0 = practice table without coin settlement. */
   multiplier: number;
+  /** Relative odds of each AI strength at this table; absent = the server-wide mix. */
+  aiSkill?: Record<AiLevel, number>;
 }
 
 /** Why the player may or may not start a game right now (China build, Appendix D). */
@@ -331,6 +339,8 @@ export interface GameOptions {
   tableId?: string;
   /** Private room (PRD §12–§13); free to create, base score capped by balance. */
   private?: { baseScore: number; handsPerGame: number; rules?: Partial<PrivateRules> };
+  /** Every AI at this strength. Only for tables without coins at stake (practice, private rooms). */
+  aiLevel?: AiLevel;
 }
 
 export type ClientMessage =

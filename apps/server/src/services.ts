@@ -4,8 +4,8 @@
  * account look like" and "may they start this game".
  */
 import { DEFAULT_RULESET, type RuleSet } from '@mahjong/engine';
-import type { AccountSummary, GameOptions, LoginMethod, PlayLimit, PrivateRules, ServerInfo, StakeInfo, StartRejection } from '@mahjong/protocol';
-import { PROTOCOL_VERSION } from '@mahjong/protocol';
+import type { AccountSummary, AiLevel, GameOptions, LoginMethod, PlayLimit, PrivateRules, ServerInfo, StakeInfo, StartRejection } from '@mahjong/protocol';
+import { AI_LEVELS, PROTOCOL_VERSION } from '@mahjong/protocol';
 import { randomBytes, randomInt } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -186,7 +186,12 @@ export interface GamePlan {
   /** The game must stop for this player at this time (minor window / guest trial end). */
   limitEndsAt: number | null;
   limitKind: PlayLimit['kind'] | null;
+  /** Relative odds of each AI strength; absent = the server-wide mix. */
+  aiSkill?: Record<AiLevel, number>;
 }
+
+/** Every AI at one strength. */
+const only = (level: AiLevel): Record<AiLevel, number> => ({ beginner: 0, intermediate: 0, expert: 0, [level]: 1 });
 
 export type StartCheck = { ok: true; plan: GamePlan } | { ok: false; reason: StartRejection; detail?: string };
 
@@ -207,6 +212,10 @@ export async function checkStart(s: Services, player: PlayerRow, options: GameOp
       limitKind = limit.kind;
     }
   }
+
+  // Choosing the AI's strength is for tables without coins at stake: at coin tables the table sets it.
+  const aiLevel = options?.aiLevel;
+  if (aiLevel !== undefined && !AI_LEVELS.includes(aiLevel)) return { ok: false, reason: 'invalidOptions', detail: 'aiLevel' };
 
   const balance = await s.wallet.balance(player.id);
   if (options?.private) {
@@ -229,6 +238,7 @@ export async function checkStart(s: Services, player: PlayerRow, options: GameOp
         multiplier: base === 0 ? 0 : 1,
         limitEndsAt,
         limitKind,
+        ...(aiLevel && base === 0 ? { aiSkill: only(aiLevel) } : {}),
       },
     };
   }
@@ -246,6 +256,7 @@ export async function checkStart(s: Services, player: PlayerRow, options: GameOp
       multiplier: table.baseScore === 0 ? 0 : table.multiplier,
       limitEndsAt,
       limitKind,
+      ...(aiLevel && table.baseScore === 0 ? { aiSkill: only(aiLevel) } : table.aiSkill ? { aiSkill: table.aiSkill } : {}),
     },
   };
 }

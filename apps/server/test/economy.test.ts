@@ -2,7 +2,7 @@ import type { ServerMessage } from '@mahjong/protocol';
 import { describe, expect, it } from 'vitest';
 import { ageOn, loadChinaConfig, minorWindowEnd, parseIdNumber } from '../src/china/compliance';
 import { openDb } from '../src/db/db';
-import { gameDay, loadEconomyConfig, type EconomyConfig } from '../src/economy/config';
+import { gameDay, loadEconomyConfig, validateEconomy, type EconomyConfig } from '../src/economy/config';
 import { Wallet } from '../src/economy/wallet';
 import { api, Client, FAST, gameOver, guestLogin, isTable, playAsBot, startServer, type TableMsg } from './helpers';
 
@@ -94,6 +94,43 @@ describe('starting games (PRD §11–§13)', () => {
     expect(t.table.view.ruleSet).toMatchObject({ maxFan: 6, handsPerGame: 2 });
     expect(t.table.stake).toMatchObject({ kind: 'private', baseScore: 200, multiplier: 1 });
     expect(t.table.stake.inviteCode).toMatch(/^\d{6}$/);
+  });
+});
+
+describe('AI strength by table', () => {
+  const skills = (t: TableMsg) => t.table.seats.filter((s) => !s.isHuman).map((s) => s.skill);
+
+  it('follows the table mix at coin tables, and the player choice only where no coins are at stake', async () => {
+    const base = loadEconomyConfig();
+    const economy: EconomyConfig = {
+      ...base,
+      tables: [...base.tables, { id: 'pros', name: '高手场', baseScore: 10, minCoins: 0, multiplier: 1, aiSkill: { beginner: 0, intermediate: 0, expert: 1 } }],
+    };
+    const server = await startServer(undefined, { economy });
+    const start = async (device: string, options: object) => {
+      const client = await Client.connect(server);
+      await client.hello(device);
+      client.send({ type: 'startGame', options });
+      return client;
+    };
+
+    const pros = await start('device-pros', { tableId: 'pros', aiLevel: 'beginner' });
+    expect(skills(await pros.next(isTable))).toEqual(['expert', 'expert', 'expert']); // a coin table ignores the choice
+
+    const practice = await start('device-easy', { tableId: 'practice', aiLevel: 'beginner' });
+    expect(skills(await practice.next(isTable))).toEqual(['beginner', 'beginner', 'beginner']);
+
+    const room = await start('device-room', { private: { baseScore: 0, handsPerGame: 1 }, aiLevel: 'intermediate' });
+    expect(skills(await room.next(isTable))).toEqual(['intermediate', 'intermediate', 'intermediate']);
+
+    const bad = await start('device-bad', { tableId: 'practice', aiLevel: 'godlike' });
+    expect(await bad.next(isRejected)).toMatchObject({ reason: 'invalidOptions', detail: 'aiLevel' });
+  });
+
+  it('rejects an aiSkill mix that is all zero', () => {
+    const base = loadEconomyConfig();
+    const tables = [...base.tables, { id: 'x', name: 'x', baseScore: 1, minCoins: 0, multiplier: 1, aiSkill: { beginner: 0, intermediate: 0, expert: 0 } }];
+    expect(validateEconomy({ ...base, tables }).join()).toMatch(/aiSkill/);
   });
 });
 
