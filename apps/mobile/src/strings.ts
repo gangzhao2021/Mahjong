@@ -474,8 +474,8 @@ const zh = {
     minorTimeLimit: '未成年人仅可在周五、周六、周日和法定节假日 20:00–21:00 游戏',
     guestTrialOver: '游客试玩时间已用完，请登录后继续',
   } as Record<string, string>,
-  minorLimit: (until: number | null) => (until ? `未成年人游戏时间至 ${new Date(until).toLocaleTimeString().slice(0, 5)}` : '未成年人仅可在周五、周六、周日和法定节假日 20:00–21:00 游戏'),
-  guestLimit: (until: number | null) => (until ? `游客试玩至 ${new Date(until).toLocaleTimeString().slice(0, 5)}` : '游客试玩时间已用完，请登录正式账号'),
+  minorLimit: (until: number | null) => (until ? `未成年人游戏时间至 ${formatTime(until)}` : '未成年人仅可在周五、周六、周日和法定节假日 20:00–21:00 游戏'),
+  guestLimit: (until: number | null) => (until ? `游客试玩至 ${formatTime(until)}` : '游客试玩时间已用完，请登录正式账号'),
   limitEnding: '游戏时间即将结束，到时将由系统托管打完本局',
   crashTitle: '出了点问题',
   crashText: '应用遇到了一个错误，已自动上报。点下面的按钮回到游戏。',
@@ -905,8 +905,8 @@ Tap to join: ${url}`,
     minorTimeLimit: 'Minors may only play 20:00–21:00 on Fridays, weekends and public holidays',
     guestTrialOver: 'Your guest trial is over; sign in to keep playing',
   },
-  minorLimit: (until: number | null) => (until ? `Minor play time until ${new Date(until).toLocaleTimeString().slice(0, 5)}` : 'Minors may only play 20:00–21:00 on Fridays, weekends and public holidays'),
-  guestLimit: (until: number | null) => (until ? `Guest trial until ${new Date(until).toLocaleTimeString().slice(0, 5)}` : 'Guest trial is over; please sign in'),
+  minorLimit: (until: number | null) => (until ? `Minor play time until ${formatTime(until)}` : 'Minors may only play 20:00–21:00 on Fridays, weekends and public holidays'),
+  guestLimit: (until: number | null) => (until ? `Guest trial until ${formatTime(until)}` : 'Guest trial is over; please sign in'),
   limitEnding: 'Play time is almost over; auto-play will finish the game',
   crashTitle: 'Something went wrong',
   crashText: 'The app hit an error and reported it automatically. Tap below to get back to the game.',
@@ -971,6 +971,27 @@ let current: Locale = 'zh';
 
 export function getLocale(): Locale {
   return current;
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Times and dates in the game's language rather than the device's (a Chinese UI on an English
+ * phone would otherwise show "10/15/2026, 9:57:10 AM"). Built by hand: same output on every engine.
+ */
+export function formatTime(ms: number | string): string {
+  const d = new Date(ms);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function formatDate(ms: number | string): string {
+  const d = new Date(ms);
+  return current === 'en' ? `${MONTHS_EN[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+export function formatDateTime(ms: number | string): string {
+  return `${formatDate(ms)} ${formatTime(ms)}`;
 }
 
 /** Switches every catalog in place; callers re-render (the app root remounts on change). */

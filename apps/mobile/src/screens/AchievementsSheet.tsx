@@ -5,7 +5,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { Btn } from '../components/ActionBar';
 import { Sheet } from '../components/Sheet';
 import { api } from '../net/api';
-import { T } from '../strings';
+import { formatDate, T } from '../strings';
 
 export function AchievementsSheet({ token, account, onAccount, onClose }: { token: string; account: AccountSummary; onAccount(a: AccountSummary): void; onClose(): void }) {
   const [status, setStatus] = useState<AchievementsStatus | null>(null);
@@ -54,7 +54,7 @@ export function AchievementsSheet({ token, account, onAccount, onClose }: { toke
                 <View style={styles.text}>
                   <Text style={styles.name}>{T.achievements.names[a.id]}</Text>
                   <Text style={styles.detail}>
-                    {earned ? new Date(a.unlockedAt!).toLocaleDateString() : T.achievements.locked} · 🪙 {a.reward}
+                    {earned ? formatDate(a.unlockedAt!) : T.achievements.locked} · 🪙 {a.reward}
                   </Text>
                 </View>
                 {earned && a.claimed ? (
