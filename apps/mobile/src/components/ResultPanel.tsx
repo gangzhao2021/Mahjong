@@ -2,10 +2,11 @@
 import { patternFan, verifyDeal, type HandResult, type Pattern, type Seat, type WinRecord } from '@mahjong/engine';
 import type { RankResult, TableSnapshot } from '@mahjong/protocol';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { PATTERN_NAMES, PAYMENT_NAMES, T } from '../strings';
 import { Btn } from './ActionBar';
 import { PopIn } from './PopIn';
+import { Melds } from './TableParts';
 import { Tile } from './Tile';
 
 interface Props {
@@ -27,6 +28,9 @@ interface Props {
 export function ResultPanel({ table, result, countdown, handCoins, gameCoins, rank, committedAt, onNextHand, onNewGame, onHome }: Props) {
   // In a friend room the next hand waits for everyone; show that this player is ready.
   const [ready, setReady] = useState(false);
+  // Winning hands as large as the panel allows: up to 18 tiles (four kongs) on a line or two.
+  const { width } = useWindowDimensions();
+  const handTile = Math.max(20, Math.min(34, Math.floor((Math.min(width - 24, PANEL_MAX_WIDTH) - 48) / 15.5)));
   const name = (seat: Seat) => table.seats[seat].name;
   // Who actually paid: on a self-draw only the players still in the hand (血战 winners who left don't).
   const payers = (w: WinRecord) => {
@@ -84,10 +88,14 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
               <Text style={styles.payLine}>
                 {fanSummary(w)} → {payers(w)}
               </Text>
+              {/* Pongs and kongs first, then the concealed hand with the winning tile lit */}
               <View style={styles.tiles}>
-                {w.hand.map((t, i) => (
-                  <Tile key={i} tile={t} width={20} highlighted={t === w.tile && i === w.hand.lastIndexOf(t)} />
-                ))}
+                <Melds melds={w.melds} tileWidth={handTile} />
+                <View style={styles.hand}>
+                  {w.hand.map((t, i) => (
+                    <Tile key={i} tile={t} width={handTile} highlighted={t === w.tile && i === w.hand.lastIndexOf(t)} />
+                  ))}
+                </View>
               </View>
             </View>
           ))}
@@ -180,6 +188,8 @@ function fanSummary(w: WinRecord): string {
   return raw > w.fan ? `${T.fanTimes(w.fan)} · ${T.fanCapped(w.fan)}` : T.fanTimes(w.fan);
 }
 
+const PANEL_MAX_WIDTH = 640;
+
 const styles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
@@ -197,7 +207,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     width: '100%',
-    maxWidth: 640,
+    maxWidth: PANEL_MAX_WIDTH,
     maxHeight: '100%',
     gap: 10,
   },
@@ -222,7 +232,8 @@ const styles = StyleSheet.create({
   patternRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   pattern: { color: '#bf360c', fontSize: 12, fontWeight: '700', backgroundColor: '#ffe0b2', borderRadius: 6, paddingHorizontal: 6, overflow: 'hidden' },
   payLine: { color: '#4e342e', fontSize: 13 },
-  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 6 },
+  hand: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
   details: { color: '#5d4037', fontSize: 13 },
   scores: { gap: 4, marginTop: 4 },
   scoreRow: { flexDirection: 'row', alignItems: 'center' },
