@@ -1,6 +1,7 @@
 /** Context buttons above the hand: swap, dingque, claims, self-draw, kong, discard. */
-import { suitOf, type Action, type HandView, type Suit, type Tile } from '@mahjong/engine';
+import { suitOf, swapGiver, type Action, type HandView, type Seat, type Suit, type Tile } from '@mahjong/engine';
 import type { DistributiveOmit } from '@mahjong/protocol';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { playSfx } from '../audio/sound';
 import { SUIT_NAMES, T, TILE_SUITS } from '../strings';
@@ -17,12 +18,35 @@ interface Props {
   onHint(): void;
   /** The AI's recommendation for the current claim, once asked for. */
   claimHint: Intent | null;
+  nameOf(seat: Seat): string;
 }
 
-export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claimHint }: Props) {
+/**
+ * Choices that pop up where another button just was (定缺 right after 确认换牌, a claim over 出牌)
+ * ignore taps for a moment, so a late tap meant for the old button can't choose for the player.
+ */
+const ARM_MS = 600;
+
+/** True once `mode` has been showing for ARM_MS; false again as soon as it goes away. */
+function useArmed(mode: string | null): boolean {
+  const [armedMode, setArmedMode] = useState<string | null>(null);
+  useEffect(() => {
+    if (mode === null) return;
+    const id = setTimeout(() => setArmedMode(mode), ARM_MS);
+    return () => {
+      clearTimeout(id);
+      setArmedMode(null);
+    };
+  }, [mode]);
+  return mode !== null && armedMode === mode;
+}
+
+export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claimHint, nameOf }: Props) {
   const legal = view.legal;
   const me = view.players[view.seat];
   const stage = view.stage;
+  const claiming = (stage.kind === 'claim' || stage.kind === 'robKong') && stage.myOptions && !stage.responded;
+  const armed = useArmed(view.phase === 'dingque' && legal.dingque ? 'dingque' : claiming ? 'claim' : null);
 
   if (view.phase === 'swap') {
     if (!legal.swapSuits) return <Hint text={T.swapWaiting} />;
@@ -45,22 +69,33 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claim
     const suggested = counts.indexOf(Math.min(...counts));
     return (
       <Bar>
-        {/* Which way the swapped tiles just went, so the player knows who has them */}
-        <Hint text={view.swapDirection ? `${T.swapDirection[view.swapDirection]} · ${T.dingqueHint}` : T.dingqueHint} />
+        {/* Who the three new tiles came from (they are marked in the hand), so the player can read that seat */}
+        <Hint
+          text={
+            view.swapDirection
+              ? `${T.swapDirection[view.swapDirection]} · ${view.swapReceived ? `${T.swapReceivedFrom(nameOf(swapGiver(view.seat, view.swapDirection)))} · ` : ''}${T.dingqueHint}`
+              : T.dingqueHint
+          }
+        />
         {([0, 1, 2] as Suit[]).map((suit) => (
-          <Btn key={suit} label={`${T.voidSuit(SUIT_NAMES[suit])} (${counts[suit]})`} primary={suit === suggested} onPress={() => onAct({ type: 'dingque', suit })} />
+          <Btn
+            key={suit}
+            label={`${T.voidSuit(SUIT_NAMES[suit])} (${counts[suit]})`}
+            primary={suit === suggested}
+            onPress={() => armed && onAct({ type: 'dingque', suit })}
+          />
         ))}
       </Bar>
     );
   }
 
-  if ((stage.kind === 'claim' || stage.kind === 'robKong') && stage.myOptions && !stage.responded) {
+  if (claiming) {
     const options: ClaimOption[] = [];
     if (legal.hu) options.push('hu');
     if (legal.kong) options.push('kong');
     if (legal.pong) options.push('pong');
     options.push('pass');
-    return <ClaimFan tile={stage.tile} tileWidth={tileWidth} options={options} suggested={claimHint?.type ?? null} onAct={(type) => onAct({ type })} onHint={onHint} />;
+    return <ClaimFan tile={stage.tile} tileWidth={tileWidth} options={options} suggested={claimHint?.type ?? null} onAct={(type) => armed && onAct({ type })} onHint={onHint} />;
   }
 
   if (stage.kind === 'turn' && stage.seat === view.seat && legal.discard) {

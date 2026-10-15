@@ -339,6 +339,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
               onAct={(a) => game.act(a)}
               onHint={onHint}
               claimHint={claimHint?.version === view.version ? claimHint.action : null}
+              nameOf={(seat) => table.seats[seat].name}
             />
           )}
         </View>
@@ -372,6 +373,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             onHover={setHovered}
             magnify={portrait || handTile < 36}
             kongable={table.autoPlay ? [] : (view.legal.selfKong ?? [])}
+            // The swapped-in tiles stay marked through 定缺 and until the first discard.
+            received={view.phase === 'dingque' || (view.phase === 'play' && me.discards.length === 0) ? (view.swapReceived ?? []) : []}
           />
         </View>
       </View>
