@@ -19,6 +19,8 @@ interface Props {
   /** The AI's recommendation for the current claim, once asked for. */
   claimHint: Intent | null;
   nameOf(seat: Seat): string;
+  /** Seconds left to answer a claim, shown on the claim buttons (null = no timer). */
+  claimCountdown: number | null;
 }
 
 /**
@@ -41,7 +43,7 @@ function useArmed(mode: string | null): boolean {
   return mode !== null && armedMode === mode;
 }
 
-export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claimHint, nameOf }: Props) {
+export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claimHint, nameOf, claimCountdown }: Props) {
   const legal = view.legal;
   const me = view.players[view.seat];
   const stage = view.stage;
@@ -95,7 +97,17 @@ export function ActionBar({ view, selectedTiles, tileWidth, onAct, onHint, claim
     if (legal.kong) options.push('kong');
     if (legal.pong) options.push('pong');
     options.push('pass');
-    return <ClaimFan tile={stage.tile} tileWidth={tileWidth} options={options} suggested={claimHint?.type ?? null} onAct={(type) => armed && onAct({ type })} onHint={onHint} />;
+    return (
+      <ClaimFan
+        tile={stage.tile}
+        tileWidth={tileWidth}
+        options={options}
+        suggested={claimHint?.type ?? null}
+        countdown={claimCountdown}
+        onAct={(type) => armed && onAct({ type })}
+        onHint={onHint}
+      />
+    );
   }
 
   if (stage.kind === 'turn' && stage.seat === view.seat && legal.discard) {
@@ -147,6 +159,7 @@ function ClaimFan({
   tileWidth,
   options,
   suggested,
+  countdown,
   onAct,
   onHint,
 }: {
@@ -154,6 +167,7 @@ function ClaimFan({
   tileWidth: number;
   options: ClaimOption[];
   suggested: string | null;
+  countdown: number | null;
   onAct(type: ClaimOption): void;
   onHint(): void;
 }) {
@@ -207,6 +221,12 @@ function ClaimFan({
       <Pressable accessibilityRole="button" accessibilityLabel={T.hint} onPress={onHint} style={({ pressed }) => [styles.fanHint, pressed && styles.pressed]}>
         <Text style={styles.fanHintText}>💡</Text>
       </Pressable>
+      {/* Seconds left to decide, right next to the choices (turns red for the last five) */}
+      {countdown !== null && (
+        <View style={[styles.fanTimer, countdown <= 5 && styles.fanTimerLow]}>
+          <Text style={styles.fanTimerText}>{countdown}</Text>
+        </View>
+      )}
       {suggested && <Text style={styles.fanSuggestion}>{T.hintClaim(CLAIM_LABEL[suggested as ClaimOption]?.() ?? T.pass)}</Text>}
     </View>
   );
@@ -272,6 +292,9 @@ const styles = StyleSheet.create({
   fanText: { fontWeight: '900' },
   fanHint: { position: 'absolute', right: 0, top: 0, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   fanHintText: { fontSize: 16 },
+  fanTimer: { position: 'absolute', left: 0, top: 0, minWidth: 34, height: 34, borderRadius: 17, paddingHorizontal: 6, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  fanTimerLow: { backgroundColor: '#c62828' },
+  fanTimerText: { color: '#fff', fontSize: 16, fontWeight: '900', fontVariant: ['tabular-nums'] },
   fanSuggestion: { position: 'absolute', right: 40, top: 7, color: '#ffe082', fontSize: 13, fontWeight: '800' },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
   hint: { color: '#e8f5e9', fontSize: 13, marginRight: 4 },

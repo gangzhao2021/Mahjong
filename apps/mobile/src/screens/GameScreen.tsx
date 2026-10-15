@@ -361,6 +361,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
               onHint={onHint}
               claimHint={claimHint?.version === view.version ? claimHint.action : null}
               nameOf={(seat) => table.seats[seat].name}
+              claimCountdown={table.timer?.kind === 'claim' && !table.autoPlay ? myTurnTimer : null}
             />
           )}
         </View>
