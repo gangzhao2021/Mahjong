@@ -4,7 +4,7 @@
  * and how many copies of each tile are still unseen (记牌器).
  */
 import { shanten } from '@mahjong/ai-play';
-import { removeTiles, suitOf, TILE_KINDS, toCounts, winningTiles, HIDDEN_TILE, type HandView, type Tile } from '@mahjong/engine';
+import { hasVoidTiles, removeTiles, suitOf, TILE_KINDS, toCounts, winningTiles, HIDDEN_TILE, type HandView, type Tile } from '@mahjong/engine';
 
 /** Copies of each tile kind not visible to this seat: 4 minus own hand, every meld, every pond and revealed hands. */
 export function unseenCounts(view: HandView): number[] {
@@ -53,4 +53,26 @@ export function discardOutcome(tile: Tile, view: HandView, unseen = unseenCounts
   const useful = rest.filter((t) => suitOf(t) !== me.voidSuit);
   // Every void tile still held costs a discard before the hand can be ready.
   return { waits: [], shanten: Math.max(1, shanten(toCounts(useful), me.melds.length) + voidCount) };
+}
+
+/** Draws left in the wall at which the end-of-hand checks are worth a warning. */
+export const LATE_WALL = 8;
+
+/**
+ * What the player should be warned about right now, if anything: a winning discard won't be
+ * offered (过手胡), or, late in the hand, what a draw would cost (查花猪 for void tiles still held,
+ * 查大叫 for a hand that isn't ready).
+ */
+export function handWarning(view: HandView): 'passedWin' | 'huaZhu' | 'daJiao' | null {
+  const me = view.players[view.seat];
+  const hand = me.hand;
+  if (!hand || me.won || view.phase !== 'play') return null;
+  const between = (hand.length - 1) % 3 === 0; // 13-tile hand, not mid-turn
+  const ready = between && waitsOf(hand, view).length > 0;
+  if (me.passedWin && ready) return 'passedWin';
+  if (view.wallCount > LATE_WALL) return null;
+  const { checkHuaZhu, checkDaJiao } = view.ruleSet.drawSettlement;
+  if (checkHuaZhu && hasVoidTiles(hand, me.voidSuit)) return 'huaZhu';
+  if (checkDaJiao && between && !ready) return 'daJiao';
+  return null;
 }

@@ -11,7 +11,7 @@ import { arrangeHand, PlayerHand, type HandTile } from '../components/PlayerHand
 import { PopIn } from '../components/PopIn';
 import { ResultPanel } from '../components/ResultPanel';
 import { Felt } from '../components/Felt';
-import { InsightPanel, TileTracker } from '../components/Insight';
+import { HandWarnings, InsightPanel, TileTracker } from '../components/Insight';
 import { autoMove, updateAutoSettings, useAutoSettings, type AutoSettings } from '../game/autoActions';
 import { useAiVoice, useVoiceCallouts } from '../audio/voice';
 import { MuteButton } from '../components/MuteButton';
@@ -343,7 +343,10 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       <View style={styles.bottom}>
         {/* Bottom padding leaves room for selected tiles, which lift into this area */}
         <View style={[styles.bottomBar, { paddingBottom: Math.round(handTile * 0.35) }]}>
-        <InsightPanel view={view} focus={focusTile} tileWidth={Math.round(handTile * 0.55)} />
+        <View style={styles.insights}>
+          <HandWarnings view={view} />
+          <InsightPanel view={view} focus={focusTile} tileWidth={Math.round(handTile * 0.55)} />
+        </View>
         <View style={styles.actions}>
           {/* While the claim fan is up, the tip sits to its left instead of under it */}
           {tipId && <CoachTip key={tipId} id={tipId} offset={tipId === 'claim' || (tipId === 'win' && stage.kind !== 'turn') ? claimFanSize(handTile).width + 8 : 0} />}
@@ -688,6 +691,7 @@ const styles = StyleSheet.create({
   autoMenu: { alignSelf: 'flex-start', backgroundColor: 'rgba(10,40,26,0.95)', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
   autoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   autoLabel: { color: '#e8f5e9', fontSize: 14, fontWeight: '700' },
+  insights: { gap: 4, flexShrink: 1 },
   bottomBar: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, minHeight: 48 },
   actions: { flex: 1, alignItems: 'flex-end', justifyContent: 'flex-end', gap: 6 },
   warning: { backgroundColor: '#c62828', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
