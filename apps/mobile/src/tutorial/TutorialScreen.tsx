@@ -1,7 +1,7 @@
 /** Lesson menu and the guided lesson view (PRD §27). */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { GameScreen } from '../screens/GameScreen';
@@ -32,6 +32,9 @@ async function markDone(id: string): Promise<string[]> {
 export function TutorialScreen({ onExit }: { onExit(): void }) {
   const [done, setDone] = useState<string[]>([]);
   const [lesson, setLesson] = useState<Lesson | null>(null);
+  // One card per row on a phone held upright, two on a small landscape screen, three when there's room.
+  const { width } = useWindowDimensions();
+  const cardBasis = width < 520 ? '100%' : width < 800 ? '45%' : '30%';
 
   useEffect(() => {
     void loadTutorialProgress().then(setDone);
@@ -73,7 +76,7 @@ export function TutorialScreen({ onExit }: { onExit(): void }) {
           return (
             <Pressable
               key={l.id}
-              style={({ pressed }) => [styles.card, isNext && styles.cardNext, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.card, { flexBasis: cardBasis }, isNext && styles.cardNext, pressed && styles.pressed]}
               onPress={() => setLesson(l)}
               accessibilityRole="button"
               accessibilityLabel={tr(l.title)}
@@ -135,11 +138,12 @@ const styles = StyleSheet.create({
   title: { color: '#fff8e1', fontSize: 22, fontWeight: '900' },
   subtitle: { color: '#c8e6c9', fontSize: 13 },
   progress: { color: '#ffd54f', fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  cards: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignContent: 'stretch' },
+  // Cards keep their own height and sit in the middle: stretched to fill a big screen they were mostly empty.
+  cards: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignContent: 'center', width: '100%', maxWidth: 980, alignSelf: 'center' },
   card: {
     flexGrow: 1,
     flexBasis: '30%',
-    minHeight: 72,
+    minHeight: 96,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
