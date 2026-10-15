@@ -12,6 +12,7 @@ import { PopIn } from '../components/PopIn';
 import { ResultPanel } from '../components/ResultPanel';
 import { Felt } from '../components/Felt';
 import { HandWarnings, InsightPanel, TileTracker } from '../components/Insight';
+import { readyDiscards } from '../game/insight';
 import { autoMove, updateAutoSettings, useAutoSettings, type AutoSettings } from '../game/autoActions';
 import { useAiVoice, useVoiceCallouts } from '../audio/voice';
 import { MuteButton } from '../components/MuteButton';
@@ -164,6 +165,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   };
   const myTurnTimer = table.timer && table.timer.kind !== 'nextHand' ? countdown : null;
   const timeRunningOut = myTurnTimer !== null && myTurnTimer <= 5 && !table.autoPlay;
+  // Tiles whose discard makes the hand ready, marked 听 in the hand (setting; not while auto-playing).
+  const readyAfter = useMemo(() => (settings.markReady && !table.autoPlay ? readyDiscards(view) : []), [view, settings.markReady, table.autoPlay]);
   useCueSounds({ view, handKey: `${table.gameId}:${table.handIndex}`, countdown: myTurnTimer, timeRunningOut, autoPlay: table.autoPlay });
   // Lessons explain each step themselves, so the one-time tips stay out of the tutorial.
   const inTutorial = table.gameId.startsWith('tutorial-');
@@ -409,6 +412,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             kongable={table.autoPlay ? [] : (view.legal.selfKong ?? [])}
             // The swapped-in tiles stay marked through 定缺 and until the first discard.
             received={view.phase === 'dingque' || (view.phase === 'play' && me.discards.length === 0) ? (view.swapReceived ?? []) : []}
+            readyAfter={readyAfter}
           />
         </View>
       </View>

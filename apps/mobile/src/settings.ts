@@ -14,6 +14,8 @@ export interface Settings {
   aiVoice: boolean;
   /** Pop-in and spring animations (off also follows the system's reduce-motion setting). */
   animations: boolean;
+  /** On my turn, mark the tiles whose discard makes the hand ready (听). */
+  markReady: boolean;
   /** AI strength at the practice table; null = the usual mix. */
   practiceAiLevel: AiLevel | null;
   /** Tile size multiplier at the table. */
@@ -27,7 +29,7 @@ export interface Settings {
 export const TILE_SCALES = [0.85, 1, 1.15] as const;
 
 const KEY = 'mahjong.settings';
-let settings: Settings = { fastPace: false, voice: true, announceTiles: false, aiVoice: false, practiceAiLevel: null, animations: true, tileScale: 1, lastTableId: null, bindReminderSnoozedUntil: 0 };
+let settings: Settings = { fastPace: false, voice: true, announceTiles: false, aiVoice: false, practiceAiLevel: null, markReady: true, animations: true, tileScale: 1, lastTableId: null, bindReminderSnoozedUntil: 0 };
 const listeners = new Set<(s: Settings) => void>();
 let loading: Promise<void> | null = null;
 

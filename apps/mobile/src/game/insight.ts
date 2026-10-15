@@ -76,3 +76,12 @@ export function handWarning(view: HandView): 'passedWin' | 'huaZhu' | 'daJiao' |
   if (checkDaJiao && between && !ready) return 'daJiao';
   return null;
 }
+
+/** On my discard: the tiles whose discard leaves the hand ready (听牌), for marking in the hand. */
+export function readyDiscards(view: HandView): Tile[] {
+  const me = view.players[view.seat];
+  const legal = view.legal.discard;
+  if (!me.hand || !legal || me.won || view.stage.kind !== 'turn' || view.stage.seat !== view.seat) return [];
+  const unseen = unseenCounts(view);
+  return legal.filter((tile) => waitsOf(removeTiles(me.hand!, [tile]), view, unseen).length > 0);
+}
