@@ -11,6 +11,8 @@ export interface TableConfig {
   minCoins: number;
   /** Coins per point of score; 0 = no coin settlement (practice table). */
   multiplier: number;
+  /** Relative odds of each AI strength (beginner / intermediate / expert); absent = the server-wide mix. */
+  aiSkill?: { beginner: number; intermediate: number; expert: number };
 }
 
 export interface EconomyConfig {
@@ -50,6 +52,12 @@ export function validateEconomy(c: EconomyConfig): string[] {
       if (typeof t.name !== 'string' || !t.name.trim()) problems.push(`table ${t.id}: name is required`);
       if (!isCount(t.baseScore) || !isCount(t.minCoins)) problems.push(`table ${t.id}: baseScore and minCoins must be non-negative integers`);
       if (!(typeof t.multiplier === 'number' && t.multiplier >= 0 && t.multiplier <= 100)) problems.push(`table ${t.id}: multiplier must be 0–100`);
+      if (t.aiSkill !== undefined) {
+        const w = [t.aiSkill?.beginner, t.aiSkill?.intermediate, t.aiSkill?.expert];
+        if (!w.every(isCount) || w.reduce((a, b) => (a as number) + (b as number), 0) === 0) {
+          problems.push(`table ${t.id}: aiSkill needs non-negative integer beginner / intermediate / expert weights, not all zero`);
+        }
+      }
     }
     if (!c.tables.some((t) => t.baseScore === 0 && t.minCoins === 0)) problems.push('a practice table (base 0, min 0) is required (PRD §11)');
     if (new Set(c.tables.map((t) => t.id)).size !== c.tables.length) problems.push('duplicate table ids');

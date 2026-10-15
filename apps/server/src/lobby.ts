@@ -342,12 +342,12 @@ export class Lobby {
   }
 
   private async createRoom(player: PlayerRow, plan: GamePlan, socket: WebSocket): Promise<Room> {
-    // Persistent characters; skill is chosen independently per game (PRD §3.2).
+    // Persistent characters; skill is chosen independently per game (PRD §3.2), weighted by the table.
     const chosen = selectCharacters(this.deps.dialogue.roster, 3, this.rng);
     const memories = await this.loadMemories(player.id, chosen.map((c) => c.character.id));
     const ai: AiSeatSpec[] = chosen.map((c) => ({
       ...c,
-      skill: pickWeighted(this.deps.config.skillWeights, this.rng),
+      skill: pickWeighted(plan.aiSkill ?? this.deps.config.skillWeights, this.rng),
       memory: memories.get(c.character.id) ?? null,
     }));
     const room = this.buildRoom(player, plan, ai, this.languageOf(player.id));

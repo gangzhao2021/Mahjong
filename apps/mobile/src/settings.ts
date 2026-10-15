@@ -1,4 +1,5 @@
 /** Player preferences kept on this device: pace, voice callouts, AI voice, animations and tile size. */
+import type { AiLevel } from '@mahjong/protocol';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
@@ -13,6 +14,8 @@ export interface Settings {
   aiVoice: boolean;
   /** Pop-in and spring animations (off also follows the system's reduce-motion setting). */
   animations: boolean;
+  /** AI strength at the practice table; null = the usual mix. */
+  practiceAiLevel: AiLevel | null;
   /** Tile size multiplier at the table. */
   tileScale: number;
   /** Public table played last; quick start returns there instead of climbing on its own. */
@@ -24,7 +27,7 @@ export interface Settings {
 export const TILE_SCALES = [0.85, 1, 1.15] as const;
 
 const KEY = 'mahjong.settings';
-let settings: Settings = { fastPace: false, voice: true, announceTiles: false, aiVoice: false, animations: true, tileScale: 1, lastTableId: null, bindReminderSnoozedUntil: 0 };
+let settings: Settings = { fastPace: false, voice: true, announceTiles: false, aiVoice: false, practiceAiLevel: null, animations: true, tileScale: 1, lastTableId: null, bindReminderSnoozedUntil: 0 };
 const listeners = new Set<(s: Settings) => void>();
 let loading: Promise<void> | null = null;
 
