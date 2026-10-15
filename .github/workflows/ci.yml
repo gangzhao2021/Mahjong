@@ -41,3 +41,7 @@ jobs:
 
       - name: Build admin dashboard
         run: pnpm admin:build
+
+      # Bundling catches what typecheck and tests can't, e.g. a require() of a missing sound or image.
+      - name: Bundle the app (web)
+        run: pnpm --dir apps/mobile exec expo export --platform web --output-dir "$RUNNER_TEMP/web"
