@@ -1,4 +1,4 @@
-/** 设置: pace, voice callouts, sound, animations and tile size. */
+/** 设置: pace, voice callouts, AI voice, sound, animations and tile size. */
 import { Switch, Text, View } from 'react-native';
 import { updateSoundSettings, useSoundSettings } from '../audio/sound';
 import { Btn } from '../components/ActionBar';
@@ -22,6 +22,8 @@ export function SettingsSheet({ onClose }: { onClose(): void }) {
     <Sheet title={T.settings.title} onClose={onClose} width={440}>
       {toggle(T.settings.fastPace, settings.fastPace, (v) => updateSettings({ fastPace: v }), T.settings.fastPaceHint)}
       {toggle(T.settings.voice, settings.voice, (v) => updateSettings({ voice: v }))}
+      {toggle(T.settings.announceTiles, settings.announceTiles, (v) => updateSettings({ announceTiles: v }), T.settings.announceTilesHint)}
+      {toggle(T.settings.aiVoice, settings.aiVoice, (v) => updateSettings({ aiVoice: v }), T.settings.aiVoiceHint)}
       {toggle(T.sound.effects, sound.effects, (v) => updateSoundSettings({ effects: v }))}
       {toggle(T.sound.music, sound.music, (v) => updateSoundSettings({ music: v }))}
       {toggle(T.settings.animations, settings.animations, (v) => updateSettings({ animations: v }))}

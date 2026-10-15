@@ -3,7 +3,8 @@ import { suitOf, type Action, type GameEvent, type HandView, type Seat, type Sui
 import type { DistributiveOmit, TableSnapshot } from '@mahjong/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
-import { updateSoundSettings, useSoundSettings, useTableSounds } from '../audio/sound';
+import { useCueSounds } from '../audio/cues';
+import { useTableSounds } from '../audio/sound';
 import { ActionBar, Btn, claimFanSize } from '../components/ActionBar';
 import { BanterPicker, ChatPanel, SpeechBubbles } from '../components/Chat';
 import { arrangeHand, PlayerHand, type HandTile } from '../components/PlayerHand';
@@ -12,7 +13,8 @@ import { ResultPanel } from '../components/ResultPanel';
 import { Felt } from '../components/Felt';
 import { InsightPanel, TileTracker } from '../components/Insight';
 import { autoMove, updateAutoSettings, useAutoSettings, type AutoSettings } from '../game/autoActions';
-import { useVoiceCallouts } from '../audio/voice';
+import { useAiVoice, useVoiceCallouts } from '../audio/voice';
+import { MuteButton } from '../components/MuteButton';
 import { useSettings } from '../settings';
 import { Compass, ConcealedTiles, Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
 import { Tile } from '../components/Tile';
@@ -75,8 +77,6 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const unreadChat = chatOpen ? 0 : game.chat.filter((e) => e.id > chatSeenId && e.seat !== view.seat).length;
   const { callouts, spotlight } = useTableMoments(game.events, sideOf, view);
   useTableSounds(game.events, game.chat, view.seat);
-  const sound = useSoundSettings();
-  const muted = !sound.effects && !sound.music;
 
   const stage = view.stage;
   const activeSeat: Seat | null = stage.kind === 'turn' ? stage.seat : null;
@@ -101,7 +101,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   // Portrait keeps 托管 and chat on the top bar; the rest drop down from ⋯.
   const [moreOpen, setMoreOpen] = useState(false);
   const auto = useAutoSettings();
-  useVoiceCallouts(game.events, settings.voice);
+  useVoiceCallouts(game.events, table.seats, view.seat, { callouts: settings.voice, tiles: settings.announceTiles });
+  useAiVoice(game.chat, table.seats, settings.aiVoice);
   // Keep the room's pace in line with the player's setting.
   const setFastPace = game.setFastPace;
   // Friend rooms keep everyone's pace, so the setting is not sent there.
@@ -152,6 +153,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   };
   const myTurnTimer = table.timer && table.timer.kind !== 'nextHand' ? countdown : null;
   const timeRunningOut = myTurnTimer !== null && myTurnTimer <= 5 && !table.autoPlay;
+  useCueSounds({ view, handKey: `${table.gameId}:${table.handIndex}`, countdown: myTurnTimer, timeRunningOut, autoPlay: table.autoPlay });
   // Lessons explain each step themselves, so the one-time tips stay out of the tutorial.
   const inTutorial = table.gameId.startsWith('tutorial-');
   const tip = useTipPending(table.autoPlay || inTutorial ? null : tipFor(view));
@@ -250,13 +252,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   );
   const menuExtras = (then?: () => void) => (
     <>
-      <Btn
-        label={`${muted ? '🔇' : '🔊'} ${T.soundLabel(!muted)}`}
-        onPress={() => {
-          then?.();
-          updateSoundSettings({ effects: muted, music: muted });
-        }}
-      />
+      <MuteButton then={then} />
       <Btn
         label={`🀄 ${T.tracker}`}
         primary={trackerOpen}
@@ -375,6 +371,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             onDiscard={(tile: TileKind) => game.act({ type: 'discard', tile })}
             onHover={setHovered}
             magnify={portrait || handTile < 36}
+            kongable={table.autoPlay ? [] : (view.legal.selfKong ?? [])}
           />
         </View>
       </View>
