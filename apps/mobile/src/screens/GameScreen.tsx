@@ -17,7 +17,7 @@ import { useAiVoice, useVoiceCallouts } from '../audio/voice';
 import { MuteButton } from '../components/MuteButton';
 import { useSettings } from '../settings';
 import { Compass, ConcealedTiles, Melds, Pond, SeatCard, useCountdown } from '../components/TableParts';
-import { Tile } from '../components/Tile';
+import { Tile, TILE_RATIO } from '../components/Tile';
 import type { GameApi, TimedEvent } from '../net/useGame';
 import { T, tableName } from '../strings';
 import { markTipSeen, useTipPending, type TipId } from '../tips';
@@ -58,8 +58,11 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
     16,
     Math.min(Math.round(30 * settings.tileScale), Math.floor((portrait ? width / 19 : height / 18) * settings.tileScale)),
   );
-  const pondRow = portrait ? POND_ROW_PORTRAIT : POND_ROW;
-  const pondColumn = portrait ? POND_COLUMN_PORTRAIT : POND_COLUMN;
+  const pondRow = portrait ? POND_LINE_PORTRAIT : POND_ROW;
+  const pondColumn = portrait ? POND_LINE_PORTRAIT : POND_COLUMN;
+  // Portrait ponds take the whole middle of the screen, so they size to it rather than to the tile scale.
+  const [middleSize, setMiddleSize] = useState<{ width: number; height: number } | null>(null);
+  const pondTile = portrait && middleSize ? portraitPondTile(middleSize, smallTile) : smallTile;
   const seatAt = (side: Side) => ((view.seat + side) % 4) as Seat;
   const sideOf = (seat: Seat) => ((seat - view.seat + 4) % 4) as Side;
 
@@ -81,6 +84,14 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const stage = view.stage;
   const activeSeat: Seat | null = stage.kind === 'turn' ? stage.seat : null;
   const lastDiscarder: Seat | null = stage.kind === 'claim' ? stage.discarder : null;
+  // The latest discard stays marked until the next one, so it is easy to find in the ponds.
+  let latestDiscarder: Seat | null = null;
+  for (let i = game.events.length - 1; i >= 0 && latestDiscarder === null; i--) {
+    const e = game.events[i].event;
+    if (e.type === 'discard') latestDiscarder = e.seat;
+  }
+  const markedPond = lastDiscarder ?? latestDiscarder;
+  const marked = (seat: Seat) => markedPond === seat && view.players[seat].discards.at(-1)?.claimed === false;
   const iWon = me.won !== null;
   const drawn = stage.kind === 'turn' && stage.seat === view.seat ? stage.drawn : null;
   // Size my tiles so the seat card, melds (drawn at 3/4 size) and the whole hand fit on one row.
@@ -184,11 +195,14 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
     );
     const card = seatCard();
     // Face-down tiles sit between the player and the centre of the table.
-    if (portrait && side !== 2) {
-      // Portrait sides: a narrow card (tiles left are on it), melds and any revealed hand underneath.
-      const tiny = Math.round(smallTile * 0.6);
+    if (portrait) {
+      // Portrait: all three opponents sit in a row at the top as narrow cards (tiles left are on them),
+      // melds and any revealed hand underneath, so the ponds get the whole width of the screen.
+      // Each takes a third of the width; melds and a winner's hand wrap inside it.
+      const column = Math.floor((width - 40) / 3);
+      const tiny = Math.max(12, Math.min(18, Math.floor(column / 7)));
       return (
-        <View style={[styles.opponent, styles.sidePortrait]}>
+        <View style={[styles.opponent, { width: column }]}>
           {seatCard(true)}
           <Melds melds={p.melds} tileWidth={tiny} />
           {p.hand && (
@@ -296,26 +310,33 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
       </View>
 
-      {portrait && <View style={styles.topSeatPortrait}>{opponent(2)}</View>}
+      {/* Portrait: left, opposite and right player along the top, each in its own corner */}
+      {portrait && (
+        <View style={styles.topSeatsPortrait}>
+          {opponent(3)}
+          {opponent(2)}
+          {opponent(1)}
+        </View>
+      )}
 
       {/* Middle: side players and the four ponds around the centre */}
-      <View style={styles.middle}>
-        {opponent(3)}
+      <View style={styles.middle} onLayout={(e) => setMiddleSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
+        {!portrait && opponent(3)}
         <View style={styles.center}>
-          <Pond side={2} discards={view.players[seatAt(2)].discards} tileWidth={smallTile} perLine={pondRow} lastDiscard={lastDiscarder === seatAt(2)} />
+          <Pond side={2} discards={view.players[seatAt(2)].discards} tileWidth={pondTile} perLine={pondRow} lastDiscard={marked(seatAt(2))} />
           <View style={styles.centerRow}>
-            <Pond side={3} discards={view.players[seatAt(3)].discards} tileWidth={smallTile} perLine={pondColumn} lastDiscard={lastDiscarder === seatAt(3)} />
+            <Pond side={3} discards={view.players[seatAt(3)].discards} tileWidth={pondTile} perLine={pondColumn} lastDiscard={marked(seatAt(3))} />
             <Compass
               winds={([0, 1, 2, 3] as Side[]).map(windOf)}
               active={activeSeat !== null ? sideOf(activeSeat) : null}
               wallCount={`${T.wall} ${view.wallCount}`}
               timer={myTurnTimer}
             />
-            <Pond side={1} discards={view.players[seatAt(1)].discards} tileWidth={smallTile} perLine={pondColumn} lastDiscard={lastDiscarder === seatAt(1)} />
+            <Pond side={1} discards={view.players[seatAt(1)].discards} tileWidth={pondTile} perLine={pondColumn} lastDiscard={marked(seatAt(1))} />
           </View>
-          <Pond side={0} discards={me.discards} tileWidth={smallTile} perLine={pondRow} lastDiscard={lastDiscarder === view.seat} />
+          <Pond side={0} discards={me.discards} tileWidth={pondTile} perLine={pondRow} lastDiscard={marked(view.seat)} />
         </View>
-        {opponent(1)}
+        {!portrait && opponent(1)}
       </View>
 
       {/* Bottom: my seat */}
@@ -589,9 +610,21 @@ const PORTRAIT_DESIGN = { width: 430, height: 860 };
 /** Discards per line: across for the top and bottom ponds, down for the side ponds (about the compass's height). */
 const POND_ROW = 12;
 const POND_COLUMN = 5;
-/** Portrait is narrow and tall: shorter rows, longer side columns. */
-const POND_ROW_PORTRAIT = 8;
-const POND_COLUMN_PORTRAIT = 10;
+/** Portrait: every pond holds 9 per line, so a typical hand's discards (up to ~18) fit in two lines. */
+const POND_LINE_PORTRAIT = 9;
+const COMPASS_SIZE = 112;
+
+/**
+ * The largest pond tile that fits the portrait middle area with two full lines in every pond:
+ * top and bottom ponds two rows of 9 across, side ponds two columns of 9 (rotated) beside the compass.
+ */
+function portraitPondTile({ width, height }: { width: number; height: number }, min: number): number {
+  const margin = 2; // Tile margin on each side
+  const across = (width - 16) / POND_LINE_PORTRAIT - 2 * margin;
+  const besideCompass = (width - COMPASS_SIZE - 24 - 8 * margin) / (4 * TILE_RATIO);
+  const tall = (height - 16 - 8 * margin - POND_LINE_PORTRAIT * 2 * margin) / (4 * TILE_RATIO + POND_LINE_PORTRAIT);
+  return Math.max(min, Math.min(34, Math.floor(Math.min(across, besideCompass, tall))));
+}
 /** Room kept for my seat card left of the hand. */
 const MY_SEAT_WIDTH = 190;
 
@@ -603,11 +636,12 @@ const BUBBLE_POSITION = {
   3: { left: 190, top: '26%' },
 } as const;
 
+/** Portrait: under each top-row card, staggered so several speakers don't cover each other. */
 const BUBBLE_POSITION_PORTRAIT = {
   0: { left: 16, bottom: 170 },
-  1: { right: 76, top: '30%' },
-  2: { top: 150, left: '30%' },
-  3: { left: 76, top: '30%' },
+  1: { right: 12, top: 250, maxWidth: 220 },
+  2: { top: 205, left: '22%', maxWidth: 220 },
+  3: { left: 12, top: 160, maxWidth: 220 },
 } as const;
 
 /** Between the discarder's pond and the compass. */
@@ -636,8 +670,7 @@ const styles = StyleSheet.create({
   topRowPortrait: { flexDirection: 'column', alignItems: 'stretch', gap: 4 },
   moreMenu: { alignSelf: 'flex-start', alignItems: 'stretch' },
   stakePortrait: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, marginTop: 0, alignSelf: 'flex-start' },
-  topSeatPortrait: { alignItems: 'center', marginTop: 4 },
-  sidePortrait: { width: 64 },
+  topSeatsPortrait: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 4 },
   handInfo: { color: '#c8e6c9', fontSize: 12 },
   stake: { alignItems: 'flex-end', marginTop: 4, flexShrink: 0 },
   coinLine: { color: '#ffe082', fontSize: 12, fontWeight: '700' },
