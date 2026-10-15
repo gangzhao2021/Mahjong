@@ -11,9 +11,9 @@ export function SettingsSheet({ onClose }: { onClose(): void }) {
   const sound = useSoundSettings();
   const toggle = (label: string, value: boolean, onChange: (v: boolean) => void, hint?: string) => (
     <View>
-      <View style={formStyles.row}>
+      <View style={formStyles.switchRow}>
         <Switch value={value} onValueChange={onChange} />
-        <Text style={formStyles.label}>{label}</Text>
+        <Text style={[formStyles.label, formStyles.switchLabel]}>{label}</Text>
       </View>
       {hint ? <Text style={formStyles.hint}>{hint}</Text> : null}
     </View>

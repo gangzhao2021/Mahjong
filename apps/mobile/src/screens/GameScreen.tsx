@@ -175,6 +175,10 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const gameCoins = game.lastWallet?.gameId === table.gameId ? game.lastWallet.gameTotal : table.coinChange;
 
   const backTile = Math.round(smallTile * 0.8);
+  // The opposite player's face-down row shrinks to fit beside their card, so a wide menu (English) can't push it over
+  // the card; with too little room it is left out (the card already says how many tiles they hold).
+  const [topSeatWidth, setTopSeatWidth] = useState<number | null>(null);
+  const topBackTile = (count: number) => (topSeatWidth === null ? backTile : Math.min(backTile, Math.floor((topSeatWidth - TOP_CARD_ROOM) / (count + 0.5))));
   const opponent = (side: Side) => {
     const seat = seatAt(side);
     // Two- and three-player tables leave seats empty: nothing to draw there.
@@ -215,7 +219,8 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
       );
     }
-    const backs = p.hand ? null : <ConcealedTiles count={p.handCount} width={side === 2 ? backTile : Math.round(backTile * 0.75)} vertical={side !== 2} />;
+    const backWidth = side === 2 ? topBackTile(p.handCount) : Math.round(backTile * 0.75);
+    const backs = p.hand || backWidth < MIN_BACK_TILE ? null : <ConcealedTiles count={p.handCount} width={backWidth} vertical={side !== 2} />;
     const revealed = p.hand && (
       <View style={styles.revealed}>
         {p.hand.map((t, i) => (
@@ -297,7 +302,11 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
           <Btn label={`💬 ${T.chat}${unreadChat ? ` · ${unreadChat}` : ''}`} primary={unreadChat > 0} onPress={() => showChat(true)} />
           {portrait ? <Btn label="⋯" primary={moreOpen} onPress={() => setMoreOpen(!moreOpen)} /> : menuExtras()}
         </View>
-        {!portrait && <View style={styles.topSeat}>{opponent(2)}</View>}
+        {!portrait && (
+          <View style={styles.topSeat} onLayout={(e) => setTopSeatWidth(e.nativeEvent.layout.width)}>
+            {opponent(2)}
+          </View>
+        )}
         <View style={[styles.stake, portrait && styles.stakePortrait]}>
           <Text style={styles.handInfo}>
             {T.modeName(view.ruleSet.xueliu)} · {T.hand(table.handIndex, table.handsPerGame)}
@@ -629,6 +638,10 @@ function portraitPondTile({ width, height }: { width: number; height: number }, 
   const tall = (height - 16 - 8 * margin - POND_LINE_PORTRAIT * 2 * margin) / (4 * TILE_RATIO + POND_LINE_PORTRAIT);
   return Math.max(min, Math.min(34, Math.floor(Math.min(across, besideCompass, tall))));
 }
+/** Room the opposite player's card takes beside their face-down row (landscape). */
+const TOP_CARD_ROOM = 200;
+/** Face-down tiles narrower than this read as dots: leave the row out instead. */
+const MIN_BACK_TILE = 10;
 /** Room kept for my seat card left of the hand. */
 const MY_SEAT_WIDTH = 190;
 
@@ -690,7 +703,7 @@ const styles = StyleSheet.create({
   autoBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, paddingTop: 54, paddingLeft: 12 },
   autoMenu: { alignSelf: 'flex-start', backgroundColor: 'rgba(10,40,26,0.95)', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
   autoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  autoLabel: { color: '#e8f5e9', fontSize: 14, fontWeight: '700' },
+  autoLabel: { color: '#e8f5e9', fontSize: 14, fontWeight: '700', flexShrink: 1 },
   insights: { gap: 4, flexShrink: 1 },
   bottomBar: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, minHeight: 48 },
   actions: { flex: 1, alignItems: 'flex-end', justifyContent: 'flex-end', gap: 6 },
