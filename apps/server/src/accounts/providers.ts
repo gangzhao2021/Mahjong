@@ -8,7 +8,8 @@ import type { Db } from '../db/db';
 
 export class LoginError extends Error {
   constructor(
-    readonly code: 'invalidToken' | 'notConfigured' | 'invalidCode' | 'tooManyAttempts' | 'rateLimited' | 'invalidPhone' | 'providerError',
+    /** guestLinked: this device's guest account now has a real sign-in, which it must use instead. */
+    readonly code: 'invalidToken' | 'notConfigured' | 'invalidCode' | 'tooManyAttempts' | 'rateLimited' | 'invalidPhone' | 'providerError' | 'guestLinked',
     message?: string,
   ) {
     super(message ?? code);

@@ -48,6 +48,13 @@ describe('linking a guest to Apple / Google (PRD §19)', () => {
     // Signing in with Apple on a new device lands in the same account.
     const apple = await api(server, 'POST', '/auth/apple', { identityToken: 'alice' });
     expect(apple.body.account.playerId).toBe(linked.body.account.playerId);
+
+    // The device id alone no longer opens the upgraded account, and no second account is made from it.
+    const guestAgain = await api(server, 'POST', '/auth/guest', { deviceId: 'device-link-1' });
+    expect(guestAgain.status).toBe(400);
+    expect(guestAgain.body).toEqual({ error: 'guestLinked' });
+    // The session already on the device keeps working.
+    expect((await api(server, 'GET', '/account', undefined, token)).body.account.playerId).toBe(linked.body.account.playerId);
   });
 
   it('refuses to link an identity that already belongs to another account', async () => {
