@@ -7,8 +7,13 @@
  * those make tiles sound like glass. Draw and discard come
  * in a few variants (draw1.wav…) that the game picks between, so repeated hits do not sound
  * machine-made.
+ *
+ * Long sounds (music, wins, kongs, settlement) are then compressed to AAC (.m4a) with macOS
+ * `afconvert` or `ffmpeg`. Short tile sounds stay WAV: AAC adds ~50 ms of priming silence, which
+ * would make a discard lag behind the tap.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -415,5 +420,24 @@ RATE = 44100;
   hit(b, { start: 0.005, gain: 0.9, pitch: 1050, thump: 0.8 });
   plucks(b, [[0.08, 196, 0.25, 0.5]]);
   writeWav('other_hu', b, 0.45);
+}
+// AAC at 64 kbps mono: indistinguishable for these sounds at about a sixth of the size.
+const COMPRESSED = ['music', 'settle_win', 'settle_lose', 'shuffle', 'kong_wind', 'kong_rain', 'zimo', 'hu', 'deal_in'];
+const has = (cmd) => {
+  try {
+    execFileSync('which', [cmd], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+const encoder = has('afconvert') ? 'afconvert' : has('ffmpeg') ? 'ffmpeg' : null;
+if (!encoder) throw new Error('Compressing needs afconvert (macOS) or ffmpeg on the PATH.');
+for (const name of COMPRESSED) {
+  const wav = path.join(OUT, `${name}.wav`);
+  const m4a = path.join(OUT, `${name}.m4a`);
+  if (encoder === 'afconvert') execFileSync('afconvert', ['-f', 'm4af', '-d', 'aac', '-b', '64000', wav, m4a]);
+  else execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', wav, '-c:a', 'aac', '-b:a', '64k', m4a]);
+  rmSync(wav);
 }
 console.log(`Sounds written to ${OUT}`);
