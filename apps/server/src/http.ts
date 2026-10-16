@@ -120,7 +120,23 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
 
   const respond = async (player: PlayerRow, token?: string) => ({ ...(token ? { token } : {}), account: await accountSummary(s, player) });
 
+  // Liveness: no I/O, so its latency tracks the event loop (the load test measures it).
   app.get('/health', async () => ({ ok: true }));
+
+  /** Readiness for monitors and the container healthcheck: the database answers within 3 s. */
+  app.get('/health/ready', async (_req, reply: FastifyReply) => {
+    const started = Date.now();
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('timeout')), 3000)));
+    try {
+      await Promise.race([s.db.query('SELECT 1'), timeout]);
+      return { ok: true, dbMs: Date.now() - started, uptimeS: Math.round(process.uptime()), ...lobby.stats };
+    } catch (error) {
+      return reply.status(503).send({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      clearTimeout(timer);
+    }
+  });
 
   /** Client crash reports; the session is optional (crashes can happen before login). */
   app.post('/telemetry/errors', async (req, reply: FastifyReply) => {

@@ -91,6 +91,12 @@ export class Lobby {
     for (const socket of this.sockets.get(playerId) ?? []) if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
   }
 
+  /** Live tables and connected players, for monitoring. */
+  get stats(): { tables: number; players: number } {
+    const tables = new Set([...this.rooms.values()].filter((r) => !r.isClosed)).size;
+    return { tables, players: [...this.sockets.values()].filter((set) => set.size > 0).length };
+  }
+
   /** The seat a player holds in their room (the host seat outside friend rooms). */
   private seatIn(room: Room, playerId: string): Seat {
     return room.seatOf(playerId) ?? room.humanSeat;
