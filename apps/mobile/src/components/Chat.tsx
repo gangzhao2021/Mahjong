@@ -62,10 +62,12 @@ interface PanelProps {
   onSticker(id: StickerId): void;
   onReport(entryId: number): void;
   reported: number[];
+  /** Hide another real player's chat (friend rooms). */
+  onBlock(seat: Seat): void;
   onClose(): void;
 }
 
-export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase, onSticker, onReport, reported, onClose }: PanelProps) {
+export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase, onSticker, onReport, reported, onBlock, onClose }: PanelProps) {
   const [text, setText] = useState('');
   const [target, setTarget] = useState<Seat | 'table'>('table');
   const list = useRef<FlatList<ChatEntry>>(null);
@@ -96,14 +98,22 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
               <Text style={styles.logName}>{nameOf(item.seat)}</Text>
               {item.target !== 'table' ? ` → ${nameOf(item.target)}` : ''}{T.colon}{item.text ?? ''} {stickerEmoji(catalog, item.sticker)}
             </Text>
-            {item.kind === 'ai' && item.text ? (
-              reported.includes(item.id) ? (
-                <Text style={styles.reported}>{T.reported}</Text>
-              ) : (
-                <Pressable onPress={() => onReport(item.id)} accessibilityRole="button" accessibilityLabel={`${T.report} ${item.text}`} hitSlop={8}>
-                  <Text style={styles.report}>{T.report}</Text>
-                </Pressable>
-              )
+            {/* AI lines and other real players' lines can be reported; a real player can also be blocked */}
+            {item.text && (item.kind === 'ai' || (item.seat !== mySeat && seats[item.seat]?.isHuman)) ? (
+              <View style={styles.lineActions}>
+                {reported.includes(item.id) ? (
+                  <Text style={styles.reported}>{T.reported}</Text>
+                ) : (
+                  <Pressable onPress={() => onReport(item.id)} accessibilityRole="button" accessibilityLabel={`${T.report} ${item.text}`} hitSlop={8}>
+                    <Text style={styles.report}>{T.report}</Text>
+                  </Pressable>
+                )}
+                {item.kind !== 'ai' && (
+                  <Pressable onPress={() => onBlock(item.seat)} accessibilityRole="button" accessibilityLabel={`${T.block} ${nameOf(item.seat)}`} hitSlop={8}>
+                    <Text style={styles.report}>{T.block}</Text>
+                  </Pressable>
+                )}
+              </View>
             ) : null}
           </View>
         )}
@@ -198,6 +208,7 @@ const styles = StyleSheet.create({
   logLine: { color: '#37474f', fontSize: 13, paddingVertical: 2, flexShrink: 1 },
   report: { color: '#90a4ae', fontSize: 11, textDecorationLine: 'underline' },
   reported: { color: '#90a4ae', fontSize: 11 },
+  lineActions: { flexDirection: 'row', gap: 10 },
   mine: { color: '#1b5e20' },
   logName: { fontWeight: '700' },
   // One horizontally scrolling row each, so the log keeps most of the height on phones.

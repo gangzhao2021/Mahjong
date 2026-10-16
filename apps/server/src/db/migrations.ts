@@ -254,4 +254,13 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (player_id, game_id)
   )
   `,
+  // Players one player has blocked: their table chat is never shown to the blocker (App Store 1.2).
+  `
+  CREATE TABLE player_blocks (
+    player_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    blocked_id text NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (player_id, blocked_id)
+  )
+  `,
 ];

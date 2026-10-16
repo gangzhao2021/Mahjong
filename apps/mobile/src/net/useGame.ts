@@ -74,8 +74,10 @@ export interface GameState {
   notice: { kind: 'minorTimeLimit' | 'guestTrialOver'; endsAt: number; at: number } | null;
   /** Task / achievement rewards just paid automatically. */
   rewards: { items: EarnedReward[]; at: number } | null;
-  /** Ids of AI lines this player reported. */
+  /** Ids of lines (AI, or another player's) this player reported. */
   reported: number[];
+  /** Seats at this table whose player this player blocked: their lines are hidden. */
+  blocked: Seat[];
   /** Why the server last took the player out of a game, if not by choice. */
   leftReason: 'minorTimeLimit' | 'guestTrialOver' | null;
 }
@@ -99,6 +101,7 @@ export interface GameApi extends GameState {
   setBanter(level: BanterLevel): void;
   /** Report an AI line as inappropriate (Appendix C). */
   reportLine(entryId: number): void;
+  blockPlayer(seat: Seat): void;
   /** Replace the account after an HTTP update (profile, reward, real-name…). */
   setAccount(account: AccountSummary): void;
   dismissPendingResult(): void;
@@ -140,6 +143,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     friendRoomRejected: null,
     leftReason: null,
     reported: [],
+    blocked: [],
   });
   const socket = useRef<WebSocket | null>(null);
   const tableRef = useRef<TableSnapshot | null>(null);
@@ -190,6 +194,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
               receivedAt: at,
               events: [...s.events, ...msg.events.map((event) => ({ id: ++eventId.current, at, event }))].slice(-MAX_EVENTS),
               chat: mergeChat(s.chat, msg.table.chat, msg.table.gameId !== s.table?.gameId, 0),
+              blocked: msg.table.gameId !== s.table?.gameId ? [] : s.blocked,
               commitments: firstCommitment(s.commitments, msg.table),
             }));
             break;
@@ -249,6 +254,9 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
             break;
           case 'lineReported':
             setState((s) => ({ ...s, reported: [...s.reported, msg.entryId] }));
+            break;
+          case 'playerBlocked':
+            setState((s) => ({ ...s, blocked: [...s.blocked, msg.seat] }));
             break;
           case 'error':
             if (msg.code === 'unauthorized') {
@@ -317,6 +325,7 @@ export function useGame(token: string | null, onUnauthorized: () => void): GameA
     sendSticker: useCallback((id) => send({ type: 'sticker', id }), [send]),
     setBanter: useCallback((level) => send({ type: 'setBanter', level }), [send]),
     reportLine: useCallback((entryId) => send({ type: 'reportLine', entryId }), [send]),
+    blockPlayer: useCallback((seat) => send({ type: 'blockPlayer', seat }), [send]),
     setAccount: useCallback((account) => setState((s) => ({ ...s, account, banterLevel: account.banterLevel })), []),
     dismissPendingResult: useCallback(() => setState((s) => ({ ...s, pendingResult: null })), []),
     dismissGameSummary: useCallback(() => setState((s) => ({ ...s, gameSummary: null })), []),

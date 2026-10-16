@@ -72,15 +72,17 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   // Messages from the other seats since the chat panel was last open.
+  // Lines from players this player blocked stay out of the panel, the bubbles and the unread count.
+  const chat = useMemo(() => (game.blocked.length ? game.chat.filter((e) => !game.blocked.includes(e.seat)) : game.chat), [game.chat, game.blocked]);
   const [chatSeenId, setChatSeenId] = useState(() => game.chat.at(-1)?.id ?? -1);
   const latestChatId = game.chat.at(-1)?.id ?? -1;
   const showChat = (open: boolean) => {
     setChatSeenId(latestChatId);
     setChatOpen(open);
   };
-  const unreadChat = chatOpen ? 0 : game.chat.filter((e) => e.id > chatSeenId && e.seat !== view.seat).length;
+  const unreadChat = chatOpen ? 0 : chat.filter((e) => e.id > chatSeenId && e.seat !== view.seat).length;
   const { callouts, spotlight } = useTableMoments(game.events, sideOf, view);
-  useTableSounds(game.events, game.chat, view.seat);
+  useTableSounds(game.events, chat, view.seat);
 
   const stage = view.stage;
   const activeSeat: Seat | null = stage.kind === 'turn' ? stage.seat : null;
@@ -423,7 +425,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
       </View>
 
-      <SpeechBubbles chat={game.chat} catalog={game.catalog} positionOf={(seat) => (portrait ? BUBBLE_POSITION_PORTRAIT : BUBBLE_POSITION)[sideOf(seat)]} />
+      <SpeechBubbles chat={chat} catalog={game.catalog} positionOf={(seat) => (portrait ? BUBBLE_POSITION_PORTRAIT : BUBBLE_POSITION)[sideOf(seat)]} />
 
       {/* The tile just discarded, shown large next to the player who let it go */}
       {spotlight && (
@@ -468,7 +470,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       {chatOpen && (
         <View style={styles.chatLayer}>
           <ChatPanel
-            chat={game.chat}
+            chat={chat}
             catalog={game.catalog}
             seats={table.seats}
             mySeat={view.seat}
@@ -477,6 +479,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             onSticker={game.sendSticker}
             onReport={game.reportLine}
             reported={game.reported}
+            onBlock={game.blockPlayer}
             onClose={() => showChat(false)}
           />
           <View style={styles.chatBanter}>

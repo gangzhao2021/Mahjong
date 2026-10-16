@@ -1,11 +1,11 @@
-/** Basic review queue: blocked player messages and reported AI lines (Appendix D.5). */
+/** Basic review queue: blocked player messages, reported AI lines and reported player lines (Appendix D.5). */
 import { useState } from 'react';
 import { fmtTime, get, post } from '../api';
 import { useLoad } from '../hooks';
 
 interface Event {
   id: number;
-  kind: 'blockedPlayerMessage' | 'reportedAiLine';
+  kind: 'blockedPlayerMessage' | 'reportedAiLine' | 'reportedPlayerLine';
   playerId: string | null;
   nickname: string | null;
   characterId: string | null;
@@ -15,7 +15,7 @@ interface Event {
   createdAt: string;
 }
 
-const KINDS = { blockedPlayerMessage: '被拦截的玩家消息', reportedAiLine: '被举报的 AI 台词' };
+const KINDS = { blockedPlayerMessage: '被拦截的玩家消息', reportedAiLine: '被举报的 AI 台词', reportedPlayerLine: '被举报的玩家发言（好友房）' };
 const REASONS: Record<string, string> = { blocklist: '敏感词', contactInfo: '联系方式', link: '链接', tooLong: '过长', vendor: '审核服务' };
 
 export function Moderation() {
@@ -53,7 +53,7 @@ export function Moderation() {
                 <td>{e.nickname ?? e.playerId}</td>
                 <td>{e.characterId ?? '—'}</td>
                 <td>{e.text}</td>
-                <td>{e.reason ? (REASONS[e.reason] ?? e.reason) : '—'}</td>
+                <td>{e.reason ? (e.reason.startsWith('reportedBy:') ? `举报人 ${e.reason.slice('reportedBy:'.length)}` : (REASONS[e.reason] ?? e.reason)) : '—'}</td>
                 <td>{e.status === 'open' ? <button onClick={() => post(`/moderation/${e.id}/resolve`).then(reload)}>标记已处理</button> : <span className="muted">已处理</span>}</td>
               </tr>
             ))}
