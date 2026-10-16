@@ -8,6 +8,9 @@ interface Day {
   day: string;
   dau: number;
   newPlayers: number;
+  /** Of that day's signups, how many played the next day / a week later; null until that day is over. */
+  retainedD1: number | null;
+  retainedD7: number | null;
   coinsIssued: number;
   coinsConsumed: number;
   privateRoomIssued: number;
@@ -38,6 +41,16 @@ export function Analytics() {
   const days = s.map((d) => d.day);
   const sessions = sum(s.map((d) => d.sessions));
   const avgMinutes = sessions ? sum(s.map((d) => d.avgSessionMinutes * d.sessions)) / sessions : 0;
+  // Pooled over the signup days whose retention day is already over.
+  const retention = (key: 'retainedD1' | 'retainedD7') => {
+    const done = s.filter((d) => d[key] !== null);
+    const cohort = sum(done.map((d) => d.newPlayers));
+    return { rate: cohort ? sum(done.map((d) => d[key] ?? 0)) / cohort : null, cohort, days: done.length };
+  };
+  const d1 = retention('retainedD1');
+  const d7 = retention('retainedD7');
+  const pct = (r: { rate: number | null }) => (r.rate === null ? '—' : `${(r.rate * 100).toFixed(1)}%`);
+  const cohortNote = (r: { cohort: number; days: number }) => (r.days ? `${r.days} 天内注册的 ${fmt(r.cohort)} 人` : '区间内还没有满期的注册日');
 
   return (
     <>
@@ -66,6 +79,8 @@ export function Analytics() {
           <div className="tiles" style={{ opacity: loading ? 0.5 : 1 }}>
             <StatTile label="最近一天活跃玩家" value={fmt(s[s.length - 1]?.dau ?? 0)} sub={`区间日均 ${fmt(Math.round(sum(s.map((d) => d.dau)) / Math.max(1, s.length)))}`} />
             <StatTile label="新注册" value={fmt(sum(s.map((d) => d.newPlayers)))} sub={`累计玩家 ${fmt(data.totals.players)}`} />
+            <StatTile label="次日留存" value={pct(d1)} sub={cohortNote(d1)} />
+            <StatTile label="7 日留存" value={pct(d7)} sub={cohortNote(d7)} />
             <StatTile label="金币发放" value={fmt(sum(s.map((d) => d.coinsIssued)))} sub={`私人房赢取 ${fmt(sum(s.map((d) => d.privateRoomIssued)))}`} />
             <StatTile label="金币消耗" value={fmt(sum(s.map((d) => d.coinsConsumed)))} sub={`流通总量 ${fmt(data.totals.coinsInCirculation)}`} />
             <StatTile label="平均在线时长" value={`${avgMinutes.toFixed(1)} 分钟`} sub={`共 ${fmt(sessions)} 次会话`} />

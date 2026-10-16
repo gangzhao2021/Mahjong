@@ -172,7 +172,30 @@ describe('analytics (PRD §33)', () => {
     expect(range.body.series).toHaveLength(7);
     expect((await admin.request('GET', '/analytics?from=2020-01-01&to=2026-01-01')).body).toEqual({ error: 'invalidRange' });
   });
+
+  it('reports day-1 and day-7 retention by signup day, once those days are over', async () => {
+    const now = () => new Date();
+    const { server, admin, code } = await adminServer(now);
+    const ids = [];
+    for (const d of ['ret-a', 'ret-b', 'ret-c']) ids.push((await server.services.accounts.login('guest', d)).player.id);
+    const db = server.services.db;
+    const ago = (days: number, hours = 0) => new Date(Date.now() - days * 86_400_000 - hours * 3_600_000);
+    // All three signed up 9 days ago; a came back the next day, b a week later, c never.
+    await db.query('UPDATE players SET created_at = $1', [ago(9)]);
+    await db.query('INSERT INTO play_sessions (player_id, started_at) VALUES ($1, $2), ($3, $4)', [ids[0], ago(8), ids[1], ago(2)]);
+    await admin.login(code());
+
+    const res = await admin.request('GET', '/analytics?' + new URLSearchParams({ from: day(ago(9)), to: day(ago(0)) }));
+    const series = res.body.series as { day: string; newPlayers: number; retainedD1: number | null; retainedD7: number | null }[];
+    expect(series[0]).toMatchObject({ newPlayers: 3, retainedD1: 1, retainedD7: 1 });
+    // Not over yet: unknown, not zero.
+    expect(series.at(-1)).toMatchObject({ retainedD1: null, retainedD7: null });
+    expect(series.at(-3)).toMatchObject({ retainedD1: 0, retainedD7: null });
+  });
 });
+
+/** A calendar day in the game's time zone (UTC+8). */
+const day = (d: Date) => new Date(d.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
 
 describe('live configuration (PRD §34–§38)', () => {
   it('validates, applies immediately and audits economy changes', async () => {
