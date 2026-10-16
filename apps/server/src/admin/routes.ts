@@ -352,7 +352,8 @@ export async function analytics(s: Services, from?: string, to?: string) {
 
   const bucket = (col: string) => `to_char(((${col}) AT TIME ZONE 'UTC') + make_interval(hours => ${Number(offset)}), 'YYYY-MM-DD')`;
   const db = s.db;
-  const [dau, signups, coins, sessions] = await Promise.all([
+  const localDate = (col: string) => `((${col}) AT TIME ZONE 'UTC' + make_interval(hours => ${Number(offset)}))::date`;
+  const [dau, signups, coins, sessions, cohorts] = await Promise.all([
     db.query<{ day: string; n: string }>(
       `SELECT ${bucket('started_at')} AS day, count(DISTINCT player_id) AS n FROM play_sessions WHERE started_at >= $1 AND started_at < $2 GROUP BY 1`,
       [start, end],
@@ -370,7 +371,17 @@ export async function analytics(s: Services, from?: string, to?: string) {
        FROM play_sessions WHERE started_at >= $1 AND started_at < $2 AND ended_at IS NOT NULL GROUP BY 1`,
       [start, end],
     ),
+    // Retention by signup day: players who started a session exactly 1 / 7 days after signing up.
+    db.query<{ day: string; d1: string; d7: string }>(
+      `SELECT ${bucket('p.created_at')} AS day,
+              count(*) FILTER (WHERE EXISTS (SELECT 1 FROM play_sessions s WHERE s.player_id = p.id AND ${localDate('s.started_at')} = ${localDate('p.created_at')} + 1)) AS d1,
+              count(*) FILTER (WHERE EXISTS (SELECT 1 FROM play_sessions s WHERE s.player_id = p.id AND ${localDate('s.started_at')} = ${localDate('p.created_at')} + 7)) AS d7
+       FROM players p WHERE p.created_at >= $1 AND p.created_at < $2 GROUP BY 1`,
+      [start, end],
+    ),
   ]);
+  const today = day(s.now());
+  const plusDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
   const days: string[] = [];
   for (let t = Date.parse(`${fromDay}T00:00:00Z`); t <= Date.parse(`${toDay}T00:00:00Z`); t += 86_400_000) days.push(new Date(t).toISOString().slice(0, 10));
@@ -384,6 +395,9 @@ export async function analytics(s: Services, from?: string, to?: string) {
       day: d,
       dau: Number(dau.find((r) => r.day === d)?.n ?? 0),
       newPlayers: Number(signups.find((r) => r.day === d)?.n ?? 0),
+      // Null until that day has come (it can still change while it is today).
+      retainedD1: plusDays(d, 1) < today ? Number(cohorts.find((r) => r.day === d)?.d1 ?? 0) : null,
+      retainedD7: plusDays(d, 7) < today ? Number(cohorts.find((r) => r.day === d)?.d7 ?? 0) : null,
       coinsIssued: sum(c, 'issued'),
       coinsConsumed: sum(c, 'consumed'),
       coinsIssuedByType: byType,
