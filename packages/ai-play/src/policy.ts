@@ -5,7 +5,10 @@
  * Skill levels differ in how much they look at:
  *   beginner     — shanten + tile acceptance, with noticeable mistakes
  *   intermediate — shanten + acceptance, light defence late in the hand
- *   expert       — + danger reading (void suits, threat level), hand value (flush / all triplets)
+ *   expert       — the same light defence, plus: always kongs (刮风下雨 money is paid at once and
+ *                  outweighs the shape it costs) and chases hand value (flush / all triplets) hard.
+ *                  Tuned by self-play (one expert vs three intermediates); heavy folding made it
+ *                  weaker at 血战, where three players win almost every hand.
  */
 import {
   rankOf,
@@ -151,10 +154,10 @@ export function rankDiscards(view: HandView, candidates: Tile[], skill: SkillLev
 
     if (skill !== 'beginner') {
       const late = wallLeft < 30 ? 1 : 0.3;
-      const defenceWeight = skill === 'expert' ? (sh >= 2 ? 60 : sh === 1 ? 30 : 12) : 15 * late;
+      const defenceWeight = 15 * late;
       score -= dangerOf(view, tile, seen) * defenceWeight;
     }
-    if (skill === 'expert') score += valueBonus(after, me.voidSuit, meldTiles);
+    if (skill === 'expert') score += 8 * valueBonus(after, me.voidSuit, meldTiles);
     return { tile, shanten: sh, acceptance: acc, score };
   });
   return scored.sort((a, b) => b.score - a.score);
@@ -198,7 +201,7 @@ function shouldPong(view: HandView, tile: Tile, skill: SkillLevel, rng: Rng): bo
 function shouldKong(view: HandView, tile: Tile, skill: SkillLevel): boolean {
   const me = self(view);
   const counts = usefulCounts(me.hand, me.voidSuit);
-  if (skill === 'beginner') return true;
+  if (skill === 'beginner' || skill === 'expert') return true;
   return shanten(countsWithout(counts, tile, 3), me.meldCount + 1) <= shanten(counts, me.meldCount);
 }
 
@@ -210,7 +213,7 @@ function shouldSelfKong(view: HandView, tile: Tile, skill: SkillLevel): boolean 
   const after = concealed
     ? shanten(countsWithout(counts, tile, 4), me.meldCount + 1)
     : shanten(countsWithout(counts, tile, 1), me.meldCount);
-  if (skill === 'beginner') return true;
+  if (skill === 'beginner' || skill === 'expert') return true;
   return after <= now;
 }
 

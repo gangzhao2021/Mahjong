@@ -12,7 +12,8 @@
     "admin:dev": "pnpm --filter @mahjong/admin dev",
     "admin:build": "pnpm --filter @mahjong/admin build",
     "admin:setup": "pnpm --filter @mahjong/server admin:setup",
-    "llm:smoke": "pnpm --filter @mahjong/server llm:smoke"
+    "llm:smoke": "pnpm --filter @mahjong/server llm:smoke",
+    "ai:bench": "tsx packages/ai-play/bench/strength.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
