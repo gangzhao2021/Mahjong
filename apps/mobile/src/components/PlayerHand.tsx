@@ -3,10 +3,10 @@
  * (or double-tap, or swipe it upward) to discard (PRD §15). With a mouse,
  * tiles that can be discarded lift slightly on hover.
  */
-import { suitOf, type Suit, type Tile as TileKind } from '@mahjong/engine';
+import { rankOf, suitOf, type Suit, type Tile as TileKind } from '@mahjong/engine';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
-import { T } from '../strings';
+import { RANK_NAMES, SUIT_NAMES, T } from '../strings';
 import { Tile } from './Tile';
 
 export interface HandTile {
@@ -140,9 +140,15 @@ function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect
     onSelect(item);
   };
 
+  // Marks above the tile differ in shape as well as colour; screen readers get them as words.
+  const marks = [kongable && T.tileMarks.kong, received && T.tileMarks.received, ready && T.tileMarks.ready].filter(Boolean);
+  const label = [`${RANK_NAMES[rankOf(item.tile) - 1]} ${SUIT_NAMES[suitOf(item.tile)]}`, ...marks].join(', ');
+
   return (
     <View
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected, disabled: dimmed }}
       onStartShouldSetResponder={() => true}
       onResponderTerminationRequest={() => false}
       onResponderGrant={(e) => {
@@ -170,7 +176,7 @@ function HandTileView({ item, width, gap, selected, canDiscard, dimmed, onSelect
       }}
     >
       <Tile tile={item.tile} width={width} dimmed={dimmed} highlighted={selected} />
-      {(kongable || received) && <View pointerEvents="none" style={[styles.mark, kongable ? styles.kongMark : styles.receivedMark, { top: -Math.max(5, width * 0.14) }]} />}
+      {(kongable || received) && <View pointerEvents="none" style={[styles.mark, received && styles.receivedMark, kongable && styles.kongMark, { top: -Math.max(5, width * 0.14) }]} />}
       {ready && (
         <View pointerEvents="none" style={[styles.readyWrap, { top: -Math.max(5, width * 0.14) - 16 }]}>
           <Text style={styles.readyMark}>{T.readyMark}</Text>
@@ -193,7 +199,8 @@ const styles = StyleSheet.create({
   mark: { position: 'absolute', left: 2, right: 2, height: 4, borderRadius: 2 },
   // Same purple as the 杠 claim button.
   kongMark: { backgroundColor: '#9b6ae0' },
-  receivedMark: { backgroundColor: '#4fc3f7' },
+  // Hollow, so it reads differently from the solid kong bar without relying on colour.
+  receivedMark: { height: 6, borderWidth: 1.5, borderColor: '#4fc3f7', backgroundColor: 'transparent' },
   readyWrap: { position: 'absolute', left: -6, right: -6, alignItems: 'center' },
   readyMark: { fontSize: 11, fontWeight: '900', color: '#ffe082', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 2 },
   magnifier: { position: 'absolute', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 8 },
