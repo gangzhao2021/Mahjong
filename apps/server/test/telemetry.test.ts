@@ -44,3 +44,23 @@ describe('legal pages (Appendix C / D.7)', () => {
     expect(await (await fetch(`${china.http}/legal/privacy`)).text()).toContain('境内');
   });
 });
+
+describe('health checks', () => {
+  it('reports readiness with the database and live counts, and 503 when the database fails', async () => {
+    const server = await startServer();
+    expect(await (await fetch(`${server.http}/health`)).json()).toEqual({ ok: true });
+    const ready = await fetch(`${server.http}/health/ready`);
+    expect(ready.status).toBe(200);
+    expect(await ready.json()).toMatchObject({ ok: true, tables: 0, players: 0 });
+
+    const db = server.services.db;
+    const query = db.query.bind(db);
+    db.query = (async () => {
+      throw new Error('connection refused');
+    }) as typeof db.query;
+    const down = await fetch(`${server.http}/health/ready`);
+    expect(down.status).toBe(503);
+    expect(await down.json()).toEqual({ ok: false, error: 'connection refused' });
+    db.query = query;
+  });
+});

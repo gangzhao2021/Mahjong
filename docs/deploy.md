@@ -42,7 +42,14 @@ docker compose up -d --build
 curl http://localhost:8787/health
 ```
 
-返回 `{"ok":true}` 即正常。查看日志：
+返回 `{"ok":true}` 即正常。`/health` 只说明进程活着；`/health/ready` 还会查数据库（3 秒超时，失败返回 503），并报告在打的桌数和在线人数：
+
+```bash
+curl http://localhost:8787/health/ready
+# {"ok":true,"dbMs":1,"uptimeS":3600,"tables":12,"players":15}
+```
+
+容器的 `HEALTHCHECK` 用的就是 `/health/ready`。查看日志：
 
 ```bash
 docker compose logs -f server
@@ -79,6 +86,33 @@ docker compose exec -T db pg_dump -U mahjong mahjong | gzip > backup-$(date +%F)
 ```
 
 备份文件要加密保存在服务器以外的地方。牌局回放日志在 `serverdata` 卷里，默认保留 180 天，丢了不影响游戏。
+
+用 cron 每天凌晨自动备份并保留 14 天（`crontab -e`，路径换成部署目录）：
+
+```
+30 4 * * * cd /srv/mahjong && docker compose exec -T db pg_dump -U mahjong mahjong | gzip > backups/backup-$(date +\%F).sql.gz && find backups -name 'backup-*.sql.gz' -mtime +14 -delete
+```
+
+**每季度做一次恢复演练**，确认备份真的能用（在另一台机器或临时库上）：
+
+```bash
+docker compose exec -T db createdb -U mahjong restore_test
+gunzip -c backups/backup-2026-10-01.sql.gz | docker compose exec -T db psql -U mahjong -d restore_test -q
+docker compose exec -T db psql -U mahjong -d restore_test -c 'SELECT count(*) FROM players'
+docker compose exec -T db dropdb -U mahjong restore_test
+```
+
+## 6.1 监控告警
+
+最少配这三项（任何外部拨测服务都可以，如 UptimeRobot、阿里云云监控）：
+
+| 监控 | 规则 | 说明 |
+|---|---|---|
+| 可用性 | 每分钟请求 `https://api.example.com/health/ready`，连续 2 次非 200 告警 | 进程挂了或数据库连不上 |
+| 延迟 | `/health` 响应超过 500 ms 持续 5 分钟告警 | 单核跑满，见第 8 节容量 |
+| 磁盘 | 数据卷剩余小于 20% 告警 | 数据库和回放日志都在卷上 |
+
+另外在 `docker compose logs server` 里盯 `Failed to save hand log`、`Recording rank failed` 这类错误；客户端崩溃在管理后台的崩溃报告页查看。
 
 ## 7. 日志保留
 

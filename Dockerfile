@@ -22,5 +22,5 @@ WORKDIR /app/apps/server
 VOLUME /data
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 8787) + '/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 8787) + '/health/ready').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 CMD ["/app/node_modules/.bin/tsx", "src/main.ts"]
