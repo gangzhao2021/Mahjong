@@ -353,7 +353,7 @@ export async function analytics(s: Services, from?: string, to?: string) {
   const bucket = (col: string) => `to_char(((${col}) AT TIME ZONE 'UTC') + make_interval(hours => ${Number(offset)}), 'YYYY-MM-DD')`;
   const db = s.db;
   const localDate = (col: string) => `((${col}) AT TIME ZONE 'UTC' + make_interval(hours => ${Number(offset)}))::date`;
-  const [dau, signups, coins, sessions, cohorts] = await Promise.all([
+  const [dau, signups, coins, sessions, cohorts, usage] = await Promise.all([
     db.query<{ day: string; n: string }>(
       `SELECT ${bucket('started_at')} AS day, count(DISTINCT player_id) AS n FROM play_sessions WHERE started_at >= $1 AND started_at < $2 GROUP BY 1`,
       [start, end],
@@ -377,6 +377,13 @@ export async function analytics(s: Services, from?: string, to?: string) {
               count(*) FILTER (WHERE EXISTS (SELECT 1 FROM play_sessions s WHERE s.player_id = p.id AND ${localDate('s.started_at')} = ${localDate('p.created_at')} + 1)) AS d1,
               count(*) FILTER (WHERE EXISTS (SELECT 1 FROM play_sessions s WHERE s.player_id = p.id AND ${localDate('s.started_at')} = ${localDate('p.created_at')} + 7)) AS d7
        FROM players p WHERE p.created_at >= $1 AND p.created_at < $2 GROUP BY 1`,
+      [start, end],
+    ),
+    // Games per table and mode: each player's first hand of a game (a friend room counts once per player).
+    db.query<{ kind: string | null; table_id: string | null; xueliu: boolean; games: string }>(
+      `SELECT log->'stake'->>'kind' AS kind, log->'stake'->>'tableId' AS table_id,
+              COALESCE((log->'ruleSet'->>'xueliu')::boolean, false) AS xueliu, count(*) AS games
+       FROM hand_history WHERE hand_index = 0 AND ended_at >= $1 AND ended_at < $2 GROUP BY 1, 2, 3`,
       [start, end],
     ),
   ]);
@@ -407,5 +414,8 @@ export async function analytics(s: Services, from?: string, to?: string) {
     };
   });
   const [totals] = await db.query<{ players: string; coins: string }>('SELECT (SELECT count(*) FROM players) AS players, (SELECT COALESCE(sum(balance), 0) FROM wallets) AS coins');
-  return { from: fromDay, to: toDay, series, totals: { players: Number(totals.players), coinsInCirculation: Number(totals.coins) } };
+  const tables = usage
+    .map((r) => ({ table: r.kind === 'public' ? (r.table_id ?? 'public') : (r.kind ?? 'unknown'), mode: r.xueliu ? 'xueliu' : 'xuezhan', games: Number(r.games) }))
+    .sort((a, b) => b.games - a.games || a.table.localeCompare(b.table) || a.mode.localeCompare(b.mode));
+  return { from: fromDay, to: toDay, series, tables, totals: { players: Number(totals.players), coinsInCirculation: Number(totals.coins) } };
 }

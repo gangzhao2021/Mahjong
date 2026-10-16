@@ -473,6 +473,7 @@ export class Room {
       salt: randomBytes(16).toString('hex'),
       dealer: this.hand.dealer,
       baseScore: this.hand.baseScore,
+      stake: { kind: this.opts.stake.kind, ...(this.opts.stake.tableId ? { tableId: this.opts.stake.tableId } : {}) },
       ruleSet: this.hand.ruleSet,
       seats: this.seats.map((s) => ({
         seat: s.info.seat,

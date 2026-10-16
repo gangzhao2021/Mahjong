@@ -22,10 +22,15 @@ interface Report {
   from: string;
   to: string;
   series: Day[];
+  /** Games per table and mode in the range (each player's games; a friend room counts per player). */
+  tables: { table: string; mode: 'xuezhan' | 'xueliu'; games: number }[];
   totals: { players: number; coinsInCirculation: number };
 }
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+
+const TABLE_NAMES: Record<string, string> = { practice: '练习场', low: '初级场', mid: '中级场', high: '高级场', private: '私人房', friend: '好友房', unknown: '未记录' };
+const MODE_NAMES = { xuezhan: '血战到底', xueliu: '血流成河' };
 
 export function Analytics() {
   const [range, setRange] = useState<{ preset: '7' | '30' | 'custom'; from: string; to: string }>({ preset: '7', from: '', to: '' });
@@ -84,6 +89,33 @@ export function Analytics() {
             <StatTile label="金币发放" value={fmt(sum(s.map((d) => d.coinsIssued)))} sub={`私人房赢取 ${fmt(sum(s.map((d) => d.privateRoomIssued)))}`} />
             <StatTile label="金币消耗" value={fmt(sum(s.map((d) => d.coinsConsumed)))} sub={`流通总量 ${fmt(data.totals.coinsInCirculation)}`} />
             <StatTile label="平均在线时长" value={`${avgMinutes.toFixed(1)} 分钟`} sub={`共 ${fmt(sessions)} 次会话`} />
+          </div>
+          <div className="card" style={{ overflowX: 'auto', marginBottom: 16 }}>
+            <h3>场次与玩法</h3>
+            {data.tables.length === 0 ? (
+              <p className="muted">区间内没有对局</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>场次</th>
+                    <th>玩法</th>
+                    <th className="num">参与局数</th>
+                    <th className="num">占比</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.tables.map((t) => (
+                    <tr key={`${t.table}:${t.mode}`}>
+                      <td>{TABLE_NAMES[t.table] ?? t.table}</td>
+                      <td>{MODE_NAMES[t.mode]}</td>
+                      <td className="num">{fmt(t.games)}</td>
+                      <td className="num">{((t.games / sum(data.tables.map((x) => x.games))) * 100).toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           <div className="charts">
             <LineChart title="日活跃玩家" days={days} series={[{ name: '活跃玩家', color: 'var(--series-1)', values: s.map((d) => d.dau) }]} loading={loading} />
