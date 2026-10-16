@@ -194,6 +194,31 @@ describe('analytics (PRD §33)', () => {
   });
 });
 
+describe('table usage', () => {
+  it('counts games per table and mode, once per player and game', async () => {
+    const { server, admin, code } = await adminServer(() => new Date());
+    const id = (await server.services.accounts.login('guest', 'usage-a')).player.id;
+    const db = server.services.db;
+    const log = (stake: object | undefined, xueliu: boolean) => JSON.stringify({ ...(stake ? { stake } : {}), ruleSet: { xueliu } });
+    const rows: [string, number, string][] = [
+      ['g1', 0, log({ kind: 'public', tableId: 'low' }, false)],
+      ['g1', 1, log({ kind: 'public', tableId: 'low' }, false)], // later hands do not count again
+      ['g2', 0, log({ kind: 'public', tableId: 'low' }, false)],
+      ['g3', 0, log({ kind: 'friend' }, true)],
+      ['g4', 0, log(undefined, false)], // written before stakes were logged
+    ];
+    for (const [game, hand, l] of rows) await db.query('INSERT INTO hand_history (player_id, game_id, hand_index, log) VALUES ($1, $2, $3, $4)', [id, game, hand, l]);
+    await admin.login(code());
+
+    const res = await admin.request('GET', '/analytics');
+    expect(res.body.tables).toEqual([
+      { table: 'low', mode: 'xuezhan', games: 2 },
+      { table: 'friend', mode: 'xueliu', games: 1 },
+      { table: 'unknown', mode: 'xuezhan', games: 1 },
+    ]);
+  });
+});
+
 /** A calendar day in the game's time zone (UTC+8). */
 const day = (d: Date) => new Date(d.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
 

@@ -16,6 +16,8 @@ export interface HandLog {
   salt?: string;
   dealer: Seat;
   baseScore: number;
+  /** Which table the hand was played at (absent in logs written before it was recorded). */
+  stake?: { kind: 'public' | 'private' | 'friend'; tableId?: string };
   ruleSet: RuleSet;
   seats: { seat: Seat; name: string; isHuman: boolean; skill?: string }[];
   actions: Action[];
