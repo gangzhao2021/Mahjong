@@ -514,9 +514,10 @@ export class Room {
         const log = h.seat === this.humanSeat ? this.log : { ...this.log, playerId: h.ctrl.playerId };
         void this.opts.store.save(log).catch((err) => console.error('Failed to save hand log', err));
       }
-      this.opts.onHandEnd?.(this, this.handIndex, this.hand.result!);
     }
     this.publish(events);
+    // After publishing, so the final table reaches players before anything settlement sends (e.g. the game summary).
+    if (this.hand.phase === 'ended') this.opts.onHandEnd?.(this, this.handIndex, this.hand.result!);
     // Conversation sees only public information: redacted for the player, or for nobody when several share the table.
     const viewer = this.multiplayer ? NOBODY : this.humanSeat;
     this.talk.onEvents(events.map((e) => redactEvent(e, viewer)));
