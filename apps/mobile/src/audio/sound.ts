@@ -15,12 +15,12 @@ const SOURCES = {
   discard: [require('../../assets/sounds/discard1.wav'), require('../../assets/sounds/discard2.wav'), require('../../assets/sounds/discard3.wav')],
   pong: [require('../../assets/sounds/pong.wav')],
   // 刮风 (exposed kong) and 下雨 (concealed kong).
-  kongWind: [require('../../assets/sounds/kong_wind.wav')],
-  kongRain: [require('../../assets/sounds/kong_rain.wav')],
-  zimo: [require('../../assets/sounds/zimo.wav')],
-  hu: [require('../../assets/sounds/hu.wav')],
+  kongWind: [require('../../assets/sounds/kong_wind.m4a')],
+  kongRain: [require('../../assets/sounds/kong_rain.m4a')],
+  zimo: [require('../../assets/sounds/zimo.m4a')],
+  hu: [require('../../assets/sounds/hu.m4a')],
   // Someone else wins: you dealt in, they self-drew (you pay too), or it's between other players.
-  dealIn: [require('../../assets/sounds/deal_in.wav')],
+  dealIn: [require('../../assets/sounds/deal_in.m4a')],
   otherZimo: [require('../../assets/sounds/other_zimo.wav')],
   otherHu: [require('../../assets/sounds/other_hu.wav')],
   tap: [require('../../assets/sounds/tap.wav')],
@@ -29,13 +29,13 @@ const SOURCES = {
   alert: [require('../../assets/sounds/alert.wav')],
   tick: [require('../../assets/sounds/tick.wav')],
   ting: [require('../../assets/sounds/ting.wav')],
-  shuffle: [require('../../assets/sounds/shuffle.wav')],
+  shuffle: [require('../../assets/sounds/shuffle.m4a')],
   swap: [require('../../assets/sounds/swap.wav')],
   dingque: [require('../../assets/sounds/dingque.wav')],
-  settleWin: [require('../../assets/sounds/settle_win.wav')],
-  settleLose: [require('../../assets/sounds/settle_lose.wav')],
+  settleWin: [require('../../assets/sounds/settle_win.m4a')],
+  settleLose: [require('../../assets/sounds/settle_lose.m4a')],
 } as const;
-const MUSIC = require('../../assets/sounds/music.wav');
+const MUSIC = require('../../assets/sounds/music.m4a');
 
 export type Sfx = keyof typeof SOURCES;
 
