@@ -297,6 +297,41 @@ describe('moderation', () => {
     expect((await m.check('你这张五条打得好啊', 'playerChat')).allowed).toBe(true);
     expect((await m.check('这把 12345678 分', 'aiLine')).allowed).toBe(true);
   });
+
+  it.each([
+    ['傻b', 'blocklist'],
+    ['煞笔', 'blocklist'],
+    ['你就是个 SB', 'blocklist'],
+    ['ＳＢ', 'blocklist'],
+    ['s.b', 'blocklist'],
+    ['去屎吧', 'blocklist'],
+    ['１３８００１３８０００', 'contactInfo'],
+    ['一三八零零一三八零零零', 'contactInfo'],
+    ['加我v信', 'link'],
+    ['加我薇信 abc123', 'link'],
+    ['加我q扣', 'link'],
+    ['wx: abc', 'link'],
+  ])('blocks the workaround %j', async (text, reason) => {
+    expect(await m.check(text, 'playerChat')).toEqual({ allowed: false, reason });
+  });
+
+  it.each([
+    'the skys are blue',
+    'plug in the usb',
+    '我要做一二三四五六七八九',
+    '幺鸡二条三条都要',
+    '这把稳了，谢谢大家',
+  ])('lets %j through', async (text) => {
+    expect((await m.check(text, 'playerChat')).allowed).toBe(true);
+  });
+
+  it('never blocks a template line the AI says', async () => {
+    for (const lines of [...Object.values(DEFAULT_TEMPLATES), ...Object.values(EN_TEMPLATES)]) {
+      for (const line of [...(lines?.mild ?? []), ...(lines?.spicy ?? [])]) {
+        expect((await m.check(line.replace(/\{\w+\}/g, '张三'), 'aiLine')).allowed, line).toBe(true);
+      }
+    }
+  });
 });
 
 describe('English table talk', () => {
