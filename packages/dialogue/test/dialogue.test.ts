@@ -327,7 +327,7 @@ describe('moderation', () => {
 
   it('never blocks a template line the AI says', async () => {
     for (const lines of [...Object.values(DEFAULT_TEMPLATES), ...Object.values(EN_TEMPLATES)]) {
-      for (const line of [...lines.mild, ...(lines.spicy ?? [])]) {
+      for (const line of [...(lines?.mild ?? []), ...(lines?.spicy ?? [])]) {
         expect((await m.check(line.replace(/\{\w+\}/g, '张三'), 'aiLine')).allowed, line).toBe(true);
       }
     }
