@@ -6,6 +6,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Db, Queryable } from '../db/db';
 import type { Wallet } from '../economy/wallet';
+import { LoginError } from './providers';
 import type { SessionTokens } from './tokens';
 
 export type Provider = 'guest' | 'apple' | 'google' | 'phone' | 'wechat';
@@ -57,6 +58,12 @@ export class Accounts {
         [provider, subject],
       );
       if (found.length) {
+        // Once a guest account is linked to Apple / Google / a phone, the device id alone no longer opens it:
+        // it sits in plain app storage, while the account now holds progress worth protecting.
+        if (provider === 'guest') {
+          const linked = await q.query('SELECT 1 FROM identities WHERE player_id = $1 AND provider <> $2 LIMIT 1', [found[0].id, 'guest']);
+          if (linked.length) throw new LoginError('guestLinked');
+        }
         if (secret) await q.query('UPDATE identities SET secret = $3 WHERE provider = $1 AND subject = $2', [provider, subject, secret]);
         return { player: found[0], created: false };
       }
