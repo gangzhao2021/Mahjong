@@ -132,18 +132,30 @@ export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount 
   );
 }
 
-/** Seconds left on the server timer, ticking locally. */
+const secondsLeft = (timer: TimerInfo | null, receivedAt: number, now: number): number | null =>
+  timer ? Math.max(0, Math.ceil((timer.remainingMs - Math.max(0, now - receivedAt)) / 1000)) : null;
+
+/**
+ * Seconds left on the server timer, ticking locally. It polls every 250 ms but only changes (and
+ * re-renders the table) when the displayed second does.
+ */
 export function useCountdown(timer: TimerInfo | null, receivedAt: number): number | null {
-  const [now, setNow] = useState(() => Date.now());
+  const [tick, setTick] = useState<{ timer: TimerInfo | null; receivedAt: number; seconds: number | null }>(() => ({
+    timer,
+    receivedAt,
+    seconds: secondsLeft(timer, receivedAt, Date.now()),
+  }));
   useEffect(() => {
     if (!timer) return;
-    const id = setInterval(() => setNow(Date.now()), 250);
+    const id = setInterval(() => {
+      const seconds = secondsLeft(timer, receivedAt, Date.now());
+      setTick((t) => (t.timer === timer && t.receivedAt === receivedAt && t.seconds === seconds ? t : { timer, receivedAt, seconds }));
+    }, 250);
     return () => clearInterval(id);
   }, [timer, receivedAt]);
-  if (!timer) return null;
-  // `now` only ticks every 250 ms, so it can lag behind a freshly received snapshot.
-  const elapsed = Math.max(0, now - receivedAt);
-  return Math.max(0, Math.ceil((timer.remainingMs - elapsed) / 1000));
+  // A freshly received snapshot shows its own time right away, before the first poll.
+  if (tick.timer !== timer || tick.receivedAt !== receivedAt) return timer ? Math.ceil(timer.remainingMs / 1000) : null;
+  return tick.seconds;
 }
 
 const skillStyle = (skill: AiLevel) => (skill === 'expert' ? styles.skillExpert : skill === 'intermediate' ? styles.skillIntermediate : styles.skillBeginner);
