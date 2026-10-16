@@ -21,3 +21,8 @@ export const ICP_NUMBER = process.env.EXPO_PUBLIC_ICP;
 export const APP_FILING_NUMBER = process.env.EXPO_PUBLIC_APP_FILING;
 /** Age-appropriateness label (适龄提示); must match the official assessment for the store listing. */
 export const AGE_RATING = process.env.EXPO_PUBLIC_AGE_RATING ?? '16+';
+/**
+ * Global build: the age players confirm on the consent screen. 17 matches the App Store rating for
+ * simulated gambling; the China build relies on real-name verification instead.
+ */
+export const MIN_AGE = Number(process.env.EXPO_PUBLIC_MIN_AGE ?? 17);

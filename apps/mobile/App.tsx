@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Btn } from './src/components/ActionBar';
 import { Felt } from './src/components/Felt';
 import { Sheet } from './src/components/Sheet';
+import { useBreakReminder } from './src/useBreakReminder';
 import { TileFan } from './src/components/TileFan';
 import { TileGallery } from './src/components/TileGallery';
 import { setMusicWanted } from './src/audio/sound';
@@ -121,6 +122,8 @@ export default function App() {
   const chatToast = useToast(game.chatRejected ? T.chatRejected[game.chatRejected.reason] : null, game.chatRejected?.at, 2500);
   const startToast = useToast(game.startRejected ? T.startRejected[game.startRejected.reason] : null, game.startRejected?.at, 4000);
   const noticeToast = useToast(game.notice ? T.limitEnding : null, game.notice?.at, 6000);
+  const breakDue = useBreakReminder(!!game.table);
+  const breakToast = useToast(breakDue ? T.breakReminder(breakDue.hours) : null, breakDue?.at, 8000);
   const friendRejection = game.friendRoomRejected ? T.friend.rejected[game.friendRoomRejected.reason] : null;
   const friendToast = useToast(
     typeof friendRejection === 'function' ? friendRejection(game.friendRoomRejected?.detail ?? '') : friendRejection,
@@ -144,7 +147,7 @@ export default function App() {
     screen = <TutorialScreen onExit={() => setTutorialOpen(false)} />;
   } else if (consented === false) {
     // Nothing is collected until the player agrees (PRD Appendix D.7).
-    screen = <ConsentScreen onAgree={() => setConsented(true)} onOpenTutorial={() => setTutorialOpen(true)} showLanguage={info?.region !== 'china'} />;
+    screen = <ConsentScreen onAgree={() => setConsented(true)} onOpenTutorial={() => setTutorialOpen(true)} global={info?.region !== 'china'} />;
   } else if (!info || token === undefined || consented === undefined || (token && !game.account)) {
     screen = (
       <Felt style={styles.splash}>
@@ -181,7 +184,7 @@ export default function App() {
     );
   }
 
-  const toast = errorToast ?? chatToast ?? startToast ?? friendToast ?? noticeToast ?? rewardToast ?? (game.leftReason ? T.startRejected[game.leftReason] : null);
+  const toast = errorToast ?? chatToast ?? startToast ?? friendToast ?? noticeToast ?? breakToast ?? rewardToast ?? (game.leftReason ? T.startRejected[game.leftReason] : null);
   return (
     <View style={styles.root}>
       <StatusBar hidden />

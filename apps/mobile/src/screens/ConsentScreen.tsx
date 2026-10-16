@@ -5,12 +5,12 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { formStyles } from '../components/Sheet';
-import { SERVER_HTTP } from '../config';
+import { MIN_AGE, SERVER_HTTP } from '../config';
 import { getLocale, T } from '../strings';
 
 const KEY = 'mahjong.consent';
@@ -43,9 +43,13 @@ export function LegalLinks() {
   );
 }
 
-/** `showLanguage`: the global build offers 中文 / English before anything else (the China build is always Chinese). */
-export function ConsentScreen({ onAgree, onOpenTutorial, showLanguage }: { onAgree(): void; onOpenTutorial(): void; showLanguage: boolean }) {
+/**
+ * `global`: the global build offers 中文 / English before anything else and asks the player to
+ * confirm their age (the China build is always Chinese and verifies age by real name instead).
+ */
+export function ConsentScreen({ onAgree, onOpenTutorial, global }: { onAgree(): void; onOpenTutorial(): void; global: boolean }) {
   const [declined, setDeclined] = useState(false);
+  const [oldEnough, setOldEnough] = useState(false);
   const agree = async () => {
     try {
       await AsyncStorage.setItem(KEY, CONSENT_VERSION);
@@ -60,7 +64,13 @@ export function ConsentScreen({ onAgree, onOpenTutorial, showLanguage }: { onAgr
         <Text style={styles.title}>{T.consent.title}</Text>
         <Text style={styles.body}>{declined ? T.consent.declined : T.consent.body}</Text>
         <LegalLinks />
-        {showLanguage && <LanguagePicker label={false} />}
+        {global && <LanguagePicker label={false} />}
+        {global && !declined && (
+          <Pressable style={styles.check} onPress={() => setOldEnough(!oldEnough)} accessibilityRole="checkbox" accessibilityState={{ checked: oldEnough }} hitSlop={8}>
+            <Text style={styles.checkMark}>{oldEnough ? '☑' : '☐'}</Text>
+            <Text style={styles.body}>{T.consent.ageConfirm(MIN_AGE)}</Text>
+          </Pressable>
+        )}
         <View style={formStyles.row}>
           {declined ? (
             <>
@@ -70,7 +80,7 @@ export function ConsentScreen({ onAgree, onOpenTutorial, showLanguage }: { onAgr
           ) : (
             <>
               <Btn label={T.consent.decline} onPress={() => setDeclined(true)} />
-              <Btn label={T.consent.agree} primary onPress={agree} />
+              <Btn label={T.consent.agree} primary disabled={global && !oldEnough} onPress={agree} />
             </>
           )}
         </View>
@@ -85,4 +95,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: '#3e2723' },
   body: { color: '#37474f', lineHeight: 22 },
   link: { color: '#1565c0', textDecorationLine: 'underline' },
+  check: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checkMark: { fontSize: 22, color: '#1f6b47' },
 });
