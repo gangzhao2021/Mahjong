@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from '
 import { useCueSounds } from '../audio/cues';
 import { useTableSounds } from '../audio/sound';
 import { ActionBar, Btn, claimFanSize } from '../components/ActionBar';
-import { BanterPicker, ChatPanel, SpeechBubbles } from '../components/Chat';
+import { ChatPanel, SpeechBubbles } from '../components/Chat';
 import { arrangeHand, PlayerHand, type HandTile } from '../components/PlayerHand';
 import { PopIn } from '../components/PopIn';
 import { ResultPanel } from '../components/ResultPanel';
@@ -481,10 +481,9 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
             reported={game.reported}
             onBlock={game.blockPlayer}
             onClose={() => showChat(false)}
+            banter={game.banterLevel}
+            onBanter={game.setBanter}
           />
-          <View style={styles.chatBanter}>
-            <BanterPicker level={game.banterLevel} onChange={game.setBanter} />
-          </View>
         </View>
       )}
 
@@ -779,14 +778,6 @@ const styles = StyleSheet.create({
   },
   bannerText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   chatLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  chatBanter: {
-    position: 'absolute',
-    left: 12,
-    bottom: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    padding: 8,
-  },
   modalBackdrop: {
     position: 'absolute',
     top: 0,

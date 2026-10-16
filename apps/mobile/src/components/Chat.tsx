@@ -65,9 +65,12 @@ interface PanelProps {
   /** Hide another real player's chat (friend rooms). */
   onBlock(seat: Seat): void;
   onClose(): void;
+  /** The AI banter setting, kept inside the panel so it never covers the hand. */
+  banter: BanterLevel;
+  onBanter(level: BanterLevel): void;
 }
 
-export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase, onSticker, onReport, reported, onBlock, onClose }: PanelProps) {
+export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase, onSticker, onReport, reported, onBlock, onClose, banter, onBanter }: PanelProps) {
   const [text, setText] = useState('');
   const [target, setTarget] = useState<Seat | 'table'>('table');
   const list = useRef<FlatList<ChatEntry>>(null);
@@ -85,6 +88,14 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
       <View style={styles.panelHeader}>
         <Text style={styles.panelTitle}>{T.chat}</Text>
         <Btn label={T.close} onPress={onClose} />
+      </View>
+      <View style={styles.banterInline}>
+        <Text style={styles.banterInlineLabel}>{T.banter}</Text>
+        {(['mild', 'spicy', 'quiet'] as BanterLevel[]).map((l) => (
+          <Pressable key={l} onPress={() => onBanter(l)} style={[styles.chip, banter === l && styles.chipOn]} accessibilityRole="button" accessibilityState={{ selected: banter === l }}>
+            <Text style={styles.chipText}>{T.banterLevels[l]}</Text>
+          </Pressable>
+        ))}
       </View>
       <FlatList
         ref={list}
@@ -231,6 +242,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   banter: { alignItems: 'center', gap: 6 },
+  banterInline: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  banterInlineLabel: { color: '#5d4037', fontSize: 12 },
   banterLabel: { color: '#e8f5e9', fontSize: 14 },
   banterRow: { flexDirection: 'row', gap: 8 },
   banterHint: { color: '#c8e6c9', fontSize: 12 },
