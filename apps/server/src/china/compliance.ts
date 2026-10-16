@@ -22,7 +22,12 @@ export interface ChinaConfig {
 
 export function loadChinaConfig(): ChinaConfig {
   const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../config');
-  return JSON.parse(readFileSync(path.join(dir, 'china.json'), 'utf8')) as ChinaConfig;
+  const config = JSON.parse(readFileSync(path.join(dir, 'china.json'), 'utf8')) as ChinaConfig;
+  const year = String(new Date(Date.now() + config.utcOffsetHours * 3_600_000).getUTCFullYear());
+  if (!config.holidays.some((d) => d.startsWith(year))) {
+    console.warn(`config/china.json has no holidays for ${year}: minors get only the weekly windows until it is updated.`);
+  }
+  return config;
 }
 
 // ---------------------------------------------------------------------------
