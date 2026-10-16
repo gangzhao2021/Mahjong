@@ -85,6 +85,40 @@ describe('friend rooms', () => {
     expect(table.table.seats.filter((s) => !s.isHuman && !s.empty).map((s) => s.skill)).toEqual(['expert', 'expert']);
   });
 
+  it("lets a player report a friend's line and block them, hiding their chat from then on", async () => {
+    const server = await startServer(PATIENT);
+    const host = await Client.connect(server);
+    const hostHello = await host.hello('device-block-host');
+    const friend = await Client.connect(server);
+    const friendHello = await friend.hello('device-block-friend');
+    host.send({ type: 'createFriendRoom', handsPerGame: 1 });
+    const { code } = (await host.next(roomWith(1))).room!;
+    friend.send({ type: 'joinFriendRoom', code });
+    await host.next(roomWith(2));
+    host.send({ type: 'startFriendRoom' });
+    await host.next(isTable);
+    await friend.next(isTable);
+
+    const isChat = (m: ServerMessage): m is Extract<ServerMessage, { type: 'chat' }> => m.type === 'chat' && m.entry.kind === 'player';
+    friend.send({ type: 'chat', text: '第一句' });
+    const first = (await host.next(isChat)).entry;
+    expect(first).toMatchObject({ seat: 1, text: '第一句' });
+
+    host.send({ type: 'reportLine', entryId: first.id });
+    expect(await host.next((m): m is ServerMessage => m.type === 'lineReported')).toMatchObject({ entryId: first.id });
+    const reports = await server.services.db.query<{ player_id: string; reason: string }>("SELECT player_id, reason FROM moderation_events WHERE kind = 'reportedPlayerLine'");
+    expect(reports).toEqual([{ player_id: friendHello.playerId, reason: `reportedBy:${hostHello.playerId}` }]);
+
+    host.send({ type: 'blockPlayer', seat: 1 });
+    expect(await host.next((m): m is ServerMessage => m.type === 'playerBlocked')).toMatchObject({ seat: 1 });
+    await new Promise((r) => setTimeout(r, 3100)); // chat rate limit
+    friend.send({ type: 'chat', text: '第二句' });
+    await friend.next((m): m is ServerMessage => isChat(m) && m.entry.text === '第二句');
+    await new Promise((r) => setTimeout(r, 300));
+    expect(host.messages.some((m) => isChat(m) && m.entry.text === '第二句')).toBe(false);
+    expect(await server.services.db.query('SELECT 1 FROM player_blocks WHERE player_id = $1 AND blocked_id = $2', [hostHello.playerId, friendHello.playerId])).toHaveLength(1);
+  });
+
   it('auto-plays a friend who drops out while the others play on', async () => {
     const server = await startServer(PATIENT);
     const host = await Client.connect(server);

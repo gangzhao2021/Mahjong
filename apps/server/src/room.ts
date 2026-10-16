@@ -200,7 +200,7 @@ export class Room {
       version: () => this.hand.actionCount,
       handIndex: () => this.handIndex,
       emit: (entry) => {
-        for (const h of this.humans) h.ctrl.send({ type: 'chat', entry });
+        for (const h of this.humans) if (!this.hides(h.ctrl.playerId, entry.seat)) h.ctrl.send({ type: 'chat', entry });
         opts.talk.onLine?.(entry, this.seats[entry.seat].info.name);
       },
       onMemoryUsed: opts.talk.onMemoryUsed,
@@ -235,6 +235,28 @@ export class Room {
       chat: this.talk.chatLog,
       guests: this.humans.filter((h) => h.seat !== this.humanSeat).map((h) => ({ seat: h.seat, playerId: h.ctrl.playerId, autoPlay: h.autoPlay })),
     };
+  }
+
+  /** Players each human has blocked (by player id); their lines are kept from that human. */
+  private readonly blocked = new Map<string, Set<string>>();
+
+  setBlocked(playerId: string, blockedIds: Iterable<string>): void {
+    this.blocked.set(playerId, new Set([...(this.blocked.get(playerId) ?? []), ...blockedIds]));
+  }
+
+  /** The player id of a real player's seat (null for AI and empty seats). */
+  playerAt(seat: Seat): string | null {
+    return this.humans.find((h) => h.seat === seat)?.ctrl.playerId ?? null;
+  }
+
+  private hides(recipient: string, speakerSeat: Seat): boolean {
+    const speaker = this.playerAt(speakerSeat);
+    return speaker !== null && (this.blocked.get(recipient)?.has(speaker) ?? false);
+  }
+
+  private chatFor(seat: Seat): ChatEntry[] {
+    const me = this.playerAt(seat);
+    return me ? this.talk.chatLog.filter((e) => !this.hides(me, e.seat)) : this.talk.chatLog;
   }
 
   /** More than one real player (a friend room). */
@@ -624,7 +646,7 @@ export class Room {
       fastPace: this.fastPace,
       deal: this.dealProof(),
       gameOver: this.gameOver,
-      chat: this.talk.chatLog,
+      chat: this.chatFor(seat),
       stake: this.opts.stake,
       coinChange: this.coinChange,
     };

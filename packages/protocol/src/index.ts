@@ -375,7 +375,10 @@ export type ClientMessage =
   | { type: 'sticker'; id: StickerId }
   | { type: 'setBanter'; level: BanterLevel }
   /** Report an AI line as inappropriate (Appendix C). */
-  | { type: 'reportLine'; entryId: number };
+  /** Report a line said at the table: an AI's, or another player's in a friend room. */
+  | { type: 'reportLine'; entryId: number }
+  /** Stop seeing this player's chat, at this table and every later one. */
+  | { type: 'blockPlayer'; seat: Seat };
 
 export type ServerMessage =
   | { type: 'welcome'; playerId: string; inGame: boolean; banterLevel: BanterLevel; catalog: ChatCatalog; account: AccountSummary }
@@ -397,6 +400,7 @@ export type ServerMessage =
   | { type: 'chatRejected'; reason: ChatRejection }
   | { type: 'banter'; level: BanterLevel }
   | { type: 'lineReported'; entryId: number }
+  | { type: 'playerBlocked'; seat: Seat }
   | { type: 'error'; code: ErrorCode; message: string };
 
 export type ErrorCode = 'badMessage' | 'notInGame' | 'illegalAction' | 'protocolMismatch' | 'helloRequired' | 'unauthorized';

@@ -314,7 +314,20 @@ export class Lobby {
       }
       case 'reportLine': {
         const entry = room?.chatEntry(Number(msg.entryId));
-        if (!room || !entry || entry.kind !== 'ai' || !entry.text) return;
+        if (!room || !entry || !entry.text) return;
+        if (entry.kind !== 'ai') {
+          // Another real player's line (friend rooms): queued for review against the speaker.
+          const speaker = room.playerAt(entry.seat);
+          if (!speaker || speaker === player.id) return;
+          await this.s.db.query("INSERT INTO moderation_events (kind, player_id, text, reason, game_id) VALUES ('reportedPlayerLine', $1, $2, $3, $4)", [
+            speaker,
+            entry.text,
+            `reportedBy:${player.id}`,
+            room.id,
+          ]);
+          send({ type: 'lineReported', entryId: entry.id });
+          return;
+        }
         const characterId = room.aiSeats.find((a) => a.seat === entry.seat)?.characterId ?? null;
         await this.s.db.query("INSERT INTO moderation_events (kind, player_id, character_id, text, game_id) VALUES ('reportedAiLine', $1, $2, $3, $4)", [
           player.id,
@@ -323,6 +336,14 @@ export class Lobby {
           room.id,
         ]);
         send({ type: 'lineReported', entryId: entry.id });
+        return;
+      }
+      case 'blockPlayer': {
+        const blocked = room?.playerAt(msg.seat as Seat);
+        if (!room || !blocked || blocked === player.id) return;
+        await this.s.db.query('INSERT INTO player_blocks (player_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [player.id, blocked]);
+        room.setBlocked(player.id, [blocked]);
+        send({ type: 'playerBlocked', seat: msg.seat });
         return;
       }
       default:
@@ -434,7 +455,18 @@ export class Lobby {
       this.rooms.set(g.player.id, room);
       this.scheduleLimit(g.player.id, room, g.plan, g.seat);
     }
+    // Real players who block each other only ever share a friend room.
+    if (guests.length) void this.loadBlocks(room, [player.id, ...guests.map((g) => g.player.id)]);
     return room;
+  }
+
+  private async loadBlocks(room: Room, playerIds: string[]): Promise<void> {
+    try {
+      const rows = await this.s.db.query<{ player_id: string; blocked_id: string }>('SELECT player_id, blocked_id FROM player_blocks WHERE player_id = ANY($1)', [playerIds]);
+      for (const id of playerIds) room.setBlocked(id, rows.filter((r) => r.player_id === id).map((r) => r.blocked_id));
+    } catch (error) {
+      console.error('Loading blocks failed:', error);
+    }
   }
 
   // ---------------------------------------------------------------------------
