@@ -127,7 +127,7 @@ export const RULES: RuleSection[] = [
     title: { zh: '流局查叫', en: 'When the wall runs out' },
     body: {
       zh: '查花猪：手里还有三门牌的人，赔给其余每家封顶分。查大叫：没听牌的人，赔给听牌的人他能胡的最大分。退税：没听牌的人要退还这局杠来的钱。',
-      en: 'Flower pig: anyone still holding three suits pays everyone else the capped score. Not ready: players who are not ready pay each ready player their best possible win. Kong refund: players who are not ready return their kong money.',
+      en: 'Flower Pig: anyone still holding three suits pays everyone else the capped score. Not ready: players who are not ready pay each ready player their best possible win. Kong refund: players who are not ready return their kong money.',
     },
   },
 ];
