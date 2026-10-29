@@ -56,7 +56,9 @@ If the work came from a numbered review item, say which one (for example, 审查
 `gh pr merge` does not wait for checks. Merging while CI is pending has already happened here once, and the run was cancelled by the next merge. So:
 
 1. Check once with `gh pr checks <n>`. Don't poll it in a loop, with `sleep`, or with Monitor. While it runs, start the next item on its own branch and check again later.
-2. When it shows `pass`, merge:
+
+   Don't turn on GitHub auto-merge (`gh pr merge --auto`) to wait for you either. `main` has no required checks, so a PR already counts as mergeable before CI has run, and auto-merge has nothing to wait for.
+2. When it shows `pass`, merge. Don't ask the owner first; they have asked for merging to happen without them:
 
    ```bash
    gh pr merge <n> --merge
@@ -73,5 +75,7 @@ git branch --merged main | grep -vE '^\*|main$' | xargs -r git branch -d
 ```
 
 ## Reporting back
+
+Finish the whole loop (fix, verify, PR, CI, merge, sync) and any follow-ups it turns up before reporting. Don't stop halfway to ask whether to merge or carry on. Stop early only for a CI failure you can't fix, or for a decision that really is the owner's (legal, product trade-offs, real-device tests).
 
 Summarize in Chinese. List each PR as a link (`https://github.com/gangzhao2021/Mahjong/pull/<n>`) with one line on what it did. Say plainly what was verified, what wasn't, and anything that needs a human (a legal decision, a real-device test, a yearly config update).
