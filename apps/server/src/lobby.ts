@@ -769,12 +769,12 @@ export class Lobby {
   }
 }
 
-/** Normalizes arbitrary non-negative weights into a random pick (PRD §4.2, §37). */
 /** 128 bits from the CSPRNG for each hand: far too many walls to search from a player's own tiles. */
 export function newHandSeed(): string {
   return randomBytes(16).toString('hex');
 }
 
+/** Normalizes arbitrary non-negative weights into a random pick (PRD §4.2, §37). */
 export function pickWeighted<K extends string>(weights: Record<K, number>, rng: Rng): K {
   const entries = (Object.entries(weights) as [K, number][]).filter(([, w]) => w > 0);
   const total = entries.reduce((a, [, w]) => a + w, 0);
