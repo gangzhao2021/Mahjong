@@ -43,13 +43,20 @@ export function LegalLinks() {
   );
 }
 
+/** Kept outside the component: switching language remounts the whole app (see index.ts), which would untick the box. */
+const ageBox = { checked: false };
+
 /**
  * `global`: the global build offers 中文 / English before anything else and asks the player to
  * confirm their age (the China build is always Chinese and verifies age by real name instead).
  */
 export function ConsentScreen({ onAgree, onOpenTutorial, global }: { onAgree(): void; onOpenTutorial(): void; global: boolean }) {
   const [declined, setDeclined] = useState(false);
-  const [oldEnough, setOldEnough] = useState(false);
+  const [oldEnough, setOldEnough] = useState(ageBox.checked);
+  const toggleAge = () => {
+    ageBox.checked = !oldEnough;
+    setOldEnough(ageBox.checked);
+  };
   const agree = async () => {
     try {
       await AsyncStorage.setItem(KEY, CONSENT_VERSION);
@@ -66,7 +73,7 @@ export function ConsentScreen({ onAgree, onOpenTutorial, global }: { onAgree(): 
         <LegalLinks />
         {global && <LanguagePicker label={false} />}
         {global && !declined && (
-          <Pressable style={styles.check} onPress={() => setOldEnough(!oldEnough)} accessibilityRole="checkbox" accessibilityState={{ checked: oldEnough }} hitSlop={8}>
+          <Pressable style={styles.check} onPress={toggleAge} accessibilityRole="checkbox" accessibilityState={{ checked: oldEnough }} hitSlop={8}>
             <Text style={styles.checkMark}>{oldEnough ? '☑' : '☐'}</Text>
             <Text style={styles.body}>{T.consent.ageConfirm(MIN_AGE)}</Text>
           </Pressable>
