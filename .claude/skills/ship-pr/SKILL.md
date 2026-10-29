@@ -53,7 +53,7 @@ If the work came from a numbered review item, say which one (for example, 审查
 
 ## 4. Merge only after CI passes
 
-Since 2026-10-29, branch protection on `main` requires the `test` check (the `test` job in `.github/workflows/ci.yml`) to pass, and a PR shows as `BLOCKED` until it does. Before the rule, a PR was merged here while CI was still running, and the run was cancelled by the next merge. If the job is ever renamed, update the rule too (`gh api repos/gangzhao2021/Mahjong/branches/main/protection`), or every PR will wait for a check that never runs.
+Since 2026-10-29, branch protection on `main` requires the `test` check (the `test` job in `.github/workflows/ci.yml`) to pass, and admins are held to it too. A PR shows as `BLOCKED` until the check passes. Before the rule, a PR was merged here while CI was still running, and the run was cancelled by the next merge. If the job is ever renamed, update the rule too (`gh api repos/gangzhao2021/Mahjong/branches/main/protection`), or every PR will wait for a check that never runs. Apart from that, don't loosen or remove the rule yourself, even if CI breaks so that no PR can pass. Tell the owner instead; that decision is theirs.
 
 1. Check once with `gh pr checks <n>`. Don't poll it in a loop, with `sleep`, or with Monitor. While it runs, start the next item on its own branch and check again later.
 
@@ -64,7 +64,7 @@ Since 2026-10-29, branch protection on `main` requires the `test` check (the `te
    gh pr merge <n> --merge
    ```
 
-   If CI failed, fix it on the same branch and push again. Never use `--admin` to get past a `BLOCKED` PR. The owner's account is an admin and can bypass the rule, which is exactly what the rule is there to stop.
+   If CI failed, fix it on the same branch and push again. If gh suggests `--admin`, ignore it: the rule covers admins too.
 3. If the merge itself is blocked by a permission prompt or classifier, tell the user and give them the exact command instead of retrying.
 
 ## 5. Sync main and clean up
