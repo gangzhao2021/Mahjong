@@ -1,6 +1,6 @@
 /** A game = `handsPerGame` hands at the same table (PRD Appendix A.10 terminology). */
 import { createHand } from './engine';
-import { createRng, deriveSeed, randomInt } from './rng';
+import { createRng, deriveSeed, randomInt, type Seed } from './rng';
 import type { RuleSet } from './ruleset';
 import type { HandResult, HandState, Seat } from './types';
 
@@ -34,12 +34,17 @@ export function handSeed(game: GameState): number {
   return deriveSeed(game.config.seed, game.handIndex);
 }
 
-export function startHand(game: GameState): HandState {
+/**
+ * Deals the next hand. Pass a fresh random `seed` for live play: the default
+ * derives it from the game seed, so revealing one hand's seed would give away
+ * every later hand.
+ */
+export function startHand(game: GameState, seed: Seed = handSeed(game)): HandState {
   if (isGameOver(game)) throw new Error('Game is over');
   return createHand({
     ruleSet: game.config.ruleSet,
     baseScore: game.config.baseScore,
-    seed: handSeed(game),
+    seed,
     dealer: game.dealer,
   });
 }

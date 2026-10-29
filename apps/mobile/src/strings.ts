@@ -197,9 +197,9 @@ const zh = {
     details: '查看校验数据',
     hide: '收起',
     commitment: (c: string) => `开局前公布的摘要：${c}`,
-    revealed: (seed: number, salt: string) => `本局公开的种子：${seed} · ${salt}`,
+    revealed: (seed: number | string, salt: string) => `本局公开的种子：${seed} · ${salt}`,
     how: '开局前我们公布 sha256(种子:随机串) 的摘要，结束后公开种子。用种子能重新发出整副牌，和摘要对得上，就说明发牌在开局前就定好了，中途没有改动。',
-    replay: (seed: number) => `🔒 这一局由种子 ${seed} 发牌，回放就是用它重新发出来的`,
+    replay: (seed: number | string) => `🔒 这一局由种子 ${seed} 发牌，回放就是用它重新发出来的`,
   },
   rank: {
     tiers: { novice: '雀士', adept: '雀杰', expert: '雀豪', master: '雀圣', saint: '雀神' } as Record<string, string>,
@@ -636,9 +636,9 @@ const en: Strings = {
     details: 'Show the proof',
     hide: 'Hide',
     commitment: (c: string) => `Published before the deal: ${c}`,
-    revealed: (seed: number, salt: string) => `Revealed after the hand: ${seed} · ${salt}`,
+    revealed: (seed: number | string, salt: string) => `Revealed after the hand: ${seed} · ${salt}`,
     how: 'Before the deal we publish sha256(seed:salt); after the hand we reveal the seed. The seed re-deals the whole wall, so a matching digest proves the tiles were fixed before play and never changed.',
-    replay: (seed: number) => `🔒 Dealt from seed ${seed}; this replay re-deals it from that seed`,
+    replay: (seed: number | string) => `🔒 Dealt from seed ${seed}; this replay re-deals it from that seed`,
   },
   rank: {
     tiers: { novice: 'Novice', adept: 'Adept', expert: 'Expert', master: 'Master', saint: 'Grandmaster' } as Record<string, string>,

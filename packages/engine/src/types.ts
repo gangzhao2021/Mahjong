@@ -1,4 +1,5 @@
 import type { RuleSet, SwapDirection } from './ruleset';
+import type { Seed } from './rng';
 import type { Pattern } from './scoring';
 import type { Suit, Tile } from './tiles';
 
@@ -135,7 +136,7 @@ export interface HandResult {
 export interface HandConfig {
   ruleSet: RuleSet;
   baseScore: number;
-  seed: number;
+  seed: Seed;
   dealer: Seat;
 }
 

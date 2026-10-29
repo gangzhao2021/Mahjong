@@ -2,7 +2,7 @@
  * Persistence for Phase 1: JSON files on disk behind small interfaces.
  * Phase 3 swaps these for PostgreSQL without touching the room logic.
  */
-import type { Action, HandResult, RuleSet, Seat } from '@mahjong/engine';
+import type { Action, HandResult, RuleSet, Seat, Seed } from '@mahjong/engine';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -11,7 +11,7 @@ export interface HandLog {
   gameId: string;
   handIndex: number;
   playerId: string;
-  seed: number;
+  seed: Seed;
   /** Random salt for the deal commitment sha256("seed:salt"), revealed with the seed after the hand. */
   salt?: string;
   dealer: Seat;
