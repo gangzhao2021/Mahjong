@@ -1,7 +1,7 @@
 /** Authenticated connections, game start checks, coin settlement and room lifecycle. */
 import type { Rng } from '@mahjong/ai-play';
 import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, textLength, type Language, type Moderator, type StickerId } from '@mahjong/dialogue';
-import { createRng, smallTableRules, isValidTile, type Action, type HandResult, type Seat } from '@mahjong/engine';
+import { createRng, smallTableRules, isValidTile, type Action, type HandResult, type Seat, type Seed } from '@mahjong/engine';
 import {
   AI_LEVELS,
   PROTOCOL_VERSION,
@@ -12,7 +12,7 @@ import {
   type GameSummary,
   type ServerMessage,
 } from '@mahjong/protocol';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import type { PlayerRow } from './accounts/accounts';
 import { ChatGuard } from './chatGuard';
@@ -34,8 +34,9 @@ export interface LobbyDeps {
   moderator: Moderator;
   hands: HandLogStore;
   services: Services;
-  /** Seed source; injectable for deterministic tests. */
+  /** Seed sources; injectable for deterministic tests. */
   seed?: () => number;
+  handSeed?: () => Seed;
 }
 
 /** Warning before a play-time limit ends a game (Appendix D.3). */
@@ -407,6 +408,7 @@ export class Lobby {
       ruleSet: plan.ruleSet,
       baseScore: plan.baseScore,
       seed: this.nextSeed(),
+      handSeed: () => (this.deps.handSeed ? this.deps.handSeed() : newHandSeed()),
       humanSeat: restore?.checkpoint.humanSeat ?? (0 as Seat),
       restore: restore?.checkpoint,
       pacer: this.pacer,
@@ -765,6 +767,11 @@ export class Lobby {
     this.pacer.dispose();
     await Promise.all([...writes, ...this.writing.values()]);
   }
+}
+
+/** 128 bits from the CSPRNG for each hand: far too many walls to search from a player's own tiles. */
+export function newHandSeed(): string {
+  return randomBytes(16).toString('hex');
 }
 
 /** Normalizes arbitrary non-negative weights into a random pick (PRD §4.2, §37). */

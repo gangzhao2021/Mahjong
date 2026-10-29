@@ -1,6 +1,7 @@
 import { createHand, replayHand, verifyDeal, type Action } from '@mahjong/engine';
 import type { ServerMessage } from '@mahjong/protocol';
 import { describe, expect, it } from 'vitest';
+import { newHandSeed } from '../src/lobby';
 import { Client, FAST, gameOver, isTable, playAsBot, startServer, type TableMsg } from './helpers';
 
 describe('game server', () => {
@@ -79,7 +80,13 @@ describe('game server', () => {
     expect([...dealt.players[v.seat].hand].sort((a, b) => a - b)).toEqual([...v.players[v.seat].hand!].sort((a, b) => a - b));
   });
 
-  it('deals each hand from its own 128-bit seed, so a revealed seed says nothing about the next hand', async () => {
+  it('draws a fresh 128-bit seed for every hand in production', () => {
+    const seeds = Array.from({ length: 100 }, newHandSeed);
+    for (const seed of seeds) expect(seed).toMatch(/^[0-9a-f]{32}$/);
+    expect(new Set(seeds).size).toBe(100);
+  });
+
+  it('deals each hand from its own seed, so a revealed seed says nothing about the next hand', async () => {
     const server = await startServer(FAST);
     const client = await Client.connect(server);
     await client.hello();
