@@ -57,7 +57,7 @@ If the work came from a numbered review item, say which one (for example, 审查
 
 1. Check once with `gh pr checks <n>`. Don't poll it in a loop, with `sleep`, or with Monitor. While it runs, start the next item on its own branch and check again later.
 
-   Don't turn on GitHub auto-merge (`gh pr merge --auto`) to wait for you either. `main` has no required checks, so a PR is mergeable before CI has run, and auto-merge would merge it straight away.
+   Don't turn on GitHub auto-merge (`gh pr merge --auto`) to wait for you either. `main` has no required checks, so a PR already counts as mergeable before CI has run, and auto-merge has nothing to wait for.
 2. When it shows `pass`, merge. Don't ask the owner first; they have asked for merging to happen without them:
 
    ```bash
