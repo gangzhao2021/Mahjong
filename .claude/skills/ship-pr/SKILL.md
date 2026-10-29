@@ -53,18 +53,18 @@ If the work came from a numbered review item, say which one (for example, 审查
 
 ## 4. Merge only after CI passes
 
-`gh pr merge` does not wait for checks. Merging while CI is pending has already happened here once, and the run was cancelled by the next merge. So:
+Since 2026-10-29, branch protection on `main` requires the `test` check (the `test` job in `.github/workflows/ci.yml`) to pass, and a PR shows as `BLOCKED` until it does. Before the rule, a PR was merged here while CI was still running, and the run was cancelled by the next merge. If the job is ever renamed, update the rule too (`gh api repos/gangzhao2021/Mahjong/branches/main/protection`), or every PR will wait for a check that never runs.
 
 1. Check once with `gh pr checks <n>`. Don't poll it in a loop, with `sleep`, or with Monitor. While it runs, start the next item on its own branch and check again later.
 
-   Don't turn on GitHub auto-merge (`gh pr merge --auto`) to wait for you either. `main` has no required checks, so a PR already counts as mergeable before CI has run, and auto-merge has nothing to wait for.
+   Leave GitHub auto-merge (`gh pr merge --auto`) off unless the owner asks for it. Merge yourself, so syncing `main` and cleaning up happen in the same pass.
 2. When it shows `pass`, merge. Don't ask the owner first; they have asked for merging to happen without them:
 
    ```bash
    gh pr merge <n> --merge
    ```
 
-   If CI failed, fix it on the same branch and push again.
+   If CI failed, fix it on the same branch and push again. Never use `--admin` to get past a `BLOCKED` PR. The owner's account is an admin and can bypass the rule, which is exactly what the rule is there to stop.
 3. If the merge itself is blocked by a permission prompt or classifier, tell the user and give them the exact command instead of retrying.
 
 ## 5. Sync main and clean up
