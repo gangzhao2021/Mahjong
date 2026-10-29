@@ -461,7 +461,8 @@ export class Room {
   // -------------------------------------------------------------------------
 
   private beginHand(): void {
-    this.hand = startHand(this.game);
+    // A fresh 128-bit seed per hand: seeds are revealed after each hand, so they must not predict the next one.
+    this.hand = startHand(this.game, randomBytes(16).toString('hex'));
     this.handIndex = this.game.handIndex;
     this.fastForward = false;
     for (const h of this.humans) h.ready = false;

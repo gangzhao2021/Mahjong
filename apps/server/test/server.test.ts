@@ -79,6 +79,23 @@ describe('game server', () => {
     expect([...dealt.players[v.seat].hand].sort((a, b) => a - b)).toEqual([...v.players[v.seat].hand!].sort((a, b) => a - b));
   });
 
+  it('deals each hand from its own 128-bit seed, so a revealed seed says nothing about the next hand', async () => {
+    const server = await startServer(FAST);
+    const client = await Client.connect(server);
+    await client.hello();
+    playAsBot(client);
+    client.send({ type: 'startGame', options: { private: { handsPerGame: 3, baseScore: 0 } } });
+    await client.next(gameOver);
+    const logs = server.hands.logs;
+    expect(logs).toHaveLength(3);
+    for (const log of logs) expect(log.seed).toMatch(/^[0-9a-f]{32}$/);
+    expect(new Set(logs.map((l) => l.seed)).size).toBe(3);
+    for (const log of logs) {
+      const replayed = replayHand({ ruleSet: log.ruleSet, baseScore: log.baseScore, seed: log.seed, dealer: log.dealer }, log.actions);
+      expect(replayed.result).toEqual(log.result);
+    }
+  });
+
   it('plays 血流成河 in a private room: winners play on and every hand runs to the end of the wall', async () => {
     const server = await startServer({ ...FAST, timers: { ...FAST.timers, discardMs: 5_000, claimMs: 5_000, swapMs: 5_000, dingqueMs: 5_000 } });
     const client = await Client.connect(server);

@@ -4,7 +4,7 @@
  * per-seat views (never the full state).
  */
 import type { BanterLevel, QuickPhrase, StickerId } from '@mahjong/dialogue';
-import type { Action, GameEvent, HandResult, HandView, RuleSet, Seat } from '@mahjong/engine';
+import type { Action, GameEvent, HandResult, HandView, RuleSet, Seat, Seed } from '@mahjong/engine';
 
 export type { BanterLevel, QuickPhrase, StickerId };
 
@@ -215,7 +215,7 @@ export interface HandReplay {
   handIndex: number;
   mySeat: Seat;
   seats: { seat: Seat; name: string; isHuman: boolean }[];
-  seed: number;
+  seed: Seed;
   dealer: Seat;
   baseScore: number;
   ruleSet: RuleSet;
@@ -229,7 +229,7 @@ export interface HandReplay {
 /** sha256("seed:salt") published before the deal; `seed` and `salt` stay null until the hand is over. */
 export interface DealProof {
   commitment: string;
-  seed: number | null;
+  seed: Seed | null;
   salt: string | null;
 }
 

@@ -8,6 +8,8 @@
  * all compute exactly the same thing without platform crypto.
  */
 
+import type { Seed } from './rng';
+
 const K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
   0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -79,11 +81,11 @@ export function sha256Hex(text: string): string {
 }
 
 /** The commitment published before the deal. */
-export function dealCommitment(seed: number, salt: string): string {
+export function dealCommitment(seed: Seed, salt: string): string {
   return sha256Hex(`${seed}:${salt}`);
 }
 
 /** Checks a revealed seed and salt against the commitment published before the deal. */
-export function verifyDeal(commitment: string, seed: number, salt: string): boolean {
+export function verifyDeal(commitment: string, seed: Seed, salt: string): boolean {
   return dealCommitment(seed, salt) === commitment;
 }
