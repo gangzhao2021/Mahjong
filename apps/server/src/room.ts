@@ -24,6 +24,7 @@ import {
   type LegalActions,
   type RuleSet,
   type Seat,
+  type Seed,
 } from '@mahjong/engine';
 import type { BanterLevel, Character, CharacterMemory, DialogueSettings, Language, Moderator, Personality, Speaker, StickerId } from '@mahjong/dialogue';
 import type { ChatEntry, DealProof, GameSummary, SeatInfo, ServerMessage, StakeInfo, TableSnapshot, TimerInfo, TimerKind } from '@mahjong/protocol';
@@ -65,6 +66,8 @@ export interface RoomOptions {
   ruleSet: RuleSet;
   baseScore: number;
   seed: number;
+  /** A fresh seed for each hand. Seeds are revealed after each hand, so one must never predict the next. */
+  handSeed: () => Seed;
   humanSeat: Seat;
   human: { playerId: string; name: string; avatar: string };
   /** Friend room: the other real players and their seats (the host is `human`). */
@@ -461,8 +464,7 @@ export class Room {
   // -------------------------------------------------------------------------
 
   private beginHand(): void {
-    // A fresh 128-bit seed per hand: seeds are revealed after each hand, so they must not predict the next one.
-    this.hand = startHand(this.game, randomBytes(16).toString('hex'));
+    this.hand = startHand(this.game, this.opts.handSeed());
     this.handIndex = this.game.handIndex;
     this.fastForward = false;
     for (const h of this.humans) h.ready = false;

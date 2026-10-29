@@ -1,4 +1,5 @@
 import { chooseAction } from '@mahjong/ai-play';
+import { sha256Hex } from '@mahjong/engine';
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage, type TableSnapshot } from '@mahjong/protocol';
 import type { AddressInfo } from 'node:net';
 import { afterEach } from 'vitest';
@@ -67,6 +68,7 @@ export const FAKE_VERIFIERS: IdentityVerifiers = {
 export async function startServer(config = FAST, options: TestServerOptions = {}): Promise<TestServer> {
   const hands = new MemoryHandLogStore();
   let seed = 1;
+  let hand = 1;
   const region = options.region ?? 'global';
   const dialogue = options.dialogue ?? loadDialogueConfig(region);
   const db = options.db ?? (await openDb({ dataDir: null }));
@@ -88,6 +90,8 @@ export async function startServer(config = FAST, options: TestServerOptions = {}
     hands: new TeeHandLogStore([hands, services.history]),
     services,
     seed: () => seed++ * 7919,
+    // Fixed but well-mixed 128-bit seeds, so test deals repeat from run to run.
+    handSeed: () => sha256Hex(`hand ${hand++}`).slice(0, 32),
   });
   const liveConfig = new LiveConfig(db, { region, economy: services.economy, dialogue, server: config, llm: options.llm ?? new NoLlm() });
   await liveConfig.load();
