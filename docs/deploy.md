@@ -130,3 +130,19 @@ docker compose exec -T db dropdb -U mahjong restore_test
 服务端是单进程，主要受 1 个 CPU 核限制。**建议每个进程最多承载约 1,000 桌同时在打**。更多玩家需要多个实例，并且同一个玩家要固定路由到同一个实例（牌局和断线重连都在实例内存里，检查点按玩家存在数据库里）；这个多实例路由还没做。
 
 没人看着的牌局（玩家离开、断线、服务端重启后恢复的）共享每秒 400 步的预算，不会挤占正在打的桌子；可以用 `ServerConfig.unattendedActionsPerSecond` 调整。
+
+## 部署后检查
+
+部署完（或升级后）跑一遍，它会真实打一局带金币的两手牌，核对账本、牌局历史和 AI 记忆，最后删除测试账号：
+
+```bash
+pnpm --filter @mahjong/server smoke:deploy --url https://api.example.com
+```
+
+在服务器上还可以加上重启检查，确认重启后牌局能接着打（线上有玩家时不要用）：
+
+```bash
+pnpm --filter @mahjong/server smoke:deploy --restart "docker compose restart server"
+```
+
+CI 每次都用这个脚本检查 Docker 镜像和 PostgreSQL。
