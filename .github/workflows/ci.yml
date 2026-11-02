@@ -43,5 +43,37 @@ jobs:
         run: pnpm admin:build
 
       # Bundling catches what typecheck and tests can't, e.g. a require() of a missing sound or image.
-      - name: Bundle the app (web)
-        run: pnpm --dir apps/mobile exec expo export --platform web --output-dir "$RUNNER_TEMP/web"
+      - name: Bundle the app (web, iOS, Android)
+        run: pnpm --dir apps/mobile exec expo export --platform web --platform ios --platform android --output-dir "$RUNNER_TEMP/app"
+
+  # The real image on real PostgreSQL: a coin game, a restart mid-game, ledger and history.
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start the stack
+        run: |
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "SESSION_SECRET=$(openssl rand -hex 32)"
+            echo "ID_HASH_SECRET=$(openssl rand -hex 32)"
+          } > .env
+          docker compose up -d --build
+
+      - name: Check the deployment
+        run: pnpm --filter @mahjong/server smoke:deploy --restart "docker compose restart server"
+
+      - name: Server logs
+        if: failure()
+        run: docker compose logs server

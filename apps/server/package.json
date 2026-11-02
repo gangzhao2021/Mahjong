@@ -8,7 +8,8 @@
     "start": "tsx --env-file-if-exists=.env src/main.ts",
     "admin:setup": "tsx src/admin/cli.ts",
     "llm:smoke": "tsx --env-file-if-exists=.env src/llm/smokeCli.ts",
-    "loadtest": "tsx scripts/loadtest.ts"
+    "loadtest": "tsx scripts/loadtest.ts",
+    "smoke:deploy": "tsx scripts/deploySmoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
