@@ -143,6 +143,11 @@ export function serverInfo(s: Services): ServerInfo {
   };
 }
 
+/** Under 14 with no guardian consent yet (Appendix D.2). */
+export function guardianRequired(s: Services, player: PlayerRow): boolean {
+  return s.region === 'china' && !!player.birth_date && !player.guardian_consent_at && ageOn(dateString(player.birth_date), s.now(), s.china.utcOffsetHours) < 14;
+}
+
 /** Play allowance under the China rules, or null when unrestricted. */
 export async function playLimit(s: Services, player: PlayerRow, providers: Provider[]): Promise<PlayLimit | null> {
   if (s.region !== 'china') return null;
@@ -171,7 +176,7 @@ export async function accountSummary(s: Services, player: PlayerRow): Promise<Ac
     isGuest,
     banterLevel: player.banter_level ?? (s.region === 'china' ? 'mild' : 'spicy'),
     reward: s.rewards.status(player, s.now()),
-    realName: { required: s.region === 'china' && !isGuest, verified: player.real_name_verified },
+    realName: { required: s.region === 'china' && !isGuest, verified: player.real_name_verified, guardianRequired: guardianRequired(s, player) },
     playLimit: await playLimit(s, player, providers),
     rank: rankInfo(player.rank_points ?? 0),
     gamesPlayed: (await s.db.query<{ games_played: number }>('SELECT games_played FROM player_profiles WHERE player_id = $1', [player.id]))[0]?.games_played ?? 0,
@@ -205,6 +210,7 @@ export async function checkStart(s: Services, player: PlayerRow, options: GameOp
   if (s.region === 'china') {
     const isGuest = providers.every((p) => p === 'guest');
     if (!isGuest && !player.real_name_verified) return { ok: false, reason: 'realNameRequired' };
+    if (guardianRequired(s, player)) return { ok: false, reason: 'guardianConsentRequired' };
     const limit = await playLimit(s, player, providers);
     if (limit) {
       if (limit.until === null) return { ok: false, reason: limit.kind === 'minor' ? 'minorTimeLimit' : 'guestTrialOver' };

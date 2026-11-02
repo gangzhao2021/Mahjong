@@ -275,6 +275,39 @@ describe('China compliance (Appendix D)', () => {
     expect((await minor.client.next(isTable)).table.view.phase).toBe('swap');
   });
 
+  it('under 14: an adult guardian must consent before play (Appendix D.2)', async () => {
+    const now = new Date('2026-10-09T12:30:00Z'); // Friday 20:30 UTC+8, inside the minor window
+    const server = await startServer(undefined, { region: 'china', now: () => now });
+    const token = (await api(server, 'POST', '/auth/wechat', { code: 'child' })).body.token as string;
+    const client = await Client.connect(server);
+    await client.helloWithToken(token);
+
+    const verified = await api(server, 'POST', '/account/real-name', { name: '小明', idNumber: idNumber('2014-05-01') }, token);
+    expect(verified.body.account.realName).toEqual({ required: true, verified: true, guardianRequired: true });
+    client.send({ type: 'startGame', options: { tableId: 'practice' } });
+    expect((await client.next(isRejected)).reason).toBe('guardianConsentRequired');
+
+    const consent = (idNumber: string) => api(server, 'POST', '/account/guardian-consent', { name: '小明', idNumber }, token);
+    expect((await consent('123')).body).toEqual({ error: 'invalidIdNumber' });
+    expect((await consent(idNumber('2010-01-01'))).body).toEqual({ error: 'guardianNotAdult' });
+    const ok = await consent(idNumber('1985-01-01'));
+    expect(ok.body.account.realName.guardianRequired).toBe(false);
+    const rows = await server.services.db.query<{ guardian_id_hash: string }>('SELECT guardian_id_hash FROM players WHERE guardian_id_hash IS NOT NULL');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].guardian_id_hash).not.toContain('1985');
+
+    client.send({ type: 'startGame', options: { tableId: 'practice' } });
+    expect((await client.next(isTable)).table.view.phase).toBe('swap');
+    expect((await consent(idNumber('1985-01-01'))).body).toEqual({ error: 'notRequired' });
+  });
+
+  it('14 or older needs no guardian', async () => {
+    const server = await startServer(undefined, { region: 'china', now: () => new Date('2026-10-09T12:30:00Z') });
+    const token = (await api(server, 'POST', '/auth/wechat', { code: 'teen' })).body.token as string;
+    const verified = await api(server, 'POST', '/account/real-name', { name: '小红', idNumber: idNumber('2012-05-01') }, token);
+    expect(verified.body.account.realName.guardianRequired).toBe(false);
+  });
+
   it('limits guests to a one-hour trial per device per 15 days', async () => {
     let now = new Date('2026-10-07T00:00:00Z');
     const server = await startServer(undefined, { region: 'china', now: () => now });

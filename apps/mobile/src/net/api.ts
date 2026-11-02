@@ -54,6 +54,7 @@ export const api = {
   link: (token: string, method: LoginMethod, credentials: Record<string, unknown>) =>
     request<AccountOnly>('POST', `/account/link/${method}`, credentials, token),
   realName: (token: string, name: string, idNumber: string) => request<AccountOnly>('POST', '/account/real-name', { name, idNumber }, token),
+  guardianConsent: (token: string, name: string, idNumber: string) => request<AccountOnly>('POST', '/account/guardian-consent', { name, idNumber }, token),
   claimReward: (token: string) => request<{ amount: number; account: AccountSummary }>('POST', '/rewards/claim', {}, token),
   ledger: (token: string) => request<{ entries: LedgerEntry[] }>('GET', '/ledger?limit=50', undefined, token),
   history: (token: string) => request<{ hands: HandHistoryEntry[] }>('GET', '/history', undefined, token),

@@ -108,7 +108,8 @@ export interface AccountSummary {
   isGuest: boolean;
   banterLevel: BanterLevel;
   reward: RewardStatus;
-  realName: { required: boolean; verified: boolean };
+  /** `guardianRequired`: under 14, and an adult guardian has not consented yet (China build). */
+  realName: { required: boolean; verified: boolean; guardianRequired: boolean };
   playLimit: PlayLimit | null;
   rank: RankInfo;
   /** Finished games, for gentle prompts such as linking a guest account. */
@@ -301,6 +302,7 @@ export type StartRejection =
   | 'baseTooHigh'
   | 'invalidOptions'
   | 'realNameRequired'
+  | 'guardianConsentRequired'
   | 'minorTimeLimit'
   | 'guestTrialOver';
 

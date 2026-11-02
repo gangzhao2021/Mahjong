@@ -263,6 +263,11 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (player_id, blocked_id)
   )
   `,
+  // Under 14: a verified adult guardian's consent, kept as a keyed hash only (Appendix D.2).
+  `
+  ALTER TABLE players ADD COLUMN guardian_consent_at timestamptz;
+  ALTER TABLE players ADD COLUMN guardian_id_hash text
+  `,
   // Chat suspensions outlive a restart, and the admin can see and lift them (PRD §7.1, Appendix D.5).
   `
   ALTER TABLE players ADD COLUMN chat_suspended_until timestamptz;

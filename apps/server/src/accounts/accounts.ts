@@ -30,6 +30,7 @@ export interface PlayerRow {
   reward_day: number;
   last_reward_date: Date | string | null;
   rank_points: number;
+  guardian_consent_at: Date | string | null;
   chat_suspended_until: Date | string | null;
 }
 
@@ -164,6 +165,10 @@ export class Accounts {
       }
       await q.query('DELETE FROM players WHERE id = $1', [playerId]);
     });
+  }
+
+  async setGuardianConsent(playerId: string, guardianIdHash: string, at: Date): Promise<void> {
+    await this.db.query('UPDATE players SET guardian_consent_at = $2, guardian_id_hash = $3 WHERE id = $1', [playerId, at, guardianIdHash]);
   }
 
   async setRealName(playerId: string, birthDate: string, idHash: string): Promise<void> {
