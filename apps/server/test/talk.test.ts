@@ -5,7 +5,7 @@ import type { ChatEntry, ServerMessage } from '@mahjong/protocol';
 import { describe, expect, it } from 'vitest';
 import { createLlmProvider, loadDialogueConfig } from '../src/dialogueConfig';
 import { AnthropicLlm } from '../src/llm/anthropic';
-import type { LlmProvider } from '../src/llm/provider';
+import { NoLlm, type LlmProvider } from '../src/llm/provider';
 import { TableTalk } from '../src/talk';
 import { Client, FAST, isTable, startServer } from './helpers';
 
@@ -37,6 +37,27 @@ async function joinGame(llm: LlmProvider, device = 'device-chat-1', dialogue = l
 }
 
 describe('AI characters', () => {
+  it('stores how each AI line was made, without sending it to the client (Appendix D.4)', async () => {
+    const dialogue = loadDialogueConfig('global');
+    dialogue.settings = { ...dialogue.settings, conversationFrequency: 1, seatCooldownMs: 0, tableCooldownMs: 0, stickerFrequency: 0 };
+    const { server, client } = await joinGame(new NoLlm(), 'device-label', dialogue);
+    client.send({ type: 'chat', text: '你好', target: 1 });
+    const line = await client.next((m): m is Extract<ServerMessage, { type: 'chat' }> => m.type === 'chat' && m.entry.kind === 'ai');
+    expect(line.entry).not.toHaveProperty('aiSource');
+    await expect.poll(() => server.services.db.query<{ ai_source: string }>("SELECT ai_source FROM chat_log WHERE kind = 'ai'")).toContainEqual({ ai_source: 'template' });
+    const player = await server.services.db.query<{ ai_source: string | null }>("SELECT ai_source FROM chat_log WHERE kind = 'player'");
+    expect(player).toEqual([{ ai_source: null }]);
+  });
+
+  it('the China build uses its own toned-down personality prompts (Appendix D.4)', () => {
+    const global = loadDialogueConfig('global').roster.personalities;
+    const china = loadDialogueConfig('china').roster.personalities;
+    expect(china.map((p) => p.id)).toEqual(global.map((p) => p.id));
+    for (const p of china) expect(p.trashTalk).toBeLessThanOrEqual(0.4);
+    expect(china.find((p) => p.id === 'sarcastic')!.systemPrompt).not.toBe(global.find((p) => p.id === 'sarcastic')!.systemPrompt);
+    expect(JSON.stringify(china.map((p) => [p.systemPrompt, p.conversationStyle]))).not.toMatch(/狠话|挑衅|挖苦|不活了|记仇/);
+  });
+
   it('seats persistent characters from the roster with their personality', async () => {
     const { table, welcome } = await joinGame(new FakeLlm());
     const ai = table.table.seats.filter((s) => !s.isHuman);

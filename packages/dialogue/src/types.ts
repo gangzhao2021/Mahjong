@@ -53,6 +53,9 @@ export interface Character {
   /** English name and catchphrases for English tables. */
   nameEn?: string;
   catchphrasesEn?: string[];
+  /** Per-character overrides of the personality (PRD §9). */
+  talkFrequency?: number;
+  stickers?: StickerId[];
 }
 
 export interface TemplateSet {

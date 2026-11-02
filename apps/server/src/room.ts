@@ -34,7 +34,7 @@ import type { LlmProvider } from './llm/provider';
 import { after, type Cancel, type Pacer } from './pacer';
 import { AiSeat, EmptySeat, HumanSeat, type SeatController } from './seats';
 import type { HandLog, HandLogStore } from './store';
-import { TableTalk } from './talk';
+import { TableTalk, type AiLineSource } from './talk';
 
 export interface AiSeatSpec {
   character: Character;
@@ -57,7 +57,7 @@ export interface RoomTalkOptions {
   onMemoryUsed?(eventIds: number[]): void;
   onPlayerQuote?(text: string, target: Seat | 'table'): void;
   /** Every line said at the table (chat log, Appendix D.6). */
-  onLine?(entry: ChatEntry, speaker: string): void;
+  onLine?(entry: ChatEntry, speaker: string, aiSource: AiLineSource | null): void;
 }
 
 export interface RoomOptions {
@@ -202,9 +202,9 @@ export class Room {
       viewFor: (seat) => viewFor(this.hand, seat),
       version: () => this.hand.actionCount,
       handIndex: () => this.handIndex,
-      emit: (entry) => {
+      emit: (entry, aiSource) => {
         for (const h of this.humans) if (!this.hides(h.ctrl.playerId, entry.seat)) h.ctrl.send({ type: 'chat', entry });
-        opts.talk.onLine?.(entry, this.seats[entry.seat].info.name);
+        opts.talk.onLine?.(entry, this.seats[entry.seat].info.name, aiSource);
       },
       onMemoryUsed: opts.talk.onMemoryUsed,
       onPlayerQuote: opts.talk.onPlayerQuote,

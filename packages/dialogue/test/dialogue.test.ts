@@ -28,6 +28,7 @@ import {
   selectCharacters,
   templateLine,
   validateRoster,
+  withOverrides,
   type Character,
   type DialogueSettings,
   type Personality,
@@ -89,6 +90,17 @@ function playPhaseHand(seed = 3): HandState {
   }
   return h;
 }
+
+describe('character overrides (PRD §9)', () => {
+  it('a character can talk more or use other stickers than its personality', () => {
+    const p = personality('calm', { talkFrequency: 0.2, stickers: ['tea'] });
+    const base = { id: 'c', name: '角色', avatar: '🐼', personalityId: 'calm', weight: 1, enabled: true };
+    expect(withOverrides(p, base)).toMatchObject({ talkFrequency: 0.2, stickers: ['tea'] });
+    expect(withOverrides(p, { ...base, talkFrequency: 0.9, stickers: ['laugh'] })).toMatchObject({ talkFrequency: 0.9, stickers: ['laugh'] });
+    expect(withOverrides(p, { ...base, stickers: [] }).stickers).toEqual(['tea']);
+    expect(validateRoster({ personalities: [p], characters: [{ ...base, talkFrequency: 2 }] })).toEqual(['c.talkFrequency must be between 0 and 1']);
+  });
+});
 
 describe('roster selection (PRD §37)', () => {
   const roster: Roster = {

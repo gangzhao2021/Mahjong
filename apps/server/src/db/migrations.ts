@@ -263,4 +263,8 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (player_id, blocked_id)
   )
   `,
+  // Implicit labelling of AI output in stored metadata: llm, template or sticker (Appendix D.4).
+  `
+  ALTER TABLE chat_log ADD COLUMN ai_source text
+  `,
 ];
