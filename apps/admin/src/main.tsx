@@ -4,6 +4,7 @@ import { errorText, get, post, setUnauthorizedHandler } from './api';
 import { AiSettings } from './pages/AiSettings';
 import { Analytics } from './pages/Analytics';
 import { Audit } from './pages/Audit';
+import { ChinaRules } from './pages/ChinaRules';
 import { CoinLog } from './pages/CoinLog';
 import { Crashes } from './pages/Crashes';
 import { Economy } from './pages/Economy';
@@ -21,6 +22,7 @@ const PAGES = {
   ai: { title: 'AI 设置', render: () => <AiSettings /> },
   roster: { title: '性格与角色', render: () => <Roster /> },
   libraries: { title: '名字与头像库', render: () => <Libraries /> },
+  china: { title: '防沉迷与节假日', render: () => <ChinaRules /> },
   moderation: { title: '内容审核', render: () => <Moderation /> },
   crashes: { title: '崩溃报告', render: () => <Crashes /> },
   audit: { title: '操作日志', render: () => <Audit /> },
@@ -29,6 +31,7 @@ type PageId = keyof typeof PAGES;
 
 function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [region, setRegion] = useState<string | null>(null);
   const [page, setPage] = useState<PageId>(() => {
     const hash = location.hash.slice(1);
     return hash in PAGES ? (hash as PageId) : 'analytics';
@@ -36,11 +39,14 @@ function App() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => setAuthed(false));
-    get('/me').then(
-      () => setAuthed(true),
+    get<{ region: string }>('/me').then(
+      (me) => {
+        setRegion(me.region);
+        setAuthed(true);
+      },
       () => setAuthed(false),
     );
-  }, []);
+  }, [authed]);
 
   useEffect(() => {
     location.hash = page;
@@ -52,7 +58,7 @@ function App() {
     <div className="layout">
       <nav className="sidebar" aria-label="后台导航">
         <h1>麻将管理后台</h1>
-        {(Object.keys(PAGES) as PageId[]).map((id) => (
+        {(Object.keys(PAGES) as PageId[]).filter((id) => id !== 'china' || region === 'china').map((id) => (
           <button key={id} className={id === page ? 'active' : ''} aria-current={id === page ? 'page' : undefined} onClick={() => setPage(id)}>
             {PAGES[id].title}
           </button>
