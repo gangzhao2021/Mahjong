@@ -1,14 +1,22 @@
 # 上架检查清单（PRD 附录 C / D）
 
-代码里能做的已经做了；下面是上架前必须由人完成或确认的事项。
+代码里能做的已经做了；下面是上架前必须由人完成或确认的事项。标「联调」的代码已写好，但要用真实账号验证。
+
+## 建议的顺序
+
+1. 注册 Expo 账号，按 [device-testing.md](device-testing.md) 打 Android 开发版上手机。这是第一次原生编译，最可能发现新问题。
+2. 配好模型密钥，跑 `pnpm llm:smoke`。
+3. 决定正式的 bundle ID 和域名，部署测试服务器，跑 `smoke:deploy`。
+4. 换美术和声音，请法务审核，上架国际版（PRD：不要让国际版等版号）。
+5. 大陆版的资质同时申请，下面「中国大陆版」一节。
 
 ## 两个版本都需要
 
 - [ ] 按 [device-testing.md](device-testing.md) 在 iOS 和 Android 真机上跑完测试清单。
-- [ ] 按 [deploy.md](deploy.md) 部署正式服务端，配好 HTTPS、每日数据库备份，确认 `/health` 正常。
+- [ ] 按 [deploy.md](deploy.md) 部署正式服务端，配好 HTTPS、每日数据库备份，运行 `smoke:deploy` 确认全部通过。
 - [ ] 换掉占位应用图标和启动图（`apps/mobile/assets`）。
 
-- [ ] 把 `app.json` 里的 bundle ID / package `com.example.mahjong` 换成正式的。
+- [ ] 把 `app.json` 里的 bundle ID / package `com.example.mahjong` 换成正式的（国内版自动加 `.cn`，或用 `APP_ID` 指定）。
 - [ ] 把 `eas.json` 里的服务器地址和 `ascAppId` 换成正式值。
 - [ ] 用录制或授权的音效和音乐替换 `apps/mobile/assets/sounds`（现在是程序合成的占位声音）。
 - [ ] 请法务审核 `/legal/privacy`、`/legal/terms`、`/legal/sdks`（`apps/server/src/legal.ts`），补全运营主体和联系方式，去掉“草案”标记。政策有实质变化时，修改 `ConsentScreen.tsx` 里的 `CONSENT_VERSION`，让玩家重新同意。
@@ -29,6 +37,11 @@
 - [ ] 版号、软著、ICP 备案、APP 备案、生成式 AI 相关备案（附录 D.1 / D.4）。
 - [ ] 在 `eas.json` 的 `production-china` 里填入 `EXPO_PUBLIC_ICP`、`EXPO_PUBLIC_APP_FILING`，并按适龄评定结果填 `EXPO_PUBLIC_AGE_RATING`（现在默认 16+，必须和商店页一致）。
 - [ ] 配好 `LLM_API_KEY` 后运行 `pnpm llm:smoke` 全部通过。
-- [ ] 接入短信服务商、国家防沉迷实名认证系统、微信开放平台 SDK、第三方内容安全服务。
+- [ ] 选定供应商。代码按阿里云（短信、文本审核）写好，换供应商要改 `apps/server/src/china/vendors.ts`。
+- [ ] 联调：阿里云短信和文本审核（`ALIYUN_*`、`MODERATION_PROVIDER`）。
+- [ ] 联调：国家防沉迷实名认证系统（`NPPA_*`）。**签名和加密细节要对照发行方后台的官方说明**，用后台的测试码验证。
+- [ ] 接入微信开放平台 SDK（客户端还没做，需要微信开放平台账号和原生打包；服务端校验已有）。
+- [ ] 请法务确认：年龄门槛、不满 14 周岁的监护人同意流程、`config/personalities.china.json` 的提示词和各性格的中文台词。
+- [ ] 确认未成年人时段和节假日是最新的（后台「防沉迷与节假日」）。
 - [ ] 服务器、数据库和大模型都在境内；登录日志和聊天记录保留至少 6 个月。
-- [ ] 安卓包里没有 Google Play 服务依赖。
+- [ ] 打出 APK 后确认没有 Google Play 服务依赖（Google 登录库已排除，间接依赖要看实际产物）。
