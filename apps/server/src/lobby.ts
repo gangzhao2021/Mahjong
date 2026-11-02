@@ -293,6 +293,7 @@ export class Lobby {
         // Moderate before any AI or display sees it (PRD §7.1).
         const verdict = await this.deps.moderator.check(text, 'playerChat');
         if (!verdict.allowed) {
+          if (verdict.reason === 'unavailable') return send({ type: 'chatRejected', reason: 'blocked' });
           const suspendedUntil = this.chatGuard.violation(player.id);
           if (suspendedUntil !== null) await this.s.db.query('UPDATE players SET chat_suspended_until = $2 WHERE id = $1', [player.id, new Date(suspendedUntil)]);
           await this.s.db.query("INSERT INTO moderation_events (kind, player_id, text, reason, game_id) VALUES ('blockedPlayerMessage', $1, $2, $3, $4)", [

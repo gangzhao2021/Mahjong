@@ -12,6 +12,7 @@ import path from 'node:path';
 import { Accounts, PLAYER_AVATARS, type PlayerRow, type Provider } from './accounts/accounts';
 import { AppleTokens, ConsoleSmsSender, SmsCodes, type SmsSender } from './accounts/providers';
 import { SessionTokens } from './accounts/tokens';
+import { missingChinaProviders, realNameFromEnv, smsSenderFromEnv } from './china/vendors';
 import { ageOn, DevRealNameVerifier, guestTrialEnd, loadChinaConfig, minorWindowEnd, type ChinaConfig, type RealNameVerifier } from './china/compliance';
 import type { Db } from './db/db';
 import { HandHistory } from './history';
@@ -74,7 +75,13 @@ export function createServices(o: ServiceOptions): Services {
     env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY && list(env.APPLE_CLIENT_IDS)[0]
       ? new AppleTokens({ teamId: env.APPLE_TEAM_ID, keyId: env.APPLE_KEY_ID, privateKey: env.APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'), clientId: list(env.APPLE_CLIENT_IDS)[0] })
       : null;
-  if (o.region === 'china' && !o.realName) console.warn('Using the DEVELOPMENT real-name verifier; production needs the national verification system.');
+  const vendorSms = o.region === 'china' ? smsSenderFromEnv(env) : null;
+  const vendorRealName = o.region === 'china' ? realNameFromEnv(env) : null;
+  if (o.region === 'china') {
+    const missing = missingChinaProviders(env);
+    if (missing.length) throw new Error(`The China build cannot run in production without: ${missing.join(', ')}. Set ALLOW_DEV_PROVIDERS=1 for staging.`);
+    if (!o.realName && !vendorRealName) console.warn('Using the DEVELOPMENT real-name verifier; production needs the national verification system.');
+  }
 
   return {
     region: o.region,
@@ -87,8 +94,8 @@ export function createServices(o: ServiceOptions): Services {
     achievements: new Achievements(o.db, wallet),
     ranks: new Ranks(o.db),
     crashes: new CrashReports(o.db, () => now().getTime()),
-    sms: new SmsCodes(o.db, o.sms ?? new ConsoleSmsSender(), () => now().getTime()),
-    realName: o.realName ?? new DevRealNameVerifier(),
+    sms: new SmsCodes(o.db, o.sms ?? vendorSms ?? new ConsoleSmsSender(), () => now().getTime()),
+    realName: o.realName ?? vendorRealName ?? new DevRealNameVerifier(),
     economy,
     china: loadChinaConfig(),
     auth: {

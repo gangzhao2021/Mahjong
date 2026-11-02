@@ -9,7 +9,8 @@ export type ModerationKind = 'playerChat' | 'aiLine' | 'nickname';
 
 export interface ModerationResult {
   allowed: boolean;
-  reason?: 'blocklist' | 'contactInfo' | 'link' | 'empty' | 'tooLong' | 'vendor';
+  /** `unavailable`: the moderation service could not be reached, so the text is held back but is not a violation. */
+  reason?: 'blocklist' | 'contactInfo' | 'link' | 'empty' | 'tooLong' | 'vendor' | 'unavailable';
 }
 
 export interface Moderator {
