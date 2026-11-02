@@ -20,6 +20,8 @@ export const BANTER_LEVELS: readonly BanterLevel[] = ['mild', 'spicy', 'quiet'];
 
 export type StickerId = 'laugh' | 'angry' | 'cry' | 'cool' | 'think' | 'clap' | 'shock' | 'smug' | 'tea' | 'pray';
 
+export type PersonalityLines = Partial<Record<string, TemplateSet>>;
+
 /** Personality template (PRD §36). Intensities are 0..1. */
 export interface Personality {
   id: string;
@@ -37,8 +39,13 @@ export interface Personality {
   stickers: StickerId[];
   weight: number;
   enabled: boolean;
-  /** Personality-specific template lines, overriding the defaults per trigger. */
-  templates?: Partial<Record<TriggerKind, TemplateSet>>;
+  /**
+   * Personality-specific template lines, overriding the defaults: keyed by
+   * trigger and role ("dealtIn.object"), or by trigger for any role. Without
+   * an LLM these are what make characters sound different.
+   */
+  templates?: PersonalityLines;
+  templatesEn?: PersonalityLines;
 }
 
 /** Persistent AI character (PRD §9, Appendix B). */

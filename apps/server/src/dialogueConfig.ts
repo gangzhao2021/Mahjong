@@ -51,11 +51,17 @@ function readJson<T>(file: string): T {
   return JSON.parse(readFileSync(path.join(CONFIG_DIR, file), 'utf8')) as T;
 }
 
+/** Own prompts, and only the mild template lines: spicy ones were not written for the China build. */
+function chinaPersonality(p: Personality, version: Partial<Personality> | undefined): Personality {
+  const mildOnly = Object.fromEntries(Object.entries(p.templates ?? {}).map(([key, set]) => [key, { mild: set!.mild }]));
+  return { ...p, ...version, templates: mildOnly };
+}
+
 export function loadDialogueConfig(region: Region = (process.env.REGION as Region) ?? 'global'): DialogueConfig {
   // Appendix D.4: the China build uses its own, separately reviewed personality prompts.
   const chinaVersions = region === 'china' ? readJson<Record<string, Partial<Personality>>>('personalities.china.json') : {};
   const roster: Roster = {
-    personalities: readJson<Personality[]>('personalities.json').map((p) => ({ ...p, ...chinaVersions[p.id] })),
+    personalities: readJson<Personality[]>('personalities.json').map((p) => (region === 'china' ? chinaPersonality(p, chinaVersions[p.id]) : p)),
     characters: readJson<Character[]>('characters.json'),
   };
   const problems = validateRoster(roster);

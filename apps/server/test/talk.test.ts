@@ -49,6 +49,26 @@ describe('AI characters', () => {
     expect(player).toEqual([{ ai_source: null }]);
   });
 
+  it('every personality has its own template lines, clean and in the right language', async () => {
+    const { personalities } = loadDialogueConfig('global').roster;
+    const moderator = new LocalModerator(loadDialogueConfig('global').blocklist, 60);
+    const china = loadDialogueConfig('china').roster.personalities;
+    expect(personalities.length).toBe(10);
+    for (const p of personalities) {
+      for (const [lines, zh] of [[p.templates, true], [p.templatesEn, false]] as const) {
+        expect(Object.keys(lines ?? {}).length).toBeGreaterThanOrEqual(8);
+        for (const set of Object.values(lines ?? {})) {
+          for (const line of [...set!.mild, ...(set!.spicy ?? [])]) {
+            expect((await moderator.check(line.replaceAll(/\{\w+\}/g, 'Li'), 'aiLine')).allowed, line).toBe(true);
+            expect(/[\u4e00-\u9fff]/.test(line), line).toBe(zh);
+            expect(line.match(/\{(\w+)\}/g)?.every((x) => ['{subject}', '{object}', '{player}', '{fan}'].includes(x)) ?? true, line).toBe(true);
+          }
+        }
+      }
+    }
+    for (const p of china) for (const set of Object.values(p.templates ?? {})) expect(set!.spicy).toBeUndefined();
+  });
+
   it('the China build uses its own toned-down personality prompts (Appendix D.4)', () => {
     const global = loadDialogueConfig('global').roster.personalities;
     const china = loadDialogueConfig('china').roster.personalities;
