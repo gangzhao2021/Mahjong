@@ -6,6 +6,7 @@ import {
   DEFAULT_BLOCKLIST,
   DEFAULT_QUICK_PHRASES,
   LocalModerator,
+  ModerationChain,
   validateRoster,
   type BanterLevel,
   type Character,
@@ -18,6 +19,7 @@ import {
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { moderatorFromEnv } from './china/vendors';
 import { AnthropicLlm } from './llm/anthropic';
 import { OpenAiCompatibleLlm } from './llm/openaiCompatible';
 import { BudgetedLlm, NoLlm, type LlmProvider } from './llm/provider';
@@ -133,7 +135,9 @@ export function createLlmProvider(config: DialogueConfig, env = process.env): Ll
   return provider.name === 'none' ? provider : new BudgetedLlm(provider, config.llm.dailyRequestCap);
 }
 
-export function createModerator(config: DialogueConfig): Moderator {
-  // Vendor moderation (Appendix D.5) chains after the local blocklist once selected.
-  return new LocalModerator(config.blocklist, config.chat.maxLength);
+export function createModerator(config: DialogueConfig, env: Record<string, string | undefined> = process.env): Moderator {
+  const local = new LocalModerator(config.blocklist, config.chat.maxLength);
+  // Vendor moderation (Appendix D.5) runs after the free local check.
+  const vendor = config.region === 'china' ? moderatorFromEnv(env) : null;
+  return vendor ? new ModerationChain([local, vendor]) : local;
 }
