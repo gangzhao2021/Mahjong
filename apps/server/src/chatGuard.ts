@@ -1,4 +1,7 @@
-/** Per-player chat rate limits and violation tracking (PRD §7.1). In memory until Phase 3. */
+/**
+ * Per-player chat rate limits and violation tracking (PRD §7.1). Rates and
+ * violation counts live in memory; the lobby stores a suspension once it starts.
+ */
 import type { ChatRejection } from '@mahjong/protocol';
 import type { ChatLimits } from './dialogueConfig';
 
@@ -34,8 +37,8 @@ export class ChatGuard {
     return null;
   }
 
-  /** Records a blocked message; suspends chat after too many in the window. */
-  violation(playerId: string): void {
+  /** Records a blocked message; after too many in the window, suspends chat and returns until when. */
+  violation(playerId: string): number | null {
     const s = this.state(playerId);
     const now = this.now();
     s.violations = s.violations.filter((t) => now - t < this.limits.violationWindowMs);
@@ -43,7 +46,20 @@ export class ChatGuard {
     if (s.violations.length >= this.limits.violationsBeforeSuspension) {
       s.suspendedUntil = now + this.limits.suspensionMs;
       s.violations = [];
+      return s.suspendedUntil;
     }
+    return null;
+  }
+
+  /** Brings back a stored suspension when the player connects. */
+  restore(playerId: string, until: number): void {
+    this.state(playerId).suspendedUntil = until;
+  }
+
+  lift(playerId: string): void {
+    const s = this.state(playerId);
+    s.suspendedUntil = 0;
+    s.violations = [];
   }
 
   isSuspended(playerId: string): boolean {

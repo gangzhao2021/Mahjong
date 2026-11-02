@@ -263,4 +263,9 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (player_id, blocked_id)
   )
   `,
+  // Chat suspensions outlive a restart, and the admin can see and lift them (PRD §7.1, Appendix D.5).
+  `
+  ALTER TABLE players ADD COLUMN chat_suspended_until timestamptz;
+  CREATE INDEX players_chat_suspended ON players(chat_suspended_until) WHERE chat_suspended_until IS NOT NULL
+  `,
 ];
