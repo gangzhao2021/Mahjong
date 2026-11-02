@@ -29,6 +29,8 @@ import type { GameEvent, HandView, Seat } from '@mahjong/engine';
 import type { ChatEntry } from '@mahjong/protocol';
 import type { LlmProvider } from './llm/provider';
 
+export type AiLineSource = 'template' | 'llm' | 'sticker';
+
 export interface TalkDeps {
   speakers: Speaker[];
   humanSeat: Seat;
@@ -45,7 +47,8 @@ export interface TalkDeps {
   /** Current engine action count and hand index (relevance window). */
   version(): number;
   handIndex(): number;
-  emit(entry: ChatEntry): void;
+  /** `aiSource` says how an AI line was made; it is stored, never sent to clients (Appendix D.4). */
+  emit(entry: ChatEntry, aiSource: AiLineSource | null): void;
   now?(): number;
   /** Memory events that went into an LLM prompt (so they are not repeated too often). */
   onMemoryUsed?(eventIds: number[]): void;
@@ -254,7 +257,7 @@ export class TableTalk {
     text: string | null,
     sticker: StickerId | null,
     target: Seat | 'table',
-    source: 'template' | 'llm' | 'sticker',
+    source: AiLineSource,
   ): void {
     const now = this.now();
     const natural = source === 'llm' ? 0 : 400 + Math.floor(this.deps.rng() * 700);
@@ -265,7 +268,7 @@ export class TableTalk {
       if (this.disposed || !this.stillRelevant(trigger)) return;
       noteSpoken(this.state, seat, this.now());
       this.discardsSinceLine = 0;
-      this.record({ seat, kind: 'ai', text, sticker, target });
+      this.record({ seat, kind: 'ai', text, sticker, target }, source);
       // AI-to-AI chatter: occasionally another character answers (one level deep).
       if (text && trigger.kind !== 'aiSpoke' && this.deps.rng() < this.deps.settings.aiReplyChance) {
         this.handle({ ...this.trigger('aiSpoke', 'low'), subject: seat, object: target === 'table' ? undefined : target, text });
@@ -274,11 +277,11 @@ export class TableTalk {
     this.timers.add(timer);
   }
 
-  private record(entry: Omit<ChatEntry, 'id' | 'at'>): void {
+  private record(entry: Omit<ChatEntry, 'id' | 'at'>, aiSource: AiLineSource | null = null): void {
     const full: ChatEntry = { ...entry, id: this.nextId++, at: this.now() };
     this.log.push(full);
     if (this.log.length > CHAT_LOG_SIZE) this.log.shift();
-    this.deps.emit(full);
+    this.deps.emit(full, aiSource);
   }
 
   private recentChat(): ChatLine[] {

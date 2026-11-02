@@ -268,4 +268,8 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE players ADD COLUMN chat_suspended_until timestamptz;
   CREATE INDEX players_chat_suspended ON players(chat_suspended_until) WHERE chat_suspended_until IS NOT NULL
   `,
+  // Implicit labelling of AI output in stored metadata: llm, template or sticker (Appendix D.4).
+  `
+  ALTER TABLE chat_log ADD COLUMN ai_source text
+  `,
 ];

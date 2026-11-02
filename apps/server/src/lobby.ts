@@ -1,6 +1,6 @@
 /** Authenticated connections, game start checks, coin settlement and room lifecycle. */
 import type { Rng } from '@mahjong/ai-play';
-import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, textLength, type Language, type Moderator, type StickerId } from '@mahjong/dialogue';
+import { BANTER_LEVELS, extractHandMemory, gameEndRivalry, selectCharacters, STICKERS, textLength, withOverrides, type Language, type Moderator, type StickerId } from '@mahjong/dialogue';
 import { createRng, smallTableRules, isValidTile, type Action, type HandResult, type Seat, type Seed } from '@mahjong/engine';
 import {
   AI_LEVELS,
@@ -434,9 +434,9 @@ export class Lobby {
         banterLevel: () => this.banterOf(player),
         language,
         onMemoryUsed: (ids) => void this.s.memory.markReferenced(ids).catch((e) => console.error('Memory update failed:', e)),
-        onLine: (entry, speaker) => {
+        onLine: (entry, speaker, aiSource) => {
           void this.s.db
-            .query('INSERT INTO chat_log (player_id, game_id, seat, kind, speaker, text, sticker) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
+            .query('INSERT INTO chat_log (player_id, game_id, seat, kind, speaker, text, sticker, ai_source) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
               // A friend's own lines are logged under their account; AI lines under the host's table.
               room.players.find((p) => p.seat === entry.seat)?.playerId ?? player.id,
               room.id,
@@ -445,6 +445,7 @@ export class Lobby {
               speaker,
               entry.text,
               entry.sticker,
+              aiSource,
             ])
             .catch((error) => console.error('Writing chat log failed:', error));
         },
@@ -548,7 +549,7 @@ export class Lobby {
       const character = roster.characters.find((c) => c.id === a.characterId);
       const personality = character && roster.personalities.find((p) => p.id === character.personalityId);
       if (!character || !personality) return false; // deleted by an admin since
-      ai.push({ character, personality, skill: a.skill });
+      ai.push({ character, personality: withOverrides(personality, character), skill: a.skill });
     }
     // Friend rooms bring their friends back to their seats (no AI memory there).
     const guests: { seat: Seat; player: PlayerRow; plan: GamePlan }[] = [];

@@ -313,10 +313,11 @@ function PlayerDrawer({ id, onClose, onChanged }: { id: string; onClose(): void;
 }
 
 interface Logs {
-  chat: { id: number; gameId: string; kind: string; speaker: string; text: string | null; sticker: string | null; createdAt: string }[];
+  chat: { id: number; gameId: string; kind: string; speaker: string; text: string | null; sticker: string | null; aiSource: string | null; createdAt: string }[];
   logins: { id: number; method: string; ip: string | null; createdAt: string }[];
 }
 
+const AI_SOURCES: Record<string, string> = { llm: 'AI（大模型生成）', template: 'AI（模板）', sticker: 'AI（表情）' };
 const CHAT_KINDS: Record<string, string> = { player: '玩家', quickPhrase: '快捷语', sticker: '表情', ai: 'AI' };
 
 /** Chat and login logs, loaded only on request (personal data; each view is audited). */
@@ -351,7 +352,7 @@ function PlayerLogs({ id }: { id: string }) {
                 <tr key={c.id}>
                   <td>{fmtTime(c.createdAt)}</td>
                   <td className="muted">{c.gameId}</td>
-                  <td>{CHAT_KINDS[c.kind] ?? c.kind}</td>
+                  <td>{(c.aiSource && AI_SOURCES[c.aiSource]) ?? CHAT_KINDS[c.kind] ?? c.kind}</td>
                   <td>{c.speaker}</td>
                   <td style={{ wordBreak: 'break-all' }}>{c.text ?? (c.sticker ? `[${c.sticker}]` : '')}</td>
                 </tr>

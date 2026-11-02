@@ -52,8 +52,10 @@ function readJson<T>(file: string): T {
 }
 
 export function loadDialogueConfig(region: Region = (process.env.REGION as Region) ?? 'global'): DialogueConfig {
+  // Appendix D.4: the China build uses its own, separately reviewed personality prompts.
+  const chinaVersions = region === 'china' ? readJson<Record<string, Partial<Personality>>>('personalities.china.json') : {};
   const roster: Roster = {
-    personalities: readJson<Personality[]>('personalities.json'),
+    personalities: readJson<Personality[]>('personalities.json').map((p) => ({ ...p, ...chinaVersions[p.id] })),
     characters: readJson<Character[]>('characters.json'),
   };
   const problems = validateRoster(roster);

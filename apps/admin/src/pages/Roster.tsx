@@ -29,6 +29,8 @@ interface Character {
   catchphrases?: string[];
   nameEn?: string;
   catchphrasesEn?: string[];
+  talkFrequency?: number;
+  stickers?: string[];
 }
 
 interface Library {
@@ -289,6 +291,10 @@ function CharacterForm({
         <textarea id="ccatch" value={(c.catchphrases ?? []).join('\n')} onChange={(e) => setC({ ...c, catchphrases: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })} />
         <label htmlFor="ccatchen">英文口头禅（每行一句）</label>
         <textarea id="ccatchen" value={(c.catchphrasesEn ?? []).join('\n')} onChange={(e) => setC({ ...c, catchphrasesEn: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })} />
+        <label htmlFor="ctalk">说话频率（0–1，留空跟随性格）</label>
+        <input id="ctalk" type="number" min={0} max={1} step={0.05} value={c.talkFrequency ?? ''} onChange={(e) => setC({ ...c, talkFrequency: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <label htmlFor="cstickers">常用表情（逗号分隔，留空跟随性格）</label>
+        <input id="cstickers" value={(c.stickers ?? []).join(',')} onChange={(e) => setC({ ...c, stickers: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
         <label htmlFor="cweight">权重</label>
         <input id="cweight" value={c.weight} onChange={(e) => setC({ ...c, weight: Number(e.target.value.replace(/[^\d.]/g, '')) || 0 })} />
         <label htmlFor="cenabled">启用</label>

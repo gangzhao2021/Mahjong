@@ -39,9 +39,18 @@ export function selectCharacters(roster: Roster, count: number, rng: Rng): { cha
       (c) => c.weight,
       rng,
     );
-    chosen.push({ character, personality });
+    chosen.push({ character, personality: withOverrides(personality, character) });
   }
   return chosen;
+}
+
+/** The personality as this character plays it (PRD §9: per-character overrides). */
+export function withOverrides(personality: Personality, character: Character): Personality {
+  return {
+    ...personality,
+    talkFrequency: character.talkFrequency ?? personality.talkFrequency,
+    stickers: character.stickers?.length ? character.stickers : personality.stickers,
+  };
 }
 
 /** Validates a roster loaded from config; returns human-readable problems. */
@@ -61,6 +70,8 @@ export function validateRoster(roster: Roster): string[] {
     if (charIds.has(c.id)) problems.push(`Duplicate character id ${c.id}`);
     charIds.add(c.id);
     if (!ids.has(c.personalityId)) problems.push(`Character ${c.id} has unknown personality ${c.personalityId}`);
+    if (c.talkFrequency !== undefined && !(c.talkFrequency >= 0 && c.talkFrequency <= 1)) problems.push(`${c.id}.talkFrequency must be between 0 and 1`);
+    if (c.stickers !== undefined && !Array.isArray(c.stickers)) problems.push(`${c.id}.stickers must be a list`);
   }
   return problems;
 }
