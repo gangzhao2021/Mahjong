@@ -17,11 +17,11 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { createHmac } from 'node:crypto';
 import { AccountSuspendedError, PLAYER_AVATARS, type PlayerRow, type Provider } from './accounts/accounts';
 import { exchangeWechatCode, LoginError, verifyAppleIdToken, verifyGoogleIdToken } from './accounts/providers';
-import { hashIdNumber, parseIdNumber } from './china/compliance';
+import { ageOn, hashIdNumber, parseIdNumber } from './china/compliance';
 import { AlreadyClaimedError } from './economy/rewards';
 import { NothingToClaimError } from './economy/achievements';
 import type { Lobby } from './lobby';
-import { accountSummary, loginMethods, serverInfo, type Services } from './services';
+import { accountSummary, guardianRequired, loginMethods, serverInfo, type Services } from './services';
 
 /** Identity checks, injectable so tests don't call Apple / Google / WeChat. */
 export interface IdentityVerifiers {
@@ -232,6 +232,21 @@ export function buildHttp(s: Services, lobby: Lobby, moderator: Moderator, optio
     if (!name || !birthDate) throw new HttpError(400, 'invalidIdNumber');
     if (!(await s.realName.verify(name, idNumber))) throw new HttpError(400, 'verificationFailed');
     await s.accounts.setRealName(player.id, birthDate, hashIdNumber(idNumber, s.auth.idHashSecret));
+    return respond((await s.accounts.get(player.id))!);
+  });
+
+  /** Under 14: a verified adult guardian consents before play (Appendix D.2). The guardian's ID is not stored, only its keyed hash. */
+  app.post('/account/guardian-consent', async (req) => {
+    const player = await requirePlayer(req);
+    if (!guardianRequired(s, player)) throw new HttpError(400, 'notRequired');
+    const b = body(req);
+    const name = typeof b.name === 'string' ? b.name.trim() : '';
+    const idNumber = typeof b.idNumber === 'string' ? b.idNumber.trim() : '';
+    const birthDate = parseIdNumber(idNumber);
+    if (!name || !birthDate) throw new HttpError(400, 'invalidIdNumber');
+    if (ageOn(birthDate, s.now(), s.china.utcOffsetHours) < 18) throw new HttpError(400, 'guardianNotAdult');
+    if (!(await s.realName.verify(name, idNumber))) throw new HttpError(400, 'verificationFailed');
+    await s.accounts.setGuardianConsent(player.id, hashIdNumber(idNumber, s.auth.idHashSecret), s.now());
     return respond((await s.accounts.get(player.id))!);
   });
 

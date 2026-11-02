@@ -1,13 +1,15 @@
-/** Real-name verification (China build, Appendix D.2). */
+/** Real-name verification and, under 14, a guardian's consent (China build, Appendix D.2). */
 import type { AccountSummary } from '@mahjong/protocol';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Btn } from '../components/ActionBar';
 import { formStyles } from '../components/Sheet';
+import { SERVER_HTTP } from '../config';
 import { api, ApiError } from '../net/api';
 import { T } from '../strings';
 
-export function RealNameScreen({ token, onVerified, onLogout }: { token: string; onVerified(account: AccountSummary): void; onLogout(): void }) {
+export function RealNameScreen({ token, guardian = false, onVerified, onLogout }: { token: string; guardian?: boolean; onVerified(account: AccountSummary): void; onLogout(): void }) {
+  const L = guardian ? T.guardian : T.realName;
   const [name, setName] = useState('');
   const [idNumber, setIdNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -17,9 +19,10 @@ export function RealNameScreen({ token, onVerified, onLogout }: { token: string;
     setBusy(true);
     setError(null);
     try {
-      onVerified((await api.realName(token, name, idNumber)).account);
+      onVerified((await (guardian ? api.guardianConsent : api.realName)(token, name, idNumber)).account);
     } catch (e) {
-      setError(e instanceof ApiError && e.code === 'invalidIdNumber' ? T.realName.invalid : T.realName.failed);
+      if (e instanceof ApiError && e.code === 'guardianNotAdult') setError(T.guardian.notAdult);
+      else setError(e instanceof ApiError && e.code === 'invalidIdNumber' ? L.invalid : L.failed);
     } finally {
       setBusy(false);
     }
@@ -28,14 +31,19 @@ export function RealNameScreen({ token, onVerified, onLogout }: { token: string;
   return (
     <View style={styles.root}>
       <View style={styles.box}>
-        <Text style={styles.title}>{T.realName.title}</Text>
-        <Text style={formStyles.hint}>{T.realName.hint}</Text>
-        <TextInput style={formStyles.input} value={name} onChangeText={setName} placeholder={T.realName.name} maxLength={20} />
-        <TextInput style={formStyles.input} value={idNumber} onChangeText={setIdNumber} placeholder={T.realName.idNumber} maxLength={18} autoCapitalize="characters" />
+        <Text style={styles.title}>{L.title}</Text>
+        <Text style={formStyles.hint}>{L.hint}</Text>
+        {guardian && (
+          <Text style={styles.link} accessibilityRole="link" onPress={() => void Linking.openURL(`${SERVER_HTTP}/legal/privacy`)}>
+            {T.guardian.policy}
+          </Text>
+        )}
+        <TextInput style={formStyles.input} value={name} onChangeText={setName} placeholder={L.name} maxLength={20} />
+        <TextInput style={formStyles.input} value={idNumber} onChangeText={setIdNumber} placeholder={L.idNumber} maxLength={18} autoCapitalize="characters" />
         {error && <Text style={formStyles.error}>{error}</Text>}
         <View style={formStyles.row}>
           <Btn label={T.logout} onPress={onLogout} />
-          <Btn label={T.realName.submit} primary disabled={busy || name.trim().length < 2 || idNumber.length !== 18} onPress={submit} />
+          <Btn label={L.submit} primary disabled={busy || name.trim().length < 2 || idNumber.length !== 18} onPress={submit} />
         </View>
       </View>
     </View>
@@ -46,4 +54,5 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1f6b47', alignItems: 'center', justifyContent: 'center', padding: 16 },
   box: { backgroundColor: '#fdfaf2', borderRadius: 16, padding: 18, gap: 10, width: '100%', maxWidth: 420 },
   title: { fontSize: 18, fontWeight: '800', color: '#3e2723' },
+  link: { color: '#1565c0', textDecorationLine: 'underline' },
 });

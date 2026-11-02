@@ -160,6 +160,8 @@ export default function App() {
     screen = <LoginScreen info={info} onLoggedIn={onLoggedIn} onOpenTutorial={() => setTutorialOpen(true)} />;
   } else if (game.account!.realName.required && !game.account!.realName.verified) {
     screen = <RealNameScreen token={token} onVerified={setAccount} onLogout={logout} />;
+  } else if (game.account!.realName.guardianRequired) {
+    screen = <RealNameScreen key="guardian" token={token} guardian onVerified={setAccount} onLogout={logout} />;
   } else if (historyOpen && !game.table) {
     screen = <HistoryScreen token={token} onClose={() => setHistoryOpen(false)} />;
   } else if (game.table) {
