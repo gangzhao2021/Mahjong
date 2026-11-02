@@ -154,6 +154,7 @@ export class Lobby {
           // The China build talks Chinese only (Appendix D); older clients send no locale.
           const language: Language = this.s.region !== 'china' && msg.locale === 'en' ? 'en' : 'zh';
           this.languages.set(player.id, language);
+          if (player.chat_suspended_until) this.chatGuard.restore(player.id, new Date(player.chat_suspended_until).getTime());
           if (!this.sockets.has(player.id)) this.sockets.set(player.id, new Set());
           this.sockets.get(player.id)!.add(socket);
           // Play session for analytics (DAU, session length — PRD §33).
@@ -292,7 +293,8 @@ export class Lobby {
         // Moderate before any AI or display sees it (PRD §7.1).
         const verdict = await this.deps.moderator.check(text, 'playerChat');
         if (!verdict.allowed) {
-          this.chatGuard.violation(player.id);
+          const suspendedUntil = this.chatGuard.violation(player.id);
+          if (suspendedUntil !== null) await this.s.db.query('UPDATE players SET chat_suspended_until = $2 WHERE id = $1', [player.id, new Date(suspendedUntil)]);
           await this.s.db.query("INSERT INTO moderation_events (kind, player_id, text, reason, game_id) VALUES ('blockedPlayerMessage', $1, $2, $3, $4)", [
             player.id,
             text,
@@ -359,6 +361,11 @@ export class Lobby {
   }
 
   /** Takes a player out of any game and disconnects them (suspension). */
+  /** The admin lifted this player's chat suspension (Appendix D.5). */
+  liftChatSuspension(playerId: string): void {
+    this.chatGuard.lift(playerId);
+  }
+
   kick(playerId: string): void {
     const room = this.rooms.get(playerId);
     // In a friend room the others play on; the kicked seat is auto-played.

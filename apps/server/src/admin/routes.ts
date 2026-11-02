@@ -307,6 +307,21 @@ export function registerAdminRoutes(app: FastifyInstance, d: AdminDeps): void {
         return { ok: true };
       });
 
+      /** Players whose chat is suspended right now (PRD §7.1, Appendix D.5). */
+      admin.get('/chat-suspensions', async () => {
+        const rows = await db.query('SELECT id, nickname, chat_suspended_until FROM players WHERE chat_suspended_until > $1 ORDER BY chat_suspended_until DESC LIMIT 200', [s.now()]);
+        return { players: rows.map((r) => ({ playerId: r.id, nickname: r.nickname, until: iso(r.chat_suspended_until) })) };
+      });
+
+      admin.post('/players/:id/chat-suspension/lift', async (req) => {
+        const { id } = req.params as { id: string };
+        const rows = await db.query('UPDATE players SET chat_suspended_until = NULL WHERE id = $1 RETURNING id', [id]);
+        if (!rows.length) throw new AdminError(404, 'notFound');
+        d.lobby.liftChatSuspension(id);
+        await audit(req, 'liftChatSuspension', id, null);
+        return { ok: true };
+      });
+
       admin.get('/crashes', async (req) => {
         const days = Math.min(90, Math.max(1, Number((req.query as { days?: string }).days ?? 7) || 7));
         return { groups: await s.crashes.groups(days) };
