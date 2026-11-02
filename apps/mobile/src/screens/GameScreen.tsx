@@ -4,6 +4,7 @@ import type { DistributiveOmit, TableSnapshot } from '@mahjong/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { useCueSounds } from '../audio/cues';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTableSounds } from '../audio/sound';
 import { ActionBar, Btn, claimFanSize } from '../components/ActionBar';
 import { ChatPanel, SpeechBubbles } from '../components/Chat';
@@ -425,7 +426,17 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
         </View>
       </View>
 
-      <SpeechBubbles chat={chat} catalog={game.catalog} positionOf={(seat) => (portrait ? BUBBLE_POSITION_PORTRAIT : BUBBLE_POSITION)[sideOf(seat)]} />
+      <SpeechBubbles
+        chat={chat}
+        catalog={game.catalog}
+        positionOf={(seat) => (portrait ? BUBBLE_POSITION_PORTRAIT : BUBBLE_POSITION)[sideOf(seat)]}
+        seats={table.seats}
+        mySeat={table.mySeat}
+        reported={game.reported}
+        onReport={game.reportLine}
+      />
+
+      {table.seats.some((s) => !s.isHuman) && <AiNotice />}
 
       {/* The tile just discarded, shown large next to the player who let it go */}
       {spotlight && (
@@ -685,6 +696,32 @@ const CALLOUT_POSITION = {
   3: { left: '24%', top: '40%' },
 } as const;
 
+const AI_NOTICE_KEY = 'mahjong.aiNoticeSeen';
+
+/** Shown once per install, at the first table: the opponents and their words are AI (Appendix D.4). */
+function AiNotice() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(AI_NOTICE_KEY).then(
+      (seen) => setShow(!seen),
+      () => setShow(true),
+    );
+  }, []);
+  if (!show) return null;
+  const dismiss = () => {
+    setShow(false);
+    void AsyncStorage.setItem(AI_NOTICE_KEY, '1').catch(() => undefined);
+  };
+  return (
+    <View style={styles.aiNotice} accessibilityRole="alert">
+      <Text style={styles.aiNoticeText}>{T.aiNotice}</Text>
+      <Pressable onPress={dismiss} accessibilityRole="button" hitSlop={8}>
+        <Text style={styles.aiNoticeOk}>{T.aiNoticeOk}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // userSelect: keep swipes on web from selecting tile text.
   stage: { paddingHorizontal: 12, paddingVertical: 6, userSelect: 'none', transformOrigin: 'top left' },
@@ -768,6 +805,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   spotlightText: { color: '#ffe082', fontSize: 12, fontWeight: '800' },
+  aiNotice: {
+    position: 'absolute',
+    top: 56,
+    alignSelf: 'center',
+    maxWidth: 520,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  aiNoticeText: { color: '#fff', fontSize: 13, flexShrink: 1 },
+  aiNoticeOk: { color: '#ffe082', fontSize: 14, fontWeight: '700' },
   banner: {
     position: 'absolute',
     alignSelf: 'center',

@@ -18,17 +18,32 @@ export function stickerEmoji(catalog: ChatCatalog | null, id: StickerId | null):
   return catalog?.stickers.find((s) => s.id === id)?.emoji ?? '';
 }
 
+/** AI lines and other real players' lines can be reported. */
+function canReport(e: ChatEntry, mySeat: Seat, seats: SeatInfo[]): boolean {
+  return !!e.text && (e.kind === 'ai' || (e.seat !== mySeat && !!seats[e.seat]?.isHuman));
+}
+
 /** Latest line per seat, shown for a few seconds next to that seat. */
 export function SpeechBubbles({
   chat,
   catalog,
   positionOf,
+  seats,
+  mySeat,
+  reported,
+  onReport,
 }: {
   chat: LocalChatEntry[];
   catalog: ChatCatalog | null;
   positionOf(seat: Seat): ViewStyle;
+  seats: SeatInfo[];
+  mySeat: Seat;
+  reported: number[];
+  onReport(entryId: number): void;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  /** The line a long press opened the Report action on (PRD §7.1, Appendix C). */
+  const [reporting, setReporting] = useState<number | null>(null);
   const latest = new Map<Seat, LocalChatEntry>();
   for (const e of chat) latest.set(e.seat, e);
   const visible = [...latest.values()].filter((e) => e.localAt + bubbleMs(e) > now);
@@ -43,9 +58,23 @@ export function SpeechBubbles({
   return (
     <>
       {visible.map((e) => (
-        <PopIn key={e.id} pointerEvents="none" from={0.8} style={[styles.bubble, positionOf(e.seat)]}>
-          {e.text ? <Text style={styles.bubbleText}>{e.text}</Text> : null}
-          {e.sticker ? <Text style={styles.bubbleSticker}>{stickerEmoji(catalog, e.sticker)}</Text> : null}
+        <PopIn key={e.id} from={0.8} style={[styles.bubble, positionOf(e.seat)]}>
+          <Pressable
+            style={styles.bubbleBody}
+            disabled={!canReport(e, mySeat, seats)}
+            onLongPress={() => setReporting(e.id)}
+            accessibilityHint={canReport(e, mySeat, seats) ? T.bubbleReportHint : undefined}
+          >
+            {e.text ? <Text style={styles.bubbleText}>{e.text}</Text> : null}
+            {e.sticker ? <Text style={styles.bubbleSticker}>{stickerEmoji(catalog, e.sticker)}</Text> : null}
+          </Pressable>
+          {reported.includes(e.id) ? (
+            <Text style={styles.bubbleReported}>{T.reported}</Text>
+          ) : reporting === e.id ? (
+            <Pressable onPress={() => onReport(e.id)} accessibilityRole="button" hitSlop={8}>
+              <Text style={styles.bubbleReport}>{T.report}</Text>
+            </Pressable>
+          ) : null}
         </PopIn>
       ))}
     </>
@@ -110,7 +139,7 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
               {item.target !== 'table' ? ` → ${nameOf(item.target)}` : ''}{T.colon}{item.text ?? ''} {stickerEmoji(catalog, item.sticker)}
             </Text>
             {/* AI lines and other real players' lines can be reported; a real player can also be blocked */}
-            {item.text && (item.kind === 'ai' || (item.seat !== mySeat && seats[item.seat]?.isHuman)) ? (
+            {canReport(item, mySeat, seats) ? (
               <View style={styles.lineActions}>
                 {reported.includes(item.id) ? (
                   <Text style={styles.reported}>{T.reported}</Text>
@@ -181,6 +210,9 @@ export function BanterPicker({ level, onChange }: { level: BanterLevel; onChange
 }
 
 const styles = StyleSheet.create({
+  bubbleBody: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  bubbleReport: { color: '#b71c1c', fontSize: 13, fontWeight: '700', marginLeft: 6, textDecorationLine: 'underline' },
+  bubbleReported: { color: '#607d8b', fontSize: 12, marginLeft: 6 },
   bubble: {
     position: 'absolute',
     maxWidth: 260,
