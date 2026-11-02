@@ -5,6 +5,7 @@ import { LiveConfig } from '../src/admin/liveConfig';
 import { openDb } from '../src/db/db';
 import { loadDialogueConfig } from '../src/dialogueConfig';
 import { DEFAULT_CONFIG } from '../src/config';
+import { loadChinaConfig, minorWindowEnd } from '../src/china/compliance';
 import { loadEconomyConfig } from '../src/economy/config';
 import { NoLlm } from '../src/llm/provider';
 import { api, Client, FAST, guestLogin, isTable, startServer, type TestServer } from './helpers';
@@ -223,6 +224,24 @@ describe('table usage', () => {
 const day = (d: Date) => new Date(d.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
 
 describe('live configuration (PRD §34–§38)', () => {
+  it('edits minor windows, holidays and the guest trial; validates and applies at once (PRD §35, D.3)', async () => {
+    const { server, admin, code } = await adminServer();
+    await admin.login(code());
+    const china = (await admin.request('GET', '/config')).body.china;
+    expect(china.guestTrialMinutes).toBe(60);
+
+    for (const bad of [{ holidays: ['2027-02-30'] }, { holidays: ['tomorrow'] }, { holidayWindow: { start: '21:00', end: '20:00' } }, { minorWindows: [{ days: [7], start: '20:00', end: '21:00' }] }, { guestTrialPeriodDays: 0 }]) {
+      expect((await admin.request('PUT', '/config/china', { ...china, ...bad })).status).toBe(400);
+    }
+
+    // A Tuesday, 20:30 in China: closed until the day is added as a holiday.
+    const tuesday = new Date('2027-02-09T12:30:00Z');
+    expect(minorWindowEnd(tuesday, server.services.china)).toBeNull();
+    expect((await admin.request('PUT', '/config/china', { ...china, holidays: ['2027-02-09'], guestTrialMinutes: 30 })).status).toBe(200);
+    expect(minorWindowEnd(tuesday, server.services.china)?.toISOString()).toBe('2027-02-09T13:00:00.000Z');
+    expect(server.services.china.guestTrialMinutes).toBe(30);
+  });
+
   it('validates, applies immediately and audits economy changes', async () => {
     const { server, admin, code } = await adminServer();
     await admin.login(code());
@@ -287,7 +306,7 @@ describe('live configuration (PRD §34–§38)', () => {
     const db = await openDb({ dataDir: null });
     const make = () => {
       const economy = loadEconomyConfig();
-      return { economy, live: new LiveConfig(db, { region: 'global', economy, dialogue: loadDialogueConfig('global'), server: { ...DEFAULT_CONFIG, skillWeights: { ...DEFAULT_CONFIG.skillWeights } }, llm: new NoLlm() }) };
+      return { economy, live: new LiveConfig(db, { region: 'global', economy, dialogue: loadDialogueConfig('global'), server: { ...DEFAULT_CONFIG, skillWeights: { ...DEFAULT_CONFIG.skillWeights } }, llm: new NoLlm(), china: loadChinaConfig() }) };
     };
     const first = make();
     await first.live.set('economy', { ...first.economy, startingCoins: 777 });

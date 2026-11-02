@@ -6,6 +6,7 @@
  */
 import { validateRoster, type Character, type DialogueSettings, type Personality, type QuickPhrase } from '@mahjong/dialogue';
 import type { SkillLevel } from '@mahjong/ai-play';
+import { validateChinaConfig, type ChinaConfig } from '../china/compliance';
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/db';
 import { regionalSettings, type ChatLimits, type DialogueConfig, type Region } from '../dialogueConfig';
@@ -29,6 +30,8 @@ export interface ConfigValues {
   /** Names and avatars to pick from when creating characters (PRD §9). */
   nameLibrary: LibraryEntry[];
   avatarLibrary: LibraryEntry[];
+  /** Minor play windows, holidays and the guest trial (PRD §35, Appendix D.2–D.3). */
+  china: ChinaConfig;
 }
 
 export type ConfigKey = keyof ConfigValues;
@@ -43,6 +46,7 @@ export const CONFIG_KEYS: readonly ConfigKey[] = [
   'characters',
   'nameLibrary',
   'avatarLibrary',
+  'china',
 ];
 
 export class ConfigError extends Error {
@@ -57,6 +61,7 @@ export interface LiveTargets {
   dialogue: DialogueConfig;
   server: ServerConfig;
   llm: LlmProvider;
+  china: ChinaConfig;
 }
 
 const RATIO_KEYS: (keyof DialogueSettings)[] = [
@@ -112,6 +117,7 @@ export class LiveConfig {
       characters: t.dialogue.roster.characters,
       nameLibrary: this.libraries.nameLibrary,
       avatarLibrary: this.libraries.avatarLibrary,
+      china: t.china,
     };
     return structuredClone(values[key]);
   }
@@ -178,6 +184,10 @@ export class LiveConfig {
       case 'avatarLibrary':
         this.libraries[key] = value as LibraryEntry[];
         break;
+      case 'china':
+        // In place: services hold a reference to this object.
+        Object.assign(t.china, value);
+        break;
     }
   }
 
@@ -228,6 +238,8 @@ export class LiveConfig {
         const list = value as LibraryEntry[];
         return Array.isArray(list) && list.every((e) => typeof e.value === 'string' && e.value.trim() && typeof e.enabled === 'boolean') ? [] : [`${key} entries need a value and enabled flag`];
       }
+      case 'china':
+        return validateChinaConfig(value as ChinaConfig);
     }
   }
 

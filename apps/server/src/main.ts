@@ -2,6 +2,7 @@ import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { AdminAuth, adminConfigFromEnv } from './admin/auth';
 import { LiveConfig } from './admin/liveConfig';
+import { warnIfNoHolidays } from './china/compliance';
 import { DEFAULT_CONFIG } from './config';
 import { openDb } from './db/db';
 import { createLlmProvider, createModerator, loadDialogueConfig } from './dialogueConfig';
@@ -21,8 +22,9 @@ const services = createServices({ region: dialogue.region, db, dataDir: config.d
 const lobby = new Lobby({ config, dialogue, llm, moderator, hands: new TeeHandLogStore([new FileHandLogStore(config.dataDir), services.history]), services });
 
 // Admin-edited settings override the JSON defaults (PRD §34–§38).
-const liveConfig = new LiveConfig(db, { region: dialogue.region, economy: services.economy, dialogue, server: config, llm });
+const liveConfig = new LiveConfig(db, { region: dialogue.region, economy: services.economy, dialogue, server: config, llm, china: services.china });
 await liveConfig.load();
+if (dialogue.region === 'china') warnIfNoHolidays(services.china);
 const adminConfig = adminConfigFromEnv(process.env);
 if (!adminConfig) console.warn('Admin dashboard disabled: set ADMIN_USERNAME, ADMIN_PASSWORD_HASH and ADMIN_TOTP_SECRET (pnpm --filter @mahjong/server admin:setup).');
 

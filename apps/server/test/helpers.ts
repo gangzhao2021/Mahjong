@@ -93,7 +93,7 @@ export async function startServer(config = FAST, options: TestServerOptions = {}
     // Fixed but well-mixed 128-bit seeds, so test deals repeat from run to run.
     handSeed: () => sha256Hex(`hand ${hand++}`).slice(0, 32),
   });
-  const liveConfig = new LiveConfig(db, { region, economy: services.economy, dialogue, server: config, llm: options.llm ?? new NoLlm() });
+  const liveConfig = new LiveConfig(db, { region, economy: services.economy, dialogue, server: config, llm: options.llm ?? new NoLlm(), china: services.china });
   await liveConfig.load();
   const app = buildHttp(services, lobby, moderator, {
     verifiers: options.verifiers ?? FAKE_VERIFIERS,

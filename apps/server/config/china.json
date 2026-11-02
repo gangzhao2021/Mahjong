@@ -1,5 +1,5 @@
 {
-  "_note": "Minor play windows follow the current regulator notice. Holidays are the days off in the State Council General Office's holiday schedule (2026: notice of 2025-11-04); add each new year when it is published, usually in November. The server warns at startup when the current year has none.",
+  "_note": "Minor play windows follow the current regulator notice. Holidays are the days off in the State Council General Office's holiday schedule (2026: notice of 2025-11-04); add each new year when it is published, usually in November. The server warns at startup when the current year has none. These are only the defaults: once the admin dashboard has saved this section, the saved values win and new years must be added there.",
   "utcOffsetHours": 8,
   "minorWindows": [
     { "days": [5, 6, 0], "start": "20:00", "end": "21:00" }

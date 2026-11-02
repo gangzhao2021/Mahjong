@@ -1,7 +1,8 @@
 /**
  * Mainland China requirements (PRD Appendix D.2–D.3): real-name
  * verification, minor play-time windows, and the restricted guest trial.
- * Not legal advice — window rules and holidays live in config/china.json.
+ * Not legal advice — window rules and holidays are seeded from
+ * config/china.json and edited in the admin dashboard (PRD §35).
  */
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -22,12 +23,41 @@ export interface ChinaConfig {
 
 export function loadChinaConfig(): ChinaConfig {
   const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../config');
-  const config = JSON.parse(readFileSync(path.join(dir, 'china.json'), 'utf8')) as ChinaConfig;
-  const year = String(new Date(Date.now() + config.utcOffsetHours * 3_600_000).getUTCFullYear());
+  return JSON.parse(readFileSync(path.join(dir, 'china.json'), 'utf8')) as ChinaConfig;
+}
+
+/** Minors get only the weekly windows in a year with no holidays listed. */
+export function warnIfNoHolidays(config: ChinaConfig, now = new Date()): void {
+  const year = local(now, config.utcOffsetHours).date.slice(0, 4);
   if (!config.holidays.some((d) => d.startsWith(year))) {
-    console.warn(`config/china.json has no holidays for ${year}: minors get only the weekly windows until it is updated.`);
+    console.warn(`No statutory holidays configured for ${year}: minors get only the weekly windows until they are added in the admin dashboard.`);
   }
-  return config;
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function validateChinaConfig(c: ChinaConfig): string[] {
+  const problems: string[] = [];
+  const badSpan = (w: { start: string; end: string }) => !HHMM.test(w?.start) || !HHMM.test(w?.end) || w.start >= w.end;
+  if (typeof c.utcOffsetHours !== 'number' || c.utcOffsetHours < -12 || c.utcOffsetHours > 14) problems.push('utcOffsetHours must be between -12 and 14');
+  if (!Array.isArray(c.minorWindows)) problems.push('minorWindows must be a list');
+  else {
+    for (const w of c.minorWindows) {
+      if (!Array.isArray(w?.days) || !w.days.length || !w.days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) problems.push('each minor window needs days from 0 (Sunday) to 6');
+      if (badSpan(w)) problems.push(`invalid minor window time ${w?.start}–${w?.end}`);
+    }
+  }
+  if (badSpan(c.holidayWindow)) problems.push('holidayWindow needs a start before its end, as HH:MM');
+  if (!Array.isArray(c.holidays)) problems.push('holidays must be a list');
+  else {
+    for (const d of c.holidays) {
+      const valid = typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d);
+      if (!valid) problems.push(`invalid holiday date ${d}`);
+    }
+  }
+  if (!Number.isInteger(c.guestTrialMinutes) || c.guestTrialMinutes < 0) problems.push('guestTrialMinutes must be a non-negative integer (0 turns the trial off)');
+  if (!Number.isInteger(c.guestTrialPeriodDays) || c.guestTrialPeriodDays < 1) problems.push('guestTrialPeriodDays must be a positive integer');
+  return problems;
 }
 
 // ---------------------------------------------------------------------------
