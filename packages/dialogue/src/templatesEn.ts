@@ -1,7 +1,7 @@
 /**
  * English template lines for players using the English UI. Same keys and
- * placeholders as DEFAULT_TEMPLATES; personality-specific templates are
- * Chinese-only, so English tables use these defaults.
+ * placeholders as DEFAULT_TEMPLATES. Personalities can override them with
+ * their own lines (`templatesEn`).
  */
 import type { TemplateSet } from './types';
 

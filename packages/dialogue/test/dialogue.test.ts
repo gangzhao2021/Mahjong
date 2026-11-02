@@ -232,6 +232,18 @@ describe('LLM prompt', () => {
 });
 
 describe('templates', () => {
+  it('a personality speaks its own lines, by role and language', () => {
+    const own = personality('calm', {
+      templates: { 'pong.subject': { mild: ['碰。'] } },
+      templatesEn: { 'pong.subject': { mild: ['Pong.'] } },
+    });
+    const ctx = { trigger: { kind: 'pong', subject: 1, version: 0, handIndex: 0, importance: 'low' }, seat: 1, intent: { kind: 'none' }, personality: own, level: 'mild', nameOf: () => 'x' } as unknown as Parameters<typeof templateLine>[0];
+    expect(templateLine(ctx, () => 0.5)).toBe('碰。');
+    expect(templateLine({ ...ctx, language: 'en' }, () => 0.5)).toBe('Pong.');
+    // Other roles have no own line here and fall back to the shared ones.
+    expect(templateLine({ ...ctx, seat: 2 }, () => 0.5)).not.toBe('碰。');
+  });
+
   it('every default template renders without leftover placeholders', () => {
     const p = personality('p');
     for (const key of Object.keys(DEFAULT_TEMPLATES)) {

@@ -129,15 +129,14 @@ export function templateLine(ctx: TemplateContext, rng: Rng): string | null {
   const role = roleOf(trigger, seat);
   const key = intentKey(intent);
   const language = ctx.language ?? 'zh';
-  // Personality templates are written in Chinese only.
-  const own = language === 'zh' ? (personality.templates ?? {}) : {};
+  const own = (language === 'en' ? personality.templatesEn : personality.templates) ?? {};
   const lib: Partial<Record<string, TemplateSet>> = language === 'en' ? EN_TEMPLATES : DEFAULT_TEMPLATES;
 
   let pool: string[] = [];
   const remembered = memoryKey(ctx);
   if (remembered) pool = linesFor(lib[remembered], level);
   if (!pool.length && key) pool = linesFor(lib[key], level);
-  if (!pool.length) pool = linesFor(own[trigger.kind], level);
+  if (!pool.length) pool = linesFor(own[`${trigger.kind}.${role}`] ?? own[trigger.kind], level);
   if (!pool.length) pool = linesFor(lib[`${trigger.kind}.${role}`], level);
   if (!pool.length && role !== 'other') pool = linesFor(lib[`${trigger.kind}.other`], level);
   // A catchphrase now and then — but a memory callback always wins.
