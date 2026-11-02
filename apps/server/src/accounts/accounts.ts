@@ -30,6 +30,7 @@ export interface PlayerRow {
   reward_day: number;
   last_reward_date: Date | string | null;
   rank_points: number;
+  chat_suspended_until: Date | string | null;
 }
 
 export class AccountSuspendedError extends Error {

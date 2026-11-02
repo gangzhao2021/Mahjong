@@ -5,6 +5,7 @@ import { LiveConfig } from '../src/admin/liveConfig';
 import { openDb } from '../src/db/db';
 import { loadDialogueConfig } from '../src/dialogueConfig';
 import { DEFAULT_CONFIG } from '../src/config';
+import { loadChinaConfig, minorWindowEnd } from '../src/china/compliance';
 import { loadEconomyConfig } from '../src/economy/config';
 import { NoLlm } from '../src/llm/provider';
 import { api, Client, FAST, guestLogin, isTable, startServer, type TestServer } from './helpers';
@@ -222,7 +223,68 @@ describe('table usage', () => {
 /** A calendar day in the game's time zone (UTC+8). */
 const day = (d: Date) => new Date(d.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
 
+describe('chat suspensions (PRD §7.1, Appendix D.5)', () => {
+  it('survive a restart, are listed for the admin, and can be lifted', async () => {
+    const db = await openDb({ dataDir: null });
+    const dialogue = () => {
+      const d = loadDialogueConfig('global');
+      d.chat = { ...d.chat, minIntervalMs: 0, perMinute: 100, violationsBeforeSuspension: 2 };
+      return d;
+    };
+    const isRejected = (m: ServerMessage): m is Extract<ServerMessage, { type: 'chatRejected' }> => m.type === 'chatRejected';
+    const join = async (server: TestServer) => {
+      const client = await Client.connect(server);
+      await client.hello('device-chat-ban');
+      client.send({ type: 'startGame', options: { tableId: 'practice' } });
+      await client.next(isTable);
+      return client;
+    };
+
+    const first = await startServer(FAST, { admin: ADMIN, dialogue: dialogue(), db });
+    const client = await join(first);
+    client.send({ type: 'chat', text: '去死吧' });
+    expect((await client.next(isRejected)).reason).toBe('blocked');
+    client.send({ type: 'chat', text: '去死吧' });
+    expect((await client.next(isRejected)).reason).toBe('suspended');
+    await client.close();
+    await first.close();
+
+    const server = await startServer(FAST, { admin: ADMIN, dialogue: dialogue(), db });
+    const again = await join(server);
+    again.send({ type: 'chat', text: '你好' });
+    expect((await again.next(isRejected)).reason).toBe('suspended');
+
+    const admin = new AdminClient(server);
+    await admin.login(totpCode(SECRET, totpStep(Date.now())));
+    const { players } = (await admin.request('GET', '/chat-suspensions')).body;
+    expect(players).toHaveLength(1);
+    expect((await admin.request('POST', `/players/${players[0].playerId}/chat-suspension/lift`)).status).toBe(200);
+    expect((await admin.request('GET', '/chat-suspensions')).body.players).toHaveLength(0);
+
+    again.send({ type: 'chat', text: '你好' });
+    await again.next((m): m is Extract<ServerMessage, { type: 'chat' }> => m.type === 'chat' && m.entry.kind === 'player');
+  });
+});
+
 describe('live configuration (PRD §34–§38)', () => {
+  it('edits minor windows, holidays and the guest trial; validates and applies at once (PRD §35, D.3)', async () => {
+    const { server, admin, code } = await adminServer();
+    await admin.login(code());
+    const china = (await admin.request('GET', '/config')).body.china;
+    expect(china.guestTrialMinutes).toBe(60);
+
+    for (const bad of [{ holidays: ['2027-02-30'] }, { holidays: ['tomorrow'] }, { holidayWindow: { start: '21:00', end: '20:00' } }, { minorWindows: [{ days: [7], start: '20:00', end: '21:00' }] }, { guestTrialPeriodDays: 0 }]) {
+      expect((await admin.request('PUT', '/config/china', { ...china, ...bad })).status).toBe(400);
+    }
+
+    // A Tuesday, 20:30 in China: closed until the day is added as a holiday.
+    const tuesday = new Date('2027-02-09T12:30:00Z');
+    expect(minorWindowEnd(tuesday, server.services.china)).toBeNull();
+    expect((await admin.request('PUT', '/config/china', { ...china, holidays: ['2027-02-09'], guestTrialMinutes: 30 })).status).toBe(200);
+    expect(minorWindowEnd(tuesday, server.services.china)?.toISOString()).toBe('2027-02-09T13:00:00.000Z');
+    expect(server.services.china.guestTrialMinutes).toBe(30);
+  });
+
   it('validates, applies immediately and audits economy changes', async () => {
     const { server, admin, code } = await adminServer();
     await admin.login(code());
@@ -287,7 +349,7 @@ describe('live configuration (PRD §34–§38)', () => {
     const db = await openDb({ dataDir: null });
     const make = () => {
       const economy = loadEconomyConfig();
-      return { economy, live: new LiveConfig(db, { region: 'global', economy, dialogue: loadDialogueConfig('global'), server: { ...DEFAULT_CONFIG, skillWeights: { ...DEFAULT_CONFIG.skillWeights } }, llm: new NoLlm() }) };
+      return { economy, live: new LiveConfig(db, { region: 'global', economy, dialogue: loadDialogueConfig('global'), server: { ...DEFAULT_CONFIG, skillWeights: { ...DEFAULT_CONFIG.skillWeights } }, llm: new NoLlm(), china: loadChinaConfig() }) };
     };
     const first = make();
     await first.live.set('economy', { ...first.economy, startingCoins: 777 });
@@ -295,7 +357,6 @@ describe('live configuration (PRD §34–§38)', () => {
     expect(second.economy.startingCoins).toBe(20000);
     await second.live.load();
     expect(second.economy.startingCoins).toBe(777);
-    await db.close();
   });
 });
 
