@@ -58,6 +58,9 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {
     retention.stop();
     await lobby.closeAll();
+    // wss.close() leaves open sockets alone, and those would keep app.close() waiting forever
+    // while players sit at a frozen table. Dropping them makes the clients reconnect.
+    for (const client of wss.clients) client.terminate();
     wss.close();
     await app.close();
     await db.close();
