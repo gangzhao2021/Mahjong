@@ -8,16 +8,18 @@ import { createContext, useContext, useId, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { useKeyboardHeight } from './useKeyboardHeight';
 
 export const FELT = '#1f6b47';
 
 /** How far the nearest Felt's content sits inside the screen edges, so overlays can still cover the whole screen. */
 const FeltInset = createContext<EdgeInsets>({ top: 0, right: 0, bottom: 0, left: 0 });
 
-/** Style for a dimmed overlay: it covers the whole screen, while what's on it stays inside the safe area. */
+/** Style for a dimmed overlay: it covers the whole screen, while what's on it stays inside the safe area and above the keyboard. */
 export function useOverlayEdges(padding = 0): ViewStyle {
   const insets = useSafeAreaInsets();
   const felt = useContext(FeltInset);
+  const keyboard = useKeyboardHeight();
   return {
     top: -felt.top,
     right: -felt.right,
@@ -25,7 +27,7 @@ export function useOverlayEdges(padding = 0): ViewStyle {
     left: -felt.left,
     paddingTop: padding + insets.top,
     paddingRight: padding + insets.right,
-    paddingBottom: padding + insets.bottom,
+    paddingBottom: padding + Math.max(insets.bottom, keyboard),
     paddingLeft: padding + insets.left,
   };
 }
