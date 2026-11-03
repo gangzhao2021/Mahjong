@@ -125,6 +125,7 @@ export function TileTracker({ view, onClose }: { view: HandView; onClose(): void
 const styles = StyleSheet.create({
   panel: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(0,0,0,0.35)',

@@ -90,7 +90,11 @@ export function SeatCard({ info, score, voidSuit, dealer, active, win, winCount 
         <View style={styles.badgesCompact}>
           {info.skill && <Text style={[styles.badge, skillStyle(info.skill)]}>{T.aiLevels[info.skill]}</Text>}
           {dealer && <Text style={[styles.badge, styles.dealerBadge]}>{T.dealer}</Text>}
-          {voidSuit !== null && !won && <Text style={[styles.badge, styles.voidBadge]}>{T.voidSuit(SUIT_NAMES[voidSuit])}</Text>}
+          {voidSuit !== null && !won && (
+            <Text style={[styles.badge, styles.voidBadge]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {T.voidSuit(SUIT_NAMES[voidSuit])}
+            </Text>
+          )}
         </View>
         <Text style={[styles.score, score > 0 ? styles.plus : score < 0 ? styles.minus : null]}>{score > 0 ? `+${score}` : score}</Text>
         {won ? (
@@ -198,9 +202,9 @@ const styles = StyleSheet.create({
   winRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   winText: { color: '#ffcdd2', fontSize: 12, fontWeight: '900' },
   avatar: { fontSize: 26 },
-  cardCompact: { flexDirection: 'column', gap: 1, paddingHorizontal: 4, width: 64 },
+  cardCompact: { flexDirection: 'column', gap: 1, paddingHorizontal: 4, width: '100%' },
   avatarCompact: { fontSize: 22 },
-  nameCompact: { fontSize: 11, maxWidth: 56 },
+  nameCompact: { fontSize: 11, maxWidth: '100%' },
   badgesCompact: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 2 },
   // Badges wrap under the name rather than pushing the card past the screen edge.
   cardText: { flexShrink: 1 },

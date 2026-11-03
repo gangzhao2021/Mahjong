@@ -408,6 +408,8 @@ const styles = StyleSheet.create({
   limit: { color: '#ffcc80', fontSize: 13, alignSelf: 'center' },
   bind: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 8,
     backgroundColor: 'rgba(0,0,0,0.3)',
@@ -415,7 +417,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  bindText: { flex: 1, color: '#e8f5e9', fontSize: 13 },
+  bindText: { flex: 1, minWidth: 180, color: '#e8f5e9', fontSize: 13 },
   capped: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
   body: { flexGrow: 1, flexDirection: 'row', gap: 24 },
   hero: { width: '40%', alignItems: 'center', justifyContent: 'center', gap: 6 },
