@@ -678,8 +678,8 @@ function portraitPondTile({ width, height }: { width: number; height: number }, 
   const tall = (height - 16 - 8 * margin - POND_LINE_PORTRAIT * 2 * margin) / (4 * TILE_RATIO + POND_LINE_PORTRAIT);
   return Math.max(min, Math.min(34, Math.floor(Math.min(across, besideCompass, tall))));
 }
-/** Narrower than this, landscape folds 静音 / 记牌 / 自动 / 离开 into the ⋯ menu like portrait; English needs about this much to clear the opposite seat. */
-const COMPACT_MENU_WIDTH = 960;
+/** Narrower than this, landscape folds 静音 / 记牌 / 自动 / 离开 into the ⋯ menu like portrait; English needs about this much for the opposite seat and its melds to clear the hand info. */
+const COMPACT_MENU_WIDTH = 1200;
 /** Room the opposite player's card takes beside their face-down row (landscape), until the card has been measured. */
 const TOP_CARD_ROOM = 200;
 /** Clear space kept between that card and the row. */
