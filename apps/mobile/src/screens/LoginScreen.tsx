@@ -3,10 +3,12 @@ import type { AccountSummary, LoginMethod, ServerInfo } from '@mahjong/protocol'
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { appleAvailable, signInWithApple, signInWithGoogle, signInWithWechat, SignInUnavailable } from '../auth/social';
 import { Btn } from '../components/ActionBar';
 import { Felt } from '../components/Felt';
 import { TileFan } from '../components/TileFan';
+import { useKeyboardHeight } from '../components/useKeyboardHeight';
 import { formStyles } from '../components/Sheet';
 import { api, ApiError } from '../net/api';
 import { getDeviceId } from '../net/deviceId';
@@ -64,8 +66,10 @@ export function LoginScreen({ info, onLoggedIn, onOpenTutorial }: Props) {
   };
 
   const methods = info.loginMethods;
+  const keyboard = useKeyboardHeight();
+  const insets = useSafeAreaInsets();
   return (
-    <Felt style={styles.root}>
+    <Felt style={[styles.root, { paddingBottom: PADDING + Math.max(0, keyboard - insets.bottom) }]}>
       <TileFan width={44} />
       <Text style={styles.title}>{T.appTitle}</Text>
       <View style={styles.box}>
@@ -142,8 +146,10 @@ export function PhoneLogin({ busy, onSubmit, onError }: { busy: boolean; onSubmi
   );
 }
 
+const PADDING = 16;
+
 const styles = StyleSheet.create({
-  root: { alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 },
+  root: { alignItems: 'center', justifyContent: 'center', padding: PADDING, gap: 12 },
   title: { fontSize: 30, fontWeight: '900', color: '#fff8e1' },
   box: { backgroundColor: 'rgba(253,250,242,0.96)', borderRadius: 16, padding: 16, gap: 12, alignItems: 'center', maxWidth: 560 },
   phone: { gap: 8 },

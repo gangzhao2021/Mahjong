@@ -14,7 +14,7 @@ export function Sheet({ title, onClose, children, width = 520 }: { title: string
           <Text style={styles.title}>{title}</Text>
           {onClose && <Btn label={T.close} onPress={onClose} />}
         </View>
-        <ScrollView contentContainerStyle={styles.body}>{children}</ScrollView>
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">{children}</ScrollView>
       </View>
     </View>
   );

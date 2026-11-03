@@ -3,10 +3,17 @@ import type { Seat } from '@mahjong/engine';
 import type { BanterLevel, ChatCatalog, ChatEntry, SeatInfo, StickerId } from '@mahjong/protocol';
 import { useEffect, useRef, useState } from 'react';
 import type { LocalChatEntry } from '../net/useGame';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { getLocale, T } from '../strings';
 import { Btn } from './ActionBar';
+import { useOverlayEdges } from './Felt';
 import { PopIn } from './PopIn';
+import { useKeyboardHeight } from './useKeyboardHeight';
+
+const PANEL_WIDTH = 340;
+const PANEL_PADDING = 10;
+/** Below this much height above the keyboard, the chat panel only shows its log and input. */
+const CRAMPED_HEIGHT = 320;
 
 /** How long a speech bubble stays up: long enough to read the whole line. */
 function bubbleMs(e: ChatEntry): number {
@@ -102,6 +109,11 @@ interface PanelProps {
 export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase, onSticker, onReport, reported, onBlock, onClose, banter, onBanter }: PanelProps) {
   const [text, setText] = useState('');
   const [target, setTarget] = useState<Seat | 'table'>('table');
+  const edges = useOverlayEdges(PANEL_PADDING);
+  const keyboard = useKeyboardHeight();
+  const window = useWindowDimensions();
+  // Typing on a landscape phone leaves little height: keep the log and the input.
+  const cramped = keyboard > 0 && window.height - keyboard < CRAMPED_HEIGHT;
   const list = useRef<FlatList<ChatEntry>>(null);
   const nameOf = (seat: Seat) => seats[seat]?.name ?? '';
 
@@ -112,23 +124,27 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
     setText('');
   };
 
+  // The panel runs to the top, right and bottom of the screen; the left edge stays where it is.
+  const panelEdges = { ...edges, left: undefined, paddingLeft: PANEL_PADDING, width: PANEL_WIDTH + Number(edges.paddingRight) - PANEL_PADDING };
   return (
-    <View style={styles.panel}>
+    <View style={[styles.panel, panelEdges]}>
       <View style={styles.panelHeader}>
         <Text style={styles.panelTitle}>{T.chat}</Text>
         <Btn label={T.close} onPress={onClose} />
       </View>
-      <View style={styles.banterInline}>
-        <Text style={styles.banterInlineLabel}>{T.banter}</Text>
-        {(['mild', 'spicy', 'quiet'] as BanterLevel[]).map((l) => (
-          <Pressable key={l} onPress={() => onBanter(l)} style={[styles.chip, banter === l && styles.chipOn]} accessibilityRole="button" accessibilityState={{ selected: banter === l }}>
-            <Text style={styles.chipText}>{T.banterLevels[l]}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {!cramped && (
+        <View style={styles.banterInline}>
+          <Text style={styles.banterInlineLabel}>{T.banter}</Text>
+          {(['mild', 'spicy', 'quiet'] as BanterLevel[]).map((l) => (
+            <Pressable key={l} onPress={() => onBanter(l)} style={[styles.chip, banter === l && styles.chipOn]} accessibilityRole="button" accessibilityState={{ selected: banter === l }}>
+              <Text style={styles.chipText}>{T.banterLevels[l]}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       <FlatList
         ref={list}
-        style={styles.log}
+        style={[styles.log, cramped && styles.logCramped]}
         data={chat}
         keyExtractor={(e) => String(e.id)}
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
@@ -158,27 +174,31 @@ export function ChatPanel({ chat, catalog, seats, mySeat, onSend, onQuickPhrase,
           </View>
         )}
       />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.chips}>
-        {catalog?.stickers.map((s) => (
-          <Pressable key={s.id} onPress={() => onSticker(s.id)} accessibilityLabel={s.label} style={styles.sticker}>
-            <Text style={styles.stickerText}>{s.emoji}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.chips}>
-        {catalog?.quickPhrases.map((q) => (
-          <Pressable key={q.id} onPress={() => onQuickPhrase(q.id)} style={styles.chip}>
-            <Text style={styles.chipText}>{q.text}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.chips}>
-        {(['table', ...seats.filter((s) => !s.isHuman).map((s) => s.seat)] as (Seat | 'table')[]).map((t) => (
-          <Pressable key={String(t)} onPress={() => setTarget(t)} style={[styles.chip, target === t && styles.chipOn]}>
-            <Text style={styles.chipText}>{t === 'table' ? T.toTable : `@${nameOf(t)}`}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      {!cramped && (
+        <>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.chips}>
+            {catalog?.stickers.map((s) => (
+              <Pressable key={s.id} onPress={() => onSticker(s.id)} accessibilityLabel={s.label} style={styles.sticker}>
+                <Text style={styles.stickerText}>{s.emoji}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.chips}>
+            {catalog?.quickPhrases.map((q) => (
+              <Pressable key={q.id} onPress={() => onQuickPhrase(q.id)} style={styles.chip}>
+                <Text style={styles.chipText}>{q.text}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.chips}>
+            {(['table', ...seats.filter((s) => !s.isHuman).map((s) => s.seat)] as (Seat | 'table')[]).map((t) => (
+              <Pressable key={String(t)} onPress={() => setTarget(t)} style={[styles.chip, target === t && styles.chipOn]}>
+                <Text style={styles.chipText}>{t === 'table' ? T.toTable : `@${nameOf(t)}`}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
+      )}
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -235,18 +255,14 @@ const styles = StyleSheet.create({
   bubbleSticker: { fontSize: 26 },
   panel: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 340,
     maxWidth: '75%',
     backgroundColor: 'rgba(253,250,242,0.98)',
-    padding: 10,
     gap: 6,
   },
   panelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   panelTitle: { fontSize: 16, fontWeight: '800', color: '#3e2723' },
   log: { flex: 1, minHeight: 80 },
+  logCramped: { minHeight: 0 },
   logRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   logLine: { color: '#37474f', fontSize: 13, paddingVertical: 2, flexShrink: 1 },
   report: { color: '#90a4ae', fontSize: 11, textDecorationLine: 'underline' },
