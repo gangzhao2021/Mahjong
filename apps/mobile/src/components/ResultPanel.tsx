@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { PATTERN_NAMES, PAYMENT_NAMES, T } from '../strings';
 import { Btn } from './ActionBar';
+import { useOverlayEdges } from './Felt';
 import { PopIn } from './PopIn';
 import { Melds } from './TableParts';
 import { Tile } from './Tile';
@@ -30,6 +31,7 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
   const [ready, setReady] = useState(false);
   // Winning hands as large as the panel allows: up to 18 tiles (four kongs) on a line or two.
   const { width } = useWindowDimensions();
+  const edges = useOverlayEdges(12);
   const handTile = Math.max(20, Math.min(34, Math.floor((Math.min(width - 24, PANEL_MAX_WIDTH) - 48) / 15.5)));
   const name = (seat: Seat) => table.seats[seat].name;
   // Who actually paid: on a self-draw only the players still in the hand (血战 winners who left don't).
@@ -48,7 +50,7 @@ export function ResultPanel({ table, result, countdown, handCoins, gameCoins, ra
   };
 
   return (
-    <View style={styles.backdrop}>
+    <View style={[styles.backdrop, edges]}>
       <View style={styles.panel}>
         <Text style={styles.title}>
           {table.gameOver ? T.gameResult : T.handResult} · {T.hand(table.handIndex, table.handsPerGame)} ·{' '}
@@ -194,14 +196,9 @@ const PANEL_MAX_WIDTH = 640;
 const styles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
   },
   panel: {
     backgroundColor: '#fdfaf2',

@@ -248,14 +248,10 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         </Text>
       )}
 
-      {/* Portrait phones scroll: the quick start sits above the tables */}
-      {portrait ? (
-        <ScrollView style={styles.scroll} contentContainerStyle={[styles.capped, styles.bodyPortrait]}>
-          {body}
-        </ScrollView>
-      ) : (
-        <View style={[styles.body, styles.capped]}>{body}</View>
-      )}
+      {/* Portrait phones scroll: the quick start sits above the tables. Short landscape screens scroll when a notice takes up room. */}
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.capped, portrait ? styles.bodyPortrait : styles.body]}>
+        {body}
+      </ScrollView>
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {friendRoom ? (
@@ -405,12 +401,12 @@ const styles = StyleSheet.create({
   },
   bindText: { flex: 1, color: '#e8f5e9', fontSize: 13 },
   capped: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
-  body: { flex: 1, flexDirection: 'row', gap: 24, minHeight: 0 },
-  hero: { flex: 0.85, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  body: { flexGrow: 1, flexDirection: 'row', gap: 24 },
+  hero: { width: '40%', alignItems: 'center', justifyContent: 'center', gap: 6 },
   heroCompact: { flex: 0.75 },
   scroll: { flex: 1 },
   bodyPortrait: { flexDirection: 'column', gap: 16, paddingBottom: 16 },
-  heroPortrait: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingTop: 8 },
+  heroPortrait: { width: '100%', paddingTop: 8 },
   tablesPortrait: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', justifyContent: 'flex-start' },
   brand: {
     color: '#fff8e1',
@@ -444,7 +440,7 @@ const styles = StyleSheet.create({
   chipHot: { backgroundColor: '#ffd54f' },
   chipText: { color: '#e8f5e9', fontSize: 12, fontWeight: '700' },
   chipHotText: { color: '#5d4100' },
-  tablesArea: { flex: 1.25, gap: 8, minHeight: 0, justifyContent: 'center' },
+  tablesArea: { flex: 1, gap: 8, minHeight: 0, justifyContent: 'center' },
   heading: { color: '#e8f5e9', fontSize: 14, fontWeight: '800' },
   grid: { flexShrink: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {

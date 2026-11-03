@@ -3,10 +3,12 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { T } from '../strings';
 import { Btn } from './ActionBar';
+import { useOverlayEdges } from './Felt';
 
 export function Sheet({ title, onClose, children, width = 520 }: { title: string; onClose?: () => void; children: ReactNode; width?: number }) {
+  const edges = useOverlayEdges(12);
   return (
-    <View style={styles.backdrop}>
+    <View style={[styles.backdrop, edges]}>
       <View style={[styles.panel, { maxWidth: width }]}>
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
@@ -41,14 +43,9 @@ export const formStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
   },
   panel: { backgroundColor: '#fdfaf2', borderRadius: 16, width: '100%', maxHeight: '100%', padding: 14 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },

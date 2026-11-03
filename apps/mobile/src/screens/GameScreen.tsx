@@ -3,6 +3,7 @@ import { suitOf, type Action, type GameEvent, type HandView, type Seat, type Sui
 import type { DistributiveOmit, TableSnapshot } from '@mahjong/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCueSounds } from '../audio/cues';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTableSounds } from '../audio/sound';
@@ -11,7 +12,7 @@ import { ChatPanel, SpeechBubbles } from '../components/Chat';
 import { arrangeHand, PlayerHand, type HandTile } from '../components/PlayerHand';
 import { PopIn } from '../components/PopIn';
 import { ResultPanel } from '../components/ResultPanel';
-import { Felt } from '../components/Felt';
+import { Felt, useOverlayEdges } from '../components/Felt';
 import { HandWarnings, InsightPanel, TileTracker } from '../components/Insight';
 import { readyDiscards } from '../game/insight';
 import { autoMove, updateAutoSettings, useAutoSettings, type AutoSettings } from '../game/autoActions';
@@ -47,15 +48,19 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const view = table.view;
   const me = view.players[view.seat];
   const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const modalEdges = useOverlayEdges();
+  const safeWidth = window.width - insets.left - insets.right;
+  const safeHeight = window.height - insets.top - insets.bottom;
   const settings = useSettings();
   // Big screens (desktop browsers, tablets) get the phone layout scaled up as a whole, so tiles,
   // seats, buttons and text keep their proportions instead of shrinking into the corners.
   // Portrait phones get their own layout: side players shrink to narrow cards and the hand takes the full width.
   const portrait = window.height > window.width;
   const design = portrait ? PORTRAIT_DESIGN : LANDSCAPE_DESIGN;
-  const scale = Math.max(1, Math.min(window.width / design.width, window.height / design.height));
-  const width = window.width / scale;
-  const height = window.height / scale;
+  const scale = Math.max(1, Math.min(safeWidth / design.width, safeHeight / design.height));
+  const width = safeWidth / scale;
+  const height = safeHeight / scale;
   const smallTile = Math.max(
     16,
     Math.min(Math.round(30 * settings.tileScale), Math.floor((portrait ? width / 19 : height / 18) * settings.tileScale)),
@@ -510,7 +515,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       )}
 
       {confirmLeave && (
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, modalEdges]}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>{T.leaveConfirmTitle}</Text>
             <Text style={styles.modalBody}>{T.leaveConfirmBody}</Text>
@@ -833,10 +838,6 @@ const styles = StyleSheet.create({
   chatLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   modalBackdrop: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
