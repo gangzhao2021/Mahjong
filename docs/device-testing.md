@@ -1,6 +1,6 @@
 # 真机测试
 
-到目前为止只在浏览器（网页版）上验证过。真机上才能确认的有：苹果登录、谷歌登录、音效和静音开关、钥匙串存储、横屏和刘海屏、App 切到后台再回来的重连。
+真机上才能确认的有：苹果登录、谷歌登录、音效和静音开关、钥匙串存储、横屏和刘海屏、App 切到后台再回来的重连。
 
 应用用到了 Expo Go 不带的原生模块（谷歌登录），所以要打一个**开发版**装到手机上，之后改代码会热更新，不用每次重新打包。
 
@@ -62,6 +62,30 @@ cd apps/mobile && npx eas-cli@latest build --profile development --platform ios
 ```bash
 pnpm mobile
 ```
+
+## 没有手机时：用 iOS 模拟器
+
+Mac 上装了 Xcode 就行，不需要苹果开发者账号。模拟器测不了静音开关和手感，上架前还是要在真机上跑一遍。
+
+```bash
+cd apps/mobile && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx expo prebuild --platform ios
+```
+
+终端不是 UTF-8 时 `pod install` 会失败，所以这里要带 `LANG`。`prebuild` 可能改掉 `package.json` 里的 `ios`、`android` 脚本，不要提交这个改动。
+
+```bash
+cd apps/mobile && xcodebuild -workspace ios/app.xcworkspace -scheme app -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -derivedDataPath ios/build build
+```
+
+设备名换成 `xcrun simctl list devices available` 里有的。我们用 `xcodebuild` 而不是 `expo run:ios`，因为后者曾把模拟器当成真机，报 `No code signing certificates`。
+
+```bash
+xcrun simctl install booted apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/app.app
+```
+
+然后运行 `pnpm mobile`，在模拟器里打开应用，选列出的开发服务器，或手动输入 `http://localhost:8081`。
+
+用 Xcode 27 编译时，应用必须采用 UIScene 生命周期，否则一启动就崩溃。`app.json` 里 `expo-build-properties` 的 `ios.enableSceneSupport` 就是为此开的。升级到 Expo SDK 58 后默认支持，到时可以去掉。
 
 ## 5. 测试清单
 
