@@ -55,6 +55,12 @@
           "enableBackgroundPlayback": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "70062941-3a3c-4f8f-bfe9-d4e6e784e38d"
+      }
+    },
+    "owner": "yashirqs-team"
   }
 }
