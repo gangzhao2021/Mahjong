@@ -12,16 +12,19 @@ export function Felt({ children, style }: { children?: ReactNode; style?: StyleP
   const id = `felt${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <View style={[styles.root, style]}>
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none">
-        <Defs>
-          <RadialGradient id={id} cx="50%" cy="45%" rx="70%" ry="75%">
-            <Stop offset="0" stopColor="#2c8a5c" />
-            <Stop offset="0.55" stopColor="#1f6b47" />
-            <Stop offset="1" stopColor="#0f3f29" />
-          </RadialGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-      </Svg>
+      {/* A plain wrapper: on native, 100% inside a padded parent means its content box, leaving a gap at the edges. */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width="100%" height="100%" preserveAspectRatio="none">
+          <Defs>
+            <RadialGradient id={id} cx="50%" cy="45%" rx="70%" ry="75%">
+              <Stop offset="0" stopColor="#2c8a5c" />
+              <Stop offset="0.55" stopColor="#1f6b47" />
+              <Stop offset="1" stopColor="#0f3f29" />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+        </Svg>
+      </View>
       {children}
     </View>
   );
