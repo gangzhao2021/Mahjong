@@ -55,6 +55,8 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   const compact = width < 700;
   // Portrait phones stack the quick start above the tables.
   const portrait = height > width;
+  // Two cards side by side on a phone leave little room for English table names.
+  const narrow = portrait && width < 420;
 
   // Quick start: new players go to practice; others to the highest table they can comfortably afford (10× the entry).
   // Quick start goes back to the table played last, or the closest cheaper one the player can still afford.
@@ -85,7 +87,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   const body = (
     <>
     {/* Left: the game's face and the one-tap way in */}
-    <View style={[styles.hero, compact && styles.heroCompact, portrait && styles.heroPortrait]}>
+    <View style={[styles.hero, compact && !portrait && styles.heroCompact, portrait && styles.heroPortrait]}>
       {/* The decorative fan gives way on short screens when the reminder takes a row */}
       {(!compact || portrait) && !(remindBind && height < 480) && <TileFan width={portrait ? Math.round(width * 0.12) : fanTile} />}
       <Text style={styles.brand}>{T.brand}</Text>
@@ -124,7 +126,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
               ? T.noCoins
               : `${T.baseScoreN(t.baseScore)} · ${T.minCoinsN(t.minCoins)}`;
           return (
-            <View key={t.id} style={[styles.card, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressedTable === t.id && styles.pressed]}>
+            <View key={t.id} style={[styles.card, narrow && styles.cardNarrow, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressedTable === t.id && styles.pressed]}>
               {/* The practice card holds a button of its own and buttons can't nest, so the card's tap target is a sibling behind the content */}
               <Pressable
                 accessibilityRole="button"
@@ -156,7 +158,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
               </View>
               <View pointerEvents="box-none" style={styles.cardBody}>
                 <View pointerEvents="none" style={styles.cardLines}>
-                  <Text style={styles.cardName} numberOfLines={1}>
+                  <Text style={[styles.cardName, narrow && styles.cardNameNarrow]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {tableName(t)}
                   </Text>
                   {affordable && t.multiplier !== 0 ? (
@@ -171,14 +173,14 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
                     </Text>
                   )}
                   {t.multiplier !== 0 && (
-                    <Text style={styles.cardAi} numberOfLines={1}>
+                    <Text style={styles.cardAi} numberOfLines={2}>
                       {T.aiMix[aiMixKind(t.aiSkill)]}
                     </Text>
                   )}
                 </View>
                 {t.multiplier === 0 && (
                   <Pressable accessibilityRole="button" onPress={cycleAiLevel} hitSlop={6}>
-                    <Text style={styles.cardAiPick} numberOfLines={1}>
+                    <Text style={styles.cardAiPick} numberOfLines={2}>
                       {T.aiPick(practiceAiLevel ? T.aiLevels[practiceAiLevel] : T.aiMixed)}
                     </Text>
                   </Pressable>
@@ -198,7 +200,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         >
           <View style={styles.privateLines}>
             <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
-            <Text style={styles.privateInfo} numberOfLines={2}>
+            <Text style={styles.privateInfo} numberOfLines={3}>
               {T.privateRoomHint}
             </Text>
           </View>
@@ -212,7 +214,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         >
           <View style={styles.privateLines}>
             <Text style={styles.privateName}>👥 {T.friend.entry}</Text>
-            <Text style={styles.privateInfo} numberOfLines={2}>
+            <Text style={styles.privateInfo} numberOfLines={3}>
               {T.friend.hint}
             </Text>
           </View>
@@ -225,7 +227,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
 
   return (
     <Felt style={styles.root}>
-      <View style={[styles.top, styles.capped]}>
+      <View style={[styles.top, portrait && styles.topPortrait, styles.capped]}>
         <Pressable style={styles.profile} onPress={onOpenAccount} accessibilityRole="button" accessibilityLabel={T.account}>
           <Text style={styles.avatar}>{account.avatar}</Text>
           <View>
@@ -386,6 +388,8 @@ function RuleSwitch({ label, value, onChange }: { label: string; value: boolean;
 const styles = StyleSheet.create({
   root: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  // Buttons too wide to share a row with the profile take a row of their own instead of stacking.
+  topPortrait: { flexWrap: 'wrap' },
   topButtons: { flexDirection: 'row', gap: 6, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end' },
   profile: {
     flexDirection: 'row',
@@ -468,12 +472,14 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 12,
   },
+  cardNarrow: { gap: 8, paddingHorizontal: 10 },
   cardTap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 14 },
   stake: { borderWidth: 4, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   stakeLabel: { fontWeight: '900', fontVariant: ['tabular-nums'] },
   cardBody: { flex: 1, paddingVertical: 8, justifyContent: 'center', gap: 3 },
   cardLines: { gap: 3 },
   cardName: { fontSize: 17, fontWeight: '900', color: '#fff8e1' },
+  cardNameNarrow: { fontSize: 14 },
   badgeWrap: { position: 'absolute', top: -8, right: 10 },
   badge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
   cardFigures: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8 },

@@ -191,7 +191,9 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   // The opposite player's face-down row shrinks to fit beside their card, so a wide menu (English) can't push it over
   // the card; with too little room it is left out (the card already says how many tiles they hold).
   const [topSeatWidth, setTopSeatWidth] = useState<number | null>(null);
-  const topBackTile = (count: number) => (topSeatWidth === null ? backTile : Math.min(backTile, Math.floor((topSeatWidth - TOP_CARD_ROOM) / (count + 0.5))));
+  // The card grows with its badges and the language, so it is measured too.
+  const [topCardRoom, setTopCardRoom] = useState(TOP_CARD_ROOM);
+  const topBackTile = (count: number) => (topSeatWidth === null ? backTile : Math.min(backTile, Math.floor((topSeatWidth - topCardRoom) / (count + 0.5))));
   const opponent = (side: Side) => {
     const seat = seatAt(side);
     // Two- and three-player tables leave seats empty: nothing to draw there.
@@ -245,7 +247,7 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       // Melds go under the backs so the top row never pushes the hand info off screen.
       return (
         <View style={[styles.opponent, styles.row, styles.shrink]}>
-          {card}
+          <View onLayout={(e) => setTopCardRoom(Math.ceil(e.nativeEvent.layout.width) + TOP_CARD_GAP)}>{card}</View>
           <View style={[styles.opponent, styles.shrink]}>
             {backs}
             <Melds melds={p.melds} tileWidth={Math.round(smallTile * 0.85)} />
@@ -676,10 +678,12 @@ function portraitPondTile({ width, height }: { width: number; height: number }, 
   const tall = (height - 16 - 8 * margin - POND_LINE_PORTRAIT * 2 * margin) / (4 * TILE_RATIO + POND_LINE_PORTRAIT);
   return Math.max(min, Math.min(34, Math.floor(Math.min(across, besideCompass, tall))));
 }
-/** Narrower than this, landscape folds 静音 / 记牌 / 自动 / 离开 into the ⋯ menu like portrait. */
-const COMPACT_MENU_WIDTH = 760;
-/** Room the opposite player's card takes beside their face-down row (landscape). */
+/** Narrower than this, landscape folds 静音 / 记牌 / 自动 / 离开 into the ⋯ menu like portrait; English needs about this much to clear the opposite seat. */
+const COMPACT_MENU_WIDTH = 960;
+/** Room the opposite player's card takes beside their face-down row (landscape), until the card has been measured. */
 const TOP_CARD_ROOM = 200;
+/** Clear space kept between that card and the row. */
+const TOP_CARD_GAP = 16;
 /** Face-down tiles narrower than this read as dots: leave the row out instead. */
 const MIN_BACK_TILE = 10;
 /** Room kept for my seat card left of the hand. */
