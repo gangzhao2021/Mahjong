@@ -189,7 +189,7 @@ describe('friend rooms', () => {
     const page = await fetch(`${server.http}/join/123456?lang=zh`);
     expect(page.status).toBe(200);
     const html = await page.text();
-    expect(html).toContain('sichuanmahjong://join/123456');
+    expect(html).toContain('mahjonggame://join/123456');
     expect(html).toContain('123456');
     expect((await fetch(`${server.http}/join/12ab56`)).status).toBe(404);
   });

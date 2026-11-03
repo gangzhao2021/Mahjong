@@ -1,6 +1,6 @@
 /**
  * Friend-room invites: share a link to the server's /join/<code> page, and pick
- * up a room number from an opened link — sichuanmahjong://join/123456 in the
+ * up a room number from an opened link — mahjonggame://join/123456 in the
  * app, or ?room=123456 on the web version.
  */
 import { useEffect, useState } from 'react';

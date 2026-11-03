@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "四川麻将",
-    "slug": "sichuan-mahjong",
+    "name": "麻将",
+    "slug": "mahjong-game",
     "version": "1.0.0",
     "orientation": "default",
-    "scheme": "sichuanmahjong",
+    "scheme": "mahjonggame",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
