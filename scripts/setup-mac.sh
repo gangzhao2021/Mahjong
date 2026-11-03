@@ -48,21 +48,21 @@ fi
 gh auth status >/dev/null 2>&1 && gh auth setup-git
 
 # --- The code --------------------------------------------------------------------
-if [ -d "$DIR/.git" ]; then
-  say "代码已在 $DIR，更新到最新"
-  git -C "$DIR" pull --ff-only || later "代码没能自动更新（可能有未提交的改动）：$DIR"
+if [ -d "${DIR}/.git" ]; then
+  say "代码已在 ${DIR}，更新到最新"
+  git -C "${DIR}" pull --ff-only || later "代码没能自动更新（可能有未提交的改动）：${DIR}"
 else
-  say "下载代码到 $DIR"
-  mkdir -p "$(dirname "$DIR")"
-  git clone "https://github.com/$REPO.git" "$DIR"
+  say "下载代码到 ${DIR}"
+  mkdir -p "$(dirname "${DIR}")"
+  git clone "https://github.com/$REPO.git" "${DIR}"
 fi
-cd "$DIR"
+cd "${DIR}"
 
 # --- Dependencies: pnpm at the version the repository names -----------------------
 PNPM_VERSION="$(node -p 'require("./package.json").packageManager.split("@")[1].split("+")[0]')"
-if [ "$(pnpm -v 2>/dev/null || true)" != "$PNPM_VERSION" ]; then
-  say "安装 pnpm $PNPM_VERSION"
-  npm install -g "pnpm@$PNPM_VERSION"
+if [ "$(pnpm -v 2>/dev/null || true)" != "${PNPM_VERSION}" ]; then
+  say "安装 pnpm ${PNPM_VERSION}"
+  npm install -g "pnpm@${PNPM_VERSION}"
 fi
 say '安装项目依赖'
 pnpm install --frozen-lockfile
@@ -84,7 +84,7 @@ fi
 # --- Check it works ---------------------------------------------------------------
 say '运行测试，确认环境正常（约一分钟）'
 if pnpm test; then
-  say "环境已就绪：$DIR"
+  say "环境已就绪：${DIR}"
 else
   later "有测试没通过，把这个窗口的输出发给 Claude"
 fi
@@ -93,4 +93,4 @@ if [ ${#TODO[@]} -gt 0 ]; then
   printf '\n\033[1;33m还有几件事要你动手：\033[0m\n'
   for t in "${TODO[@]}"; do echo "  - $t"; done
 fi
-printf '\n之后在 Claude 里打开这个文件夹就可以继续了：%s\n' "$DIR"
+printf '\n之后在 Claude 里打开这个文件夹就可以继续了：%s\n' "${DIR}"

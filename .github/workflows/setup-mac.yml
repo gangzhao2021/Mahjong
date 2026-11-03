@@ -24,8 +24,8 @@ jobs:
       # Twice: running it again must be safe.
       - name: Run the script
         run: |
-          bash scripts/setup-mac.sh < /dev/null
-          bash scripts/setup-mac.sh < /dev/null
+          /bin/bash scripts/setup-mac.sh < /dev/null
+          /bin/bash scripts/setup-mac.sh < /dev/null
         env:
           MAHJONG_DIR: ${{ github.workspace }}
           MINIMAL: '1'
