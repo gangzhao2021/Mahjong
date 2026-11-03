@@ -122,22 +122,39 @@ step('game finished');
 interface Ledger {
   entries: { amount: number; type: string; ref: string | null }[];
 }
-// The last hand settles just after the final table goes out.
-const settlements = (l: Ledger) => l.entries.filter((e) => e.type === 'handSettlement');
-let ledger = await http<Ledger>('/ledger?limit=200', {}, token);
-for (let i = 0; i < 30 && settlements(ledger).length < 2; i++) {
-  await new Promise((r) => setTimeout(r, 1000));
-  ledger = await http<Ledger>('/ledger?limit=200', {}, token);
+interface Hand {
+  gameId: string;
+  handIndex: number;
+  mySeat: number;
+  deltas: number[];
 }
-const refs = settlements(ledger).map((e) => e.ref);
-if (refs.length !== 2 || new Set(refs).size !== 2) fail(`expected each hand to settle once, got ${refs.join(', ')}`);
+// A hand with no net change writes no ledger row, so compare against the history, hand by hand.
+const settlementProblem = (hands: Hand[], ledger: Ledger): string | null => {
+  if (hands.length !== 2) return `expected 2 hands in the history, found ${hands.length}`;
+  const rows = ledger.entries.filter((e) => e.type === 'handSettlement');
+  const expected = hands.filter((h) => h.deltas[h.mySeat] !== 0);
+  for (const h of expected) {
+    const row = rows.filter((e) => e.ref === `${h.gameId}:${h.handIndex}`);
+    if (row.length !== 1 || row[0].amount !== h.deltas[h.mySeat]) return `hand ${h.handIndex} won or lost ${h.deltas[h.mySeat]}, ledger has ${JSON.stringify(row)}`;
+  }
+  return rows.length === expected.length ? null : `${rows.length} settlements for ${expected.length} hands with a result`;
+};
+// The last hand settles just after the final table goes out.
+let hands: Hand[] = [];
+let ledger: Ledger = { entries: [] };
+let problem: string | null = 'not read yet';
+for (let i = 0; i < 30 && problem; i++) {
+  if (i) await new Promise((r) => setTimeout(r, 1000));
+  hands = (await http<{ hands: Hand[] }>('/history', {}, token)).hands;
+  ledger = await http<Ledger>('/ledger?limit=200', {}, token);
+  problem = settlementProblem(hands, ledger);
+}
+if (problem) fail(problem);
 const after = (await http<{ account: AccountSummary }>('/account', {}, token)).account;
 const sum = ledger.entries.reduce((acc, e) => acc + e.amount, 0);
 if (sum !== after.balance) fail(`ledger adds up to ${sum}, balance is ${after.balance}`);
-step(`each hand settled once; ledger matches the balance (${after.balance} coins)`);
+step(`each hand with a result settled once; ledger matches the balance (${after.balance} coins)`);
 
-const { hands } = await http<{ hands: { gameId: string; handIndex: number }[] }>('/history', {}, token);
-if (hands.length !== 2) fail(`expected 2 hands in the history, found ${hands.length}`);
 await http(`/history/${hands[0].gameId}/${hands[0].handIndex}`, {}, token);
 step('hand history and replay');
 

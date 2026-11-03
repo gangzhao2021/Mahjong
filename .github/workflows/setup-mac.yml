@@ -1,0 +1,31 @@
+name: Mac setup
+
+# The one-command setup, on a real Mac runner.
+on:
+  pull_request:
+    paths:
+      - scripts/setup-mac.sh
+      - .github/workflows/setup-mac.yml
+  push:
+    branches: [main]
+    paths:
+      - scripts/setup-mac.sh
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      # Twice: running it again must be safe.
+      - name: Run the script
+        run: |
+          /bin/bash scripts/setup-mac.sh < /dev/null
+          /bin/bash scripts/setup-mac.sh < /dev/null
+        env:
+          MAHJONG_DIR: ${{ github.workspace }}
+          MINIMAL: '1'

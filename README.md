@@ -21,6 +21,12 @@ apps/admin          管理后台（React + Vite），构建后由服务端在 /a
 
 ## 运行
 
+新 Mac 上一条命令装好全部环境和代码（可重复运行）：
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/gangzhao2021/Mahjong/main/scripts/setup-mac.sh)"
+```
+
 需要 Node 22+ 和 pnpm 10+。
 
 ```bash
