@@ -49,7 +49,6 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
   const me = view.players[view.seat];
   const window = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const modalEdges = useOverlayEdges();
   const safeWidth = window.width - insets.left - insets.right;
   const safeHeight = window.height - insets.top - insets.bottom;
   const settings = useSettings();
@@ -515,26 +514,33 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
       )}
 
       {confirmLeave && (
-        <View style={[styles.modalBackdrop, modalEdges]}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>{T.leaveConfirmTitle}</Text>
-            <Text style={styles.modalBody}>{T.leaveConfirmBody}</Text>
-            <View style={styles.modalButtons}>
-              <Btn label={T.cancel} onPress={() => setConfirmLeave(false)} />
-              <Btn
-                label={T.confirm}
-                danger
-                onPress={() => {
-                  setConfirmLeave(false);
-                  game.leaveGame();
-                }}
-              />
-            </View>
-          </View>
-        </View>
+        <LeaveDialog
+          onCancel={() => setConfirmLeave(false)}
+          onConfirm={() => {
+            setConfirmLeave(false);
+            game.leaveGame();
+          }}
+        />
       )}
       </View>
     </Felt>
+  );
+}
+
+/** Rendered inside the table's Felt, whose inset the overlay edges depend on. */
+function LeaveDialog({ onCancel, onConfirm }: { onCancel(): void; onConfirm(): void }) {
+  const edges = useOverlayEdges();
+  return (
+    <View style={[styles.modalBackdrop, edges]}>
+      <View style={styles.modal}>
+        <Text style={styles.modalTitle}>{T.leaveConfirmTitle}</Text>
+        <Text style={styles.modalBody}>{T.leaveConfirmBody}</Text>
+        <View style={styles.modalButtons}>
+          <Btn label={T.cancel} onPress={onCancel} />
+          <Btn label={T.confirm} danger onPress={onConfirm} />
+        </View>
+      </View>
+    </View>
   );
 }
 
