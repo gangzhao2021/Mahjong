@@ -23,13 +23,21 @@ cd apps/mobile && npx eas-cli@latest init
 
 ## 2. 让手机连上电脑上的服务端
 
-手机和电脑连同一个 Wi-Fi，查电脑的局域网 IP（Windows 用 `ipconfig`），然后把 `apps/mobile/eas.json` 里 `development` 配置的 `EXPO_PUBLIC_SERVER_URL` 改成 `http://电脑IP:8787`。启动服务端：
+手机和电脑连同一个 Wi-Fi，查电脑的局域网 IP（Mac 用 `ipconfig getifaddr en0`，Windows 用 `ipconfig`），然后新建 `apps/mobile/.env.local`（不进 git），写入：
+
+```
+EXPO_PUBLIC_SERVER_URL=http://电脑IP:8787
+```
+
+开发版的 JS 由电脑上的开发服务器提供，地址从这个文件读取，`eas.json` 里 `development` 配置的值在这里不起作用。IP 变了只要改这个文件，再重启开发服务器（`pnpm mobile --clear`），不用重新打包。
+
+启动服务端：
 
 ```bash
 pnpm server
 ```
 
-Windows 防火墙第一次会询问是否允许 Node.js 访问网络，选“允许”。
+系统防火墙第一次可能询问是否允许 Node.js 访问网络，选“允许”。
 
 ## 3. 打开发版
 
@@ -49,7 +57,7 @@ cd apps/mobile && npx eas-cli@latest build --profile development --platform ios
 
 ## 4. 运行
 
-装好后，电脑上启动开发服务器，手机打开刚装的应用，扫码连接：
+装好后，电脑上启动开发服务器，手机打开刚装的应用，扫码连接（也可以在应用里手动输入终端显示的地址）：
 
 ```bash
 pnpm mobile
