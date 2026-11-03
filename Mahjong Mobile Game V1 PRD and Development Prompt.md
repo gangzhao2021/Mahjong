@@ -15,6 +15,8 @@
 >
 > Items marked **[CONFIRMED]** were proposed during review and confirmed by the product owner on 2026-10-07, including all Appendix A rule defaults.
 >
+> **Revision 4 (2026-11-03)** — Product owner change: the brand is generic (temporary name 麻将 / Mahjong), not tied to Sichuan. V1 gameplay stays Sichuan Xuezhan Daodi as specified here; "Sichuan" now names the ruleset only. See `docs/naming.md`.
+>
 > **Revision 3 (2026-10-07)** — Product owner changes:
 > - Players can chat with AI in free text; input moderation, prompt-injection defense, reporting and muting added (§7, §7.1, §18)
 > - V1 launches in **mainland China** as well as globally. Two regional deployments, China login methods (phone + WeChat), real-name verification and anti-addiction, domestic LLM and content moderation, data localization, AI-content labelling (§19, §41.1, Appendix D)

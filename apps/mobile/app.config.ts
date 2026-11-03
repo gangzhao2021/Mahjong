@@ -15,8 +15,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const appId = process.env.APP_ID ?? `${config.ios?.bundleIdentifier}${china ? '.cn' : ''}`;
   return {
     ...config,
-    name: config.name ?? '四川麻将',
-    slug: config.slug ?? 'sichuan-mahjong',
+    name: config.name ?? '麻将',
+    slug: config.slug ?? 'mahjong-game',
     plugins,
     ios: { ...config.ios, bundleIdentifier: appId },
     android: { ...config.android, package: appId },

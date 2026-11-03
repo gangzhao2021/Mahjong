@@ -14,6 +14,7 @@
 
 - [ ] 按 [device-testing.md](device-testing.md) 在 iOS 和 Android 真机上跑完测试清单。
 - [ ] 按 [deploy.md](deploy.md) 部署正式服务端，配好 HTTPS、每日数据库备份，运行 `smoke:deploy` 确认全部通过。
+- [ ] 定正式的应用名和商标。现在的“麻将 / Mahjong”是临时的通用名，商店里不容易被搜到，也不容易注册商标；大陆版申请软著和版号前就要定下来。要改的地方：`app.json`、`apps/mobile/src/strings.ts`（`appTitle`、`brand`、`consent.title`、`inviteText`）、`apps/server/src/invite.ts`、`apps/server/src/legal.ts`。
 - [ ] 换掉占位应用图标和启动图（`apps/mobile/assets`）。
 
 - [ ] 把 `app.json` 里的 bundle ID / package `com.example.mahjong` 换成正式的（国内版自动加 `.cn`，或用 `APP_ID` 指定）。

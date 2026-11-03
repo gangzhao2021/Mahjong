@@ -94,7 +94,7 @@ const enNames: typeof zhNames = {
 };
 
 const zh = {
-  appTitle: '四川麻将 · 血战到底',
+  appTitle: '麻将 · 四川血战',
   start: '开始游戏',
   hands: '局数',
   baseScore: '底分',
@@ -236,7 +236,7 @@ const zh = {
     share: '📤 分享邀请',
     copied: '邀请已复制，粘贴给朋友就行',
     shareFailed: '没能打开分享，请把房号告诉朋友',
-    inviteText: (code: string, url: string) => `来四川麻将好友房一起打牌！房号 ${code}
+    inviteText: (code: string, url: string) => `来好友房一起打麻将！房号 ${code}
 点链接直接加入：${url}`,
     rejected: {
       notFound: '没有这个房号，请核对一下',
@@ -451,8 +451,8 @@ const zh = {
   rewardDay: (d: number) => `第 ${d} 天`,
   rewardNote: '错过的天数不会清零，领完一轮重新开始。',
   tables: '选择场次',
-  brand: '四川麻将',
-  brandSub: '血战到底',
+  brand: '麻将',
+  brandSub: '四川血战',
   quickStart: '快速开始',
   needMore: (n: number) => `还差 ${n.toLocaleString()} 金币`,
   tutorialProgress: (done: number, total: number) => (done >= total ? '新手教程 已学完' : `新手教程 ${done}/${total}`),
@@ -500,7 +500,7 @@ const zh = {
   crashRetry: '重新加载',
   legal: { privacy: '《隐私政策》', terms: '《用户协议》', sdks: '《第三方 SDK 清单》' },
   consent: {
-    title: '欢迎来到四川麻将',
+    title: '欢迎来玩麻将',
     body: '在开始之前，请阅读《用户协议》和《隐私政策》。我们会收集账号标识、游戏记录和聊天内容来提供游戏服务；牌桌上的 AI 角色由大模型生成对话。我们不出售你的个人信息，不做跨应用追踪。',
     agree: '同意并继续',
     decline: '不同意',
@@ -550,7 +550,7 @@ const zh = {
 export type Strings = typeof zh;
 
 const en: Strings = {
-  appTitle: 'Sichuan Mahjong · Bloody Battle',
+  appTitle: 'Mahjong · Sichuan Bloody Battle',
   start: 'Start',
   hands: 'Hands',
   baseScore: 'Base score',
@@ -690,7 +690,7 @@ const en: Strings = {
     share: '📤 Share invite',
     copied: 'Invite copied: paste it to your friends',
     shareFailed: "Couldn't open sharing; tell your friends the number",
-    inviteText: (code: string, url: string) => `Join my Sichuan Mahjong table! Room ${code}
+    inviteText: (code: string, url: string) => `Join my Mahjong table! Room ${code}
 Tap to join: ${url}`,
     rejected: {
       notFound: 'No room with that number',
@@ -902,8 +902,8 @@ Tap to join: ${url}`,
   rewardDay: (d: number) => `Day ${d}`,
   rewardNote: "Missed days don't reset your progress; the cycle restarts after the last day.",
   tables: 'Choose a table',
-  brand: 'Sichuan Mahjong',
-  brandSub: 'Bloody Battle',
+  brand: 'Mahjong',
+  brandSub: 'Sichuan Bloody Battle',
   quickStart: 'Quick start',
   needMore: (n: number) => `Need ${n.toLocaleString()} more coins`,
   tutorialProgress: (done: number, total: number) => (done >= total ? 'Tutorial complete' : `Tutorial ${done}/${total}`),
@@ -951,7 +951,7 @@ Tap to join: ${url}`,
   crashRetry: 'Reload',
   legal: { privacy: 'Privacy Policy', terms: 'Terms of Service', sdks: 'Third-party SDKs' },
   consent: {
-    title: 'Welcome to Sichuan Mahjong',
+    title: 'Welcome to Mahjong',
     body: 'Before you start, please read the Terms of Service and Privacy Policy. We collect account identifiers, game records and chat messages to run the game; the AI players at the table talk using a large language model. We never sell your personal information and do not track you across apps.',
     agree: 'Agree and continue',
     decline: 'Decline',

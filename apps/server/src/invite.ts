@@ -1,10 +1,10 @@
 /**
  * Friend-room invite links: /join/123456 is a tiny landing page that opens the
- * app (sichuanmahjong://join/123456), offers the web version when one is
+ * app (mahjonggame://join/123456), offers the web version when one is
  * deployed (WEB_CLIENT_URL), and always shows the number to type in by hand.
  */
 
-export const APP_SCHEME = 'sichuanmahjong';
+export const APP_SCHEME = 'mahjonggame';
 
 export function isRoomCode(code: string): boolean {
   return /^\d{6}$/.test(code);
@@ -15,8 +15,8 @@ export function invitePage(code: string, webClientUrl: string | null, lang: 'zh'
   const app = `${APP_SCHEME}://join/${code}`;
   const web = webClientUrl ? `${webClientUrl.replace(/\/$/, '')}/?room=${code}` : null;
   const t = zh
-    ? { title: '四川麻将 · 好友房邀请', lead: '朋友邀请你来四川麻将好友房一起打牌', number: '房号', app: '用 App 打开', web: '在网页里玩', manual: '打不开？进入游戏后点「好友房」，输入上面的房号即可加入。' }
-    : { title: 'Sichuan Mahjong · friend room', lead: 'A friend invited you to their Sichuan Mahjong table', number: 'Room number', app: 'Open in the app', web: 'Play in the browser', manual: 'Not opening? In the game, tap "Friends" and type the number above.' };
+    ? { title: '麻将 · 好友房邀请', lead: '朋友邀请你来好友房一起打麻将', number: '房号', app: '用 App 打开', web: '在网页里玩', manual: '打不开？进入游戏后点「好友房」，输入上面的房号即可加入。' }
+    : { title: 'Mahjong · friend room', lead: 'A friend invited you to their Mahjong table', number: 'Room number', app: 'Open in the app', web: 'Play in the browser', manual: 'Not opening? In the game, tap "Friends" and type the number above.' };
   return `<!doctype html>
 <html lang="${zh ? 'zh-CN' : 'en'}">
 <head>
