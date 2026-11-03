@@ -4,9 +4,14 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { T } from '../strings';
 import { Btn } from './ActionBar';
 import { useOverlayEdges } from './Felt';
+import { useBackPress } from './useBackPress';
 
 export function Sheet({ title, onClose, children, width = 520 }: { title: string; onClose?: () => void; children: ReactNode; width?: number }) {
   const edges = useOverlayEdges(12);
+  useBackPress(() => {
+    onClose?.();
+    return !!onClose;
+  });
   return (
     <View style={[styles.backdrop, edges]}>
       <View style={[styles.panel, { maxWidth: width }]}>

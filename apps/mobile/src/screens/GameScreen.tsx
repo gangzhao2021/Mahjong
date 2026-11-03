@@ -13,6 +13,7 @@ import { arrangeHand, PlayerHand, type HandTile } from '../components/PlayerHand
 import { PopIn } from '../components/PopIn';
 import { ResultPanel } from '../components/ResultPanel';
 import { Felt, useOverlayEdges } from '../components/Felt';
+import { useBackPress } from '../components/useBackPress';
 import { HandWarnings, InsightPanel, TileTracker } from '../components/Insight';
 import { readyDiscards } from '../game/insight';
 import { autoMove, updateAutoSettings, useAutoSettings, type AutoSettings } from '../game/autoActions';
@@ -272,6 +273,17 @@ export function GameScreen({ game, onNewGame }: { game: GameApi & { table: Table
 
   // In the portrait ⋯ drop-down every choice also closes the drop-down.
   const closeMore = () => setMoreOpen(false);
+  // Back closes what is open on top of the table, then asks before leaving the game.
+  useBackPress(() => {
+    if (confirmLeave) setConfirmLeave(false);
+    else if (moreOpen) setMoreOpen(false);
+    else if (autoOpen) setAutoOpen(false);
+    else if (trackerOpen) setTrackerOpen(false);
+    else if (chatOpen) showChat(false);
+    else if (table.gameOver) game.leaveGame();
+    else setConfirmLeave(true);
+    return true;
+  });
   const leaveButton = (then?: () => void) => (
     <Btn
       label={T.leave}
