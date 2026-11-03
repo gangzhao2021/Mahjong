@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BackHandler } from 'react-native';
+import { BackHandler, Platform } from 'react-native';
 
 /**
  * Handles the Android back button while mounted; return true once it is dealt with.
@@ -11,6 +11,8 @@ export function useBackPress(handler: () => boolean) {
     latest.current = handler;
   });
   useEffect(() => {
+    // BackHandler logs an error on the web and does nothing on iOS.
+    if (Platform.OS !== 'android') return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => latest.current());
     return () => subscription.remove();
   }, []);
