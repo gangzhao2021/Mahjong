@@ -6,6 +6,7 @@ import { initialWindowMetrics, SafeAreaProvider, useSafeAreaInsets } from 'react
 import { Btn } from './src/components/ActionBar';
 import { Felt } from './src/components/Felt';
 import { Sheet } from './src/components/Sheet';
+import { useBackPress } from './src/components/useBackPress';
 import { useBreakReminder } from './src/useBreakReminder';
 import { TileFan } from './src/components/TileFan';
 import { TileGallery } from './src/components/TileGallery';
@@ -120,6 +121,13 @@ function Main() {
     },
     [setAccount],
   );
+
+  // Back leaves a full-screen page for the lobby; from the lobby itself it leaves the app.
+  useBackPress(() => {
+    const close = rulesOpen ? setRulesOpen : tutorialOpen ? setTutorialOpen : accountOpen ? setAccountOpen : historyOpen ? setHistoryOpen : null;
+    close?.(false);
+    return !!close;
+  });
 
   const start = (options: GameOptions) => {
     lastOptions.current = options;
