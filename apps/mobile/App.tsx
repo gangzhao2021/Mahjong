@@ -2,6 +2,7 @@ import type { AccountSummary, GameOptions, ServerInfo } from '@mahjong/protocol'
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { initialWindowMetrics, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Btn } from './src/components/ActionBar';
 import { Felt } from './src/components/Felt';
 import { Sheet } from './src/components/Sheet';
@@ -31,6 +32,8 @@ import { getLocale, T } from './src/strings';
 /** Development only: `?tiles` on web shows every tile face. */
 const SHOW_TILE_GALLERY = __DEV__ && typeof window !== 'undefined' && !!window.location?.search?.includes('tiles');
 
+const TOAST_TOP = 10;
+
 /** Shows the latest value of `key` for a few seconds. */
 function useToast<V>(value: V | null, key: number | undefined, ms = 3000): V | null {
   const [hiddenKey, setHiddenKey] = useState<number | undefined>(undefined);
@@ -43,6 +46,15 @@ function useToast<V>(value: V | null, key: number | undefined, ms = 3000): V | n
 }
 
 export default function App() {
+  return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <Main />
+    </SafeAreaProvider>
+  );
+}
+
+function Main() {
+  const insets = useSafeAreaInsets();
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -213,12 +225,12 @@ export default function App() {
         </Sheet>
       )}
       {toast && (
-        <View pointerEvents="none" style={styles.toast}>
+        <View pointerEvents="none" style={[styles.toast, { top: TOAST_TOP + insets.top }]}>
           <Text style={styles.toastText}>{toast}</Text>
         </View>
       )}
       {token && game.account && game.status !== 'online' && (
-        <View pointerEvents="none" style={styles.toast}>
+        <View pointerEvents="none" style={[styles.toast, { top: TOAST_TOP + insets.top }]}>
           <Text style={styles.toastText}>{T.reconnecting}</Text>
         </View>
       )}
@@ -234,7 +246,6 @@ const styles = StyleSheet.create({
   big: { fontSize: 22, fontWeight: '800', color: '#3e2723' },
   toast: {
     position: 'absolute',
-    top: 10,
     alignSelf: 'center',
     backgroundColor: 'rgba(0,0,0,0.8)',
     paddingHorizontal: 14,
