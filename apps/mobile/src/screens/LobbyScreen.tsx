@@ -87,7 +87,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   const body = (
     <>
     {/* Left: the game's face and the one-tap way in */}
-    <View style={[styles.hero, compact && !portrait && styles.heroCompact, portrait && styles.heroPortrait]}>
+    <View style={[styles.hero, compact && !portrait && styles.heroCompact, !portrait && height < 480 && styles.heroShort, portrait && styles.heroPortrait]}>
       {/* The decorative fan gives way on short screens when the reminder takes a row */}
       {(!compact || portrait) && !(remindBind && height < 480) && <TileFan width={portrait ? Math.round(width * 0.12) : fanTile} />}
       <Text style={styles.brand}>{T.brand}</Text>
@@ -422,6 +422,8 @@ const styles = StyleSheet.create({
   body: { flexGrow: 1, flexDirection: 'row', gap: 24 },
   hero: { width: '40%', alignItems: 'center', justifyContent: 'center', gap: 6 },
   heroCompact: { flex: 0.75 },
+  // A short landscape screen scrolls when the table cards run tall: centring would push Quick start below the fold.
+  heroShort: { justifyContent: 'flex-start' },
   scroll: { flex: 1 },
   bodyPortrait: { flexDirection: 'column', gap: 16, paddingBottom: 16 },
   heroPortrait: { width: '100%', paddingTop: 8 },
@@ -435,7 +437,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 6,
     textShadowOffset: { width: 0, height: 2 },
   },
-  brandSub: { color: '#ffd54f', fontSize: 15, fontWeight: '800', letterSpacing: 6, marginTop: -4 },
+  brandSub: { color: '#ffd54f', fontSize: 15, fontWeight: '800', letterSpacing: 6, marginTop: -4, textAlign: 'center' },
   quick: {
     marginTop: 6,
     backgroundColor: '#ffca28',
