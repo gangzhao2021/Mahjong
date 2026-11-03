@@ -775,8 +775,9 @@ const styles = StyleSheet.create({
   autoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   autoLabel: { color: '#e8f5e9', fontSize: 14, fontWeight: '700', flexShrink: 1 },
   insights: { gap: 4, flexShrink: 1 },
-  bottomBar: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, minHeight: 48 },
-  actions: { flex: 1, alignItems: 'flex-end', justifyContent: 'flex-end', gap: 6 },
+  // Long waits and a wide action row can't share a line on a phone: the actions move up, over the waits, rather than squeezing into a sliver.
+  bottomBar: { flexDirection: 'row', flexWrap: 'wrap-reverse', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, minHeight: 48 },
+  actions: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', maxWidth: '100%', alignItems: 'flex-end', justifyContent: 'flex-end', gap: 6 },
   warning: { backgroundColor: '#c62828', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
   warningText: { color: '#fff', fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
   tip: {
