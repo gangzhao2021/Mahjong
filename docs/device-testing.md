@@ -87,6 +87,60 @@ xcrun simctl install booted apps/mobile/ios/build/Build/Products/Debug-iphonesim
 
 用 Xcode 27 编译时，应用必须采用 UIScene 生命周期，否则一启动就崩溃。`app.json` 里 `expo-build-properties` 的 `ios.enableSceneSupport` 就是为此开的。升级到 Expo SDK 58 后默认支持，到时可以去掉。
 
+## 没有手机时：用 Android 模拟器
+
+本机编译不用排 EAS 的队，第一次大约 4 分钟（Apple 芯片，只编 arm64）。模拟器一样测不了手感和声音，上架前还是要在真机上跑一遍。
+
+```bash
+brew install openjdk@17 && brew install --cask android-commandlinetools
+```
+
+```bash
+export JAVA_HOME="$(brew --prefix openjdk@17)" ANDROID_HOME="$HOME/Library/Android/sdk"
+```
+
+下面的命令都要在设了这两个变量的终端里运行。第一条会让你逐份确认 SDK 许可协议。
+
+```bash
+"$(brew --prefix)/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses
+```
+
+```bash
+"$(brew --prefix)/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "cmdline-tools;latest" platform-tools emulator "platforms;android-36" "system-images;android-36;google_apis;arm64-v8a"
+```
+
+系统镜像下载偶尔会解压失败，重跑一次就好。创建设备要用刚装进 SDK 的 `avdmanager`，Homebrew 那份找不到系统镜像。
+
+```bash
+echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n mahjong_test -k "system-images;android-36;google_apis;arm64-v8a" -d pixel_7
+```
+
+```bash
+"$ANDROID_HOME/emulator/emulator" -avd mahjong_test
+```
+
+```bash
+cd apps/mobile && npx expo prebuild --platform android --no-install && cd android && ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a
+```
+
+和 iOS 一样，不要提交 `prebuild` 对 `package.json` 的改动。
+
+```bash
+"$ANDROID_HOME/platform-tools/adb" install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+然后运行 `pnpm mobile`，再把开发服务器端口转给模拟器，并打开应用：
+
+```bash
+"$ANDROID_HOME/platform-tools/adb" reverse tcp:8081 tcp:8081
+```
+
+```bash
+"$ANDROID_HOME/platform-tools/adb" shell am start -a android.intent.action.VIEW -d "mahjonggame://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+```
+
+服务器地址和真机一样来自 `apps/mobile/.env.local`，填电脑的局域网 IP。
+
 ## 5. 测试清单
 
 - [ ] 首次启动显示隐私同意；不同意时只能学教程
