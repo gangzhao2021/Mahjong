@@ -159,9 +159,17 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
                   <Text style={styles.cardName} numberOfLines={1}>
                     {tableName(t)}
                   </Text>
-                  <Text style={[styles.cardInfo, !affordable && styles.short]} numberOfLines={1}>
-                    {cardInfo}
-                  </Text>
+                  {affordable && t.multiplier !== 0 ? (
+                    // Wraps between the two figures when the card is too narrow for both.
+                    <View style={styles.cardFigures}>
+                      <Text style={styles.cardInfo}>{T.baseScoreN(t.baseScore)}</Text>
+                      <Text style={styles.cardInfo}>{T.minCoinsN(t.minCoins)}</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.cardInfo, !affordable && styles.short]} numberOfLines={2}>
+                      {cardInfo}
+                    </Text>
+                  )}
                   {t.multiplier !== 0 && (
                     <Text style={styles.cardAi} numberOfLines={1}>
                       {T.aiMix[aiMixKind(t.aiSkill)]}
@@ -188,10 +196,12 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
           onPress={() => setPrivateOpen(true)}
           style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
         >
-          <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
-          <Text style={styles.privateInfo} numberOfLines={1}>
-            {T.privateRoomHint}
-          </Text>
+          <View style={styles.privateLines}>
+            <Text style={styles.privateName}>🏠 {T.privateRoom}</Text>
+            <Text style={styles.privateInfo} numberOfLines={2}>
+              {T.privateRoomHint}
+            </Text>
+          </View>
           <Text style={styles.privateArrow}>›</Text>
         </Pressable>
         <Pressable
@@ -200,10 +210,12 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
           onPress={() => setFriendOpen(true)}
           style={({ pressed }) => [styles.private, blocked && styles.disabled, pressed && styles.pressed]}
         >
-          <Text style={styles.privateName}>👥 {T.friend.entry}</Text>
-          <Text style={styles.privateInfo} numberOfLines={1}>
-            {T.friend.hint}
-          </Text>
+          <View style={styles.privateLines}>
+            <Text style={styles.privateName}>👥 {T.friend.entry}</Text>
+            <Text style={styles.privateInfo} numberOfLines={2}>
+              {T.friend.hint}
+            </Text>
+          </View>
           <Text style={styles.privateArrow}>›</Text>
         </Pressable>
       </View>
@@ -464,6 +476,7 @@ const styles = StyleSheet.create({
   cardName: { fontSize: 17, fontWeight: '900', color: '#fff8e1' },
   badgeWrap: { position: 'absolute', top: -8, right: 10 },
   badge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
+  cardFigures: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8 },
   cardInfo: { fontSize: 12, color: '#a5d6a7', fontWeight: '700' },
   cardAi: { fontSize: 11, color: '#c8e6c9', marginTop: 2 },
   cardAiPick: { fontSize: 11, color: '#ffe082', fontWeight: '800', marginTop: 2 },
@@ -482,7 +495,8 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   privateName: { fontSize: 16, fontWeight: '900', color: '#ffe082' },
-  privateInfo: { flex: 1, fontSize: 12, color: 'rgba(232,245,233,0.7)' },
+  privateLines: { flex: 1, gap: 2 },
+  privateInfo: { fontSize: 12, color: 'rgba(232,245,233,0.7)' },
   privateArrow: { fontSize: 24, color: '#ffe082', fontWeight: '700' },
   disabled: { opacity: 0.5 },
   pressed: { transform: [{ scale: 0.97 }] },
