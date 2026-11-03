@@ -45,7 +45,14 @@ if [ -t 0 ] && ! gh auth status >/dev/null 2>&1; then
   say '登录 GitHub：按提示操作，会打开浏览器'
   gh auth login --hostname github.com --git-protocol https --web
 fi
-gh auth status >/dev/null 2>&1 && gh auth setup-git
+if gh auth status >/dev/null 2>&1; then
+  gh auth setup-git
+  # Commits need a name; use the GitHub account and its private no-reply address.
+  if [ -z "$(git config --global user.name || true)" ]; then
+    git config --global user.name "$(gh api user --jq .login)"
+    git config --global user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"
+  fi
+fi
 
 # --- The code --------------------------------------------------------------------
 if [ -d "${DIR}/.git" ]; then
@@ -72,7 +79,7 @@ if [ "${MINIMAL:-}" != 1 ]; then
   say '安装原生编译和部署检查要用的工具（下载较大，可能要一段时间）'
   command -v pod >/dev/null || brew install cocoapods || later 'CocoaPods 没装上：brew install cocoapods'
   [ -d '/Applications/Android Studio.app' ] || brew install --cask android-studio || later 'Android Studio 没装上：brew install --cask android-studio'
-  [ -d '/Applications/Docker.app' ] || brew install --cask docker || later 'Docker 没装上：brew install --cask docker'
+  [ -d '/Applications/Docker.app' ] || brew install --cask docker-desktop || later 'Docker 没装上：brew install --cask docker-desktop'
   [ -d '/Applications/Android Studio.app' ] && later '打开一次 Android Studio，按向导点完，它会下载 Android SDK'
   if [ ! -d '/Applications/Xcode.app' ]; then
     # Xcode only comes from the App Store and needs an Apple ID.
