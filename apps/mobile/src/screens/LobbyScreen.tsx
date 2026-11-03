@@ -47,6 +47,7 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [friendOpen, setFriendOpen] = useState(false);
+  const [pressedTable, setPressedTable] = useState<string | null>(null);
   const { width, height } = useWindowDimensions();
   const online = status === 'online';
   const limit = account.playLimit;
@@ -117,21 +118,33 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
         {info.tables.map((t) => {
           const affordable = account.balance >= t.minCoins;
           const tier = TIER[t.id] ?? TIER_FALLBACK;
+          const cardInfo = !affordable
+            ? `🔒 ${T.needMore(t.minCoins - account.balance)}`
+            : t.multiplier === 0
+              ? T.noCoins
+              : `${T.baseScoreN(t.baseScore)} · ${T.minCoinsN(t.minCoins)}`;
           return (
-            <Pressable
-              key={t.id}
-              accessibilityRole="button"
-              disabled={!online || blocked || !affordable}
-              onPress={() => play(t.id)}
-              style={({ pressed }) => [styles.card, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressed && styles.pressed]}
-            >
+            <View key={t.id} style={[styles.card, { minHeight: cardHeight }, (!affordable || blocked) && styles.disabled, pressedTable === t.id && styles.pressed]}>
+              {/* The practice card holds a button of its own and buttons can't nest, so the card's tap target is a sibling behind the content */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${tableName(t)}, ${cardInfo}`}
+                disabled={!online || blocked || !affordable}
+                onPress={() => play(t.id)}
+                onPressIn={() => setPressedTable(t.id)}
+                onPressOut={() => setPressedTable(null)}
+                style={styles.cardTap}
+              />
               {t.id === quick.id && (
-                <Text style={[styles.badge, { backgroundColor: tier.fill, color: tier.ink }]} numberOfLines={1}>
-                  {T.recommended}
-                </Text>
+                <View pointerEvents="none" style={styles.badgeWrap}>
+                  <Text style={[styles.badge, { backgroundColor: tier.fill, color: tier.ink }]} numberOfLines={1}>
+                    {T.recommended}
+                  </Text>
+                </View>
               )}
               {/* Poker chip carrying the base score; the practice table has none, so it shows the table's initial */}
               <View
+                pointerEvents="none"
                 style={[
                   styles.stake,
                   { width: chipSize, height: chipSize, borderRadius: chipSize / 2, backgroundColor: tier.fill, borderColor: tier.rim },
@@ -141,30 +154,29 @@ export function LobbyScreen({ info, token, account, status, onAccount, onStart, 
                   {t.multiplier === 0 ? tableName(t).slice(0, 1) : t.baseScore}
                 </Text>
               </View>
-              <View style={styles.cardBody}>
-                <Text style={styles.cardName} numberOfLines={1}>
-                  {tableName(t)}
-                </Text>
-                <Text style={[styles.cardInfo, !affordable && styles.short]} numberOfLines={1}>
-                  {!affordable
-                    ? `🔒 ${T.needMore(t.minCoins - account.balance)}`
-                    : t.multiplier === 0
-                      ? T.noCoins
-                      : `${T.baseScoreN(t.baseScore)} · ${T.minCoinsN(t.minCoins)}`}
-                </Text>
-                {t.multiplier === 0 ? (
+              <View pointerEvents="box-none" style={styles.cardBody}>
+                <View pointerEvents="none" style={styles.cardLines}>
+                  <Text style={styles.cardName} numberOfLines={1}>
+                    {tableName(t)}
+                  </Text>
+                  <Text style={[styles.cardInfo, !affordable && styles.short]} numberOfLines={1}>
+                    {cardInfo}
+                  </Text>
+                  {t.multiplier !== 0 && (
+                    <Text style={styles.cardAi} numberOfLines={1}>
+                      {T.aiMix[aiMixKind(t.aiSkill)]}
+                    </Text>
+                  )}
+                </View>
+                {t.multiplier === 0 && (
                   <Pressable accessibilityRole="button" onPress={cycleAiLevel} hitSlop={6}>
                     <Text style={styles.cardAiPick} numberOfLines={1}>
                       {T.aiPick(practiceAiLevel ? T.aiLevels[practiceAiLevel] : T.aiMixed)}
                     </Text>
                   </Pressable>
-                ) : (
-                  <Text style={styles.cardAi} numberOfLines={1}>
-                    {T.aiMix[aiMixKind(t.aiSkill)]}
-                  </Text>
                 )}
               </View>
-            </Pressable>
+            </View>
           );
         })}
       </View>
@@ -448,11 +460,14 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 12,
   },
+  cardTap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 14 },
   stake: { borderWidth: 4, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   stakeLabel: { fontWeight: '900', fontVariant: ['tabular-nums'] },
   cardBody: { flex: 1, paddingVertical: 8, justifyContent: 'center', gap: 3 },
+  cardLines: { gap: 3 },
   cardName: { fontSize: 17, fontWeight: '900', color: '#fff8e1' },
-  badge: { position: 'absolute', top: -8, right: 10, fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
+  badgeWrap: { position: 'absolute', top: -8, right: 10 },
+  badge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, overflow: 'hidden' },
   cardInfo: { fontSize: 12, color: '#a5d6a7', fontWeight: '700' },
   cardAi: { fontSize: 11, color: '#c8e6c9', marginTop: 2 },
   cardAiPick: { fontSize: 11, color: '#ffe082', fontWeight: '800', marginTop: 2 },
